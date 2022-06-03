@@ -1,2 +1,2 @@
-# Tekisasu-Graphics
-An internal build of Aseprite for Tekisasu
+# Aseprite-tekisasu
+ An internal build of Aseprite for Tekisasu

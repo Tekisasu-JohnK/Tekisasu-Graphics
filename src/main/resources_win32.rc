@@ -1,0 +1,36 @@
+0 ICON data/icons/ase.ico
+1 ICON data/icons/doc.ico
+2 ICON data/icons/ext.ico
+
+1 VERSIONINFO
+  FILEVERSION 1,2,27,0
+  PRODUCTVERSION 1,2,27,0
+  FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+  FILEFLAGS 0x1L
+#else
+  FILEFLAGS 0x0L
+#endif
+  FILEOS 0x4L
+  FILETYPE 0x1L
+  FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "Comments", "https://dev.tekisasu.com/"
+            VALUE "FileDescription", "Tekisasu Graphics"
+            VALUE "FileVersion", "1,2,27,0"
+            VALUE "InternalName", "tekisasu-graphics"
+            VALUE "LegalCopyright", "Copyright (C) 2020-2021 Tekisasu, Copyright (C) 2001-2021 Igara Studio S.A."
+            VALUE "OriginalFilename", "Tekisasu-Graphics.exe"
+            VALUE "ProductName", "TEKISASU-GRAPHICS"
+            VALUE "ProductVersion", "1,2,27,0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

@@ -1,0 +1,13 @@
+sudo: false
+language: c
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.8
+    packages:
+    - gcc-6
+    - clang-format-3.8
+compiler: gcc-6
+env: COMPILER=gcc-6
+script: ./make-ci.sh

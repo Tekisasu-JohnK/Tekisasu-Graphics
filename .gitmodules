@@ -1,0 +1,68 @@
+[submodule "third_party/pixman"]
+	path = third_party/pixman
+	url = https://github.com/aseprite/pixman.git
+[submodule "third_party/simpleini"]
+	path = third_party/simpleini
+	url = https://github.com/aseprite/simpleini.git
+[submodule "third_party/gtest"]
+	path = third_party/gtest
+	url = https://github.com/aseprite/gtest.git
+[submodule "third_party/libwebp"]
+	path = third_party/libwebp
+	url = https://github.com/aseprite/libwebp.git
+[submodule "src/flic"]
+	path = src/flic
+	url = https://github.com/aseprite/flic.git
+[submodule "third_party/freetype2"]
+	path = third_party/freetype2
+	url = https://github.com/aseprite/freetype2.git
+	ignore = dirty
+[submodule "third_party/zlib"]
+	path = third_party/zlib
+	url = https://github.com/aseprite/zlib.git
+	ignore = dirty
+[submodule "third_party/libpng"]
+	path = third_party/libpng
+	url = https://github.com/aseprite/libpng.git
+[submodule "src/clip"]
+	path = src/clip
+	url = https://github.com/aseprite/clip.git
+[submodule "src/observable"]
+	path = src/observable
+	url = https://github.com/aseprite/observable.git
+[submodule "src/undo"]
+	path = src/undo
+	url = https://github.com/aseprite/undo.git
+[submodule "laf"]
+	path = laf
+	url = https://github.com/aseprite/laf.git
+[submodule "third_party/cmark"]
+	path = third_party/cmark
+	url = https://github.com/aseprite/cmark.git
+[submodule "third_party/harfbuzz"]
+	path = third_party/harfbuzz
+	url = https://github.com/aseprite/harfbuzz.git
+[submodule "third_party/libarchive"]
+	path = third_party/libarchive
+	url = https://github.com/aseprite/libarchive.git
+[submodule "third_party/json11"]
+	path = third_party/json11
+	url = https://github.com/aseprite/json11.git
+[submodule "third_party/benchmark"]
+	path = third_party/benchmark
+	url = https://github.com/aseprite/benchmark.git
+[submodule "third_party/giflib"]
+	path = third_party/giflib
+	url = https://github.com/aseprite/giflib.git
+[submodule "third_party/fmt"]
+	path = third_party/fmt
+	url = https://github.com/aseprite/fmt.git
+[submodule "third_party/tinyexpr"]
+	path = third_party/tinyexpr
+	url = https://github.com/aseprite/tinyexpr.git
+[submodule "third_party/lua"]
+	path = third_party/lua
+	url = https://github.com/aseprite/lua
+[submodule "src/tga"]
+	path = src/tga
+	url = https://github.com/aseprite/tga.git
