@@ -4,7 +4,7 @@
  *
  *   FreeType API for controlling driver modules (specification only).
  *
- * Copyright 2017-2018 by
+ * Copyright (C) 2017-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,9 +19,8 @@
 #ifndef FTDRIVER_H_
 #define FTDRIVER_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_PARAMETER_TAGS_H
+#include <freetype/freetype.h>
+#include <freetype/ftparams.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -54,10 +53,10 @@ FT_BEGIN_HEADER
    *   reasons.
    *
    *   Available properties are @increase-x-height, @no-stem-darkening
-   *   (experimental), @darkening-parameters (experimental), @warping
-   *   (experimental), @glyph-to-script-map (experimental), @fallback-script
-   *   (experimental), and @default-script (experimental), as documented in
-   *   the @properties section.
+   *   (experimental), @darkening-parameters (experimental),
+   *   @glyph-to-script-map (experimental), @fallback-script (experimental),
+   *   and @default-script (experimental), as documented in the @properties
+   *   section.
    *
    */
 
@@ -85,15 +84,15 @@ FT_BEGIN_HEADER
    *   @properties section.
    *
    *
-   *   **Hinting and antialiasing principles of the new engine**
+   *   **Hinting and anti-aliasing principles of the new engine**
    *
    *   The rasterizer is positioning horizontal features (e.g., ascender
    *   height & x-height, or crossbars) on the pixel grid and minimizing the
-   *   amount of antialiasing applied to them, while placing vertical
+   *   amount of anti-aliasing applied to them, while placing vertical
    *   features (vertical stems) on the pixel grid without hinting, thus
    *   representing the stem position and weight accurately.  Sometimes the
    *   vertical stems may be only partially black.  In this context,
-   *   'antialiasing' means that stems are not positioned exactly on pixel
+   *   'anti-aliasing' means that stems are not positioned exactly on pixel
    *   borders, causing a fuzzy appearance.
    *
    *   There are two principles behind this approach.
@@ -109,7 +108,7 @@ FT_BEGIN_HEADER
    *   sizes are comparable to kerning values and thus would be noticeable
    *   (and distracting) while reading if hinting were applied.
    *
-   *   One of the reasons to not hint horizontally is antialiasing for LCD
+   *   One of the reasons to not hint horizontally is anti-aliasing for LCD
    *   screens: The pixel geometry of modern displays supplies three vertical
    *   subpixels as the eye moves horizontally across each visible pixel.  On
    *   devices where we can be certain this characteristic is present a
@@ -117,7 +116,7 @@ FT_BEGIN_HEADER
    *   weight.  In Western writing systems this turns out to be the more
    *   critical direction anyway; the weights and spacing of vertical stems
    *   (see above) are central to Armenian, Cyrillic, Greek, and Latin type
-   *   designs.  Even when the rasterizer uses greyscale antialiasing instead
+   *   designs.  Even when the rasterizer uses greyscale anti-aliasing instead
    *   of color (a necessary compromise when one doesn't know the screen
    *   characteristics), the unhinted vertical features preserve the design's
    *   weight and spacing much better than aliased type would.
@@ -213,16 +212,14 @@ FT_BEGIN_HEADER
    * @description:
    *   While FreeType's TrueType driver doesn't expose API functions by
    *   itself, it is possible to control its behaviour with @FT_Property_Set
-   *   and @FT_Property_Get.  The following lists the available properties
-   *   together with the necessary macros and structures.
+   *   and @FT_Property_Get.
    *
-   *   The TrueType driver's module name is 'truetype'.
+   *   The TrueType driver's module name is 'truetype'; a single property
+   *   @interpreter-version is available, as documented in the @properties
+   *   section.
    *
-   *   A single property @interpreter-version is available, as documented in
-   *   the @properties section.
-   *
-   *   We start with a list of definitions, kindly provided by Greg
-   *   Hitchcock.
+   *   To help understand the differences between interpreter versions, we
+   *   introduce a list of definitions, kindly provided by Greg Hitchcock.
    *
    *   _Bi-Level Rendering_
    *
@@ -249,7 +246,7 @@ FT_BEGIN_HEADER
    *   of improving symmetry in glyphs through hinting the right-side bearing
    *   were no longer necessary.  This lead to what GDI calls 'natural
    *   widths' ClearType, see
-   *   http://www.beatstamm.com/typography/RTRCh4.htm#Sec21.  Since hinting
+   *   http://rastertragedy.com/RTRCh4.htm#Sec21.  Since hinting
    *   has extra resolution, most non-linearity went away, but it is still
    *   possible for hints to change the advance widths in this mode.
    *
@@ -262,7 +259,7 @@ FT_BEGIN_HEADER
    *   to determine the width in bi-level rendering, and then re-run in
    *   ClearType, with the difference in widths being absorbed in the font
    *   hints for ClearType (mostly in the white space of hints); see
-   *   http://www.beatstamm.com/typography/RTRCh4.htm#Sec20.  Somewhat by
+   *   http://rastertragedy.com/RTRCh4.htm#Sec20.  Somewhat by
    *   definition, compatible width ClearType allows for non-linear widths,
    *   but only when the bi-level version has non-linear widths.
    *
@@ -275,7 +272,7 @@ FT_BEGIN_HEADER
    *   mode', not to be confused with GDI's 'natural widths'.  Subpixel
    *   positioning, in the current implementation of Direct Write,
    *   unfortunately does not support hinted advance widths, see
-   *   http://www.beatstamm.com/typography/RTRCh4.htm#Sec22.  Note that the
+   *   http://rastertragedy.com/RTRCh4.htm#Sec22.  Note that the
    *   TrueType interpreter fully allows the advance width to be adjusted in
    *   this mode, just the DWrite client will ignore those changes.
    *
@@ -284,7 +281,7 @@ FT_BEGIN_HEADER
    *   This is a set of exceptions made in the TrueType interpreter to
    *   minimize hinting techniques that were problematic with the extra
    *   resolution of ClearType; see
-   *   http://www.beatstamm.com/typography/RTRCh4.htm#Sec1 and
+   *   http://rastertragedy.com/RTRCh4.htm#Sec1 and
    *   https://www.microsoft.com/typography/cleartype/truetypecleartype.aspx.
    *   This technique is not to be confused with ClearType compatible widths.
    *   ClearType backward compatibility has no direct impact on changing
@@ -297,6 +294,31 @@ FT_BEGIN_HEADER
    *   (Not to be confused with 'natural widths'.)  This mode removes all the
    *   exceptions in the TrueType interpreter when running with ClearType.
    *   Any issues on widths would still apply, though.
+   *
+   */
+
+
+  /**************************************************************************
+   *
+   * @section:
+   *   ot_svg_driver
+   *
+   * @title:
+   *   The SVG driver
+   *
+   * @abstract:
+   *   Controlling the external rendering of OT-SVG glyphs.
+   *
+   * @description:
+   *   By default, FreeType can only load the 'SVG~' table of OpenType fonts
+   *   if configuration macro `FT_CONFIG_OPTION_SVG` is defined.  To make it
+   *   render SVG glyphs, an external SVG rendering library is needed.  All
+   *   details on the interface between FreeType and the external library
+   *   via function hooks can be found in section @svg_fonts.
+   *
+   *   The OT-SVG driver's module name is 'ot-svg'; it supports a single
+   *   property called @svg-hooks, documented below in the @properties
+   *   section.
    *
    */
 
@@ -357,18 +379,14 @@ FT_BEGIN_HEADER
    * @description:
    *   Thanks to Adobe, which contributed a new hinting (and parsing) engine,
    *   an application can select between 'freetype' and 'adobe' if compiled
-   *   with CFF_CONFIG_OPTION_OLD_ENGINE.  If this configuration macro isn't
-   *   defined, 'hinting-engine' does nothing.
+   *   with `CFF_CONFIG_OPTION_OLD_ENGINE`.  If this configuration macro
+   *   isn't defined, 'hinting-engine' does nothing.
    *
    *   The same holds for the Type~1 and CID modules if compiled with
-   *   T1_CONFIG_OPTION_OLD_ENGINE.
+   *   `T1_CONFIG_OPTION_OLD_ENGINE`.
    *
-   *   For the 'cff' module, the default engine is 'freetype' if
-   *   CFF_CONFIG_OPTION_OLD_ENGINE is defined, and 'adobe' otherwise.
-   *
-   *   For both the 'type1' and 't1cid' modules, the default engine is
-   *   'freetype' if T1_CONFIG_OPTION_OLD_ENGINE is defined, and 'adobe'
-   *   otherwise.
+   *   For the 'cff' module, the default engine is 'adobe'.  For both the
+   *   'type1' and 't1cid' modules, the default engine is 'adobe', too.
    *
    * @note:
    *   This property can be used with @FT_Property_Get also.
@@ -427,12 +445,8 @@ FT_BEGIN_HEADER
    *   counteracts the 'thinning out' of glyphs, making text remain readable
    *   at smaller sizes.
    *
-   *   By default, the Adobe engines for CFF, Type~1, and CID fonts darken
-   *   stems at smaller sizes, regardless of hinting, to enhance contrast.
-   *   Setting this property, stem darkening gets switched off.
-   *
    *   For the auto-hinter, stem-darkening is experimental currently and thus
-   *   switched off by default (this is, 'no-stem-darkening' is set to TRUE
+   *   switched off by default (this is, `no-stem-darkening` is set to TRUE
    *   by default).  Total consistency with the CFF driver is not achieved
    *   right now because the emboldening method differs and glyphs must be
    *   scaled down on the Y-axis to keep outline points inside their
@@ -478,7 +492,7 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   By default, the Adobe hinting engine, as used by the CFF, Type~1, and
-   *   CID font drivers, darkens stems as follows (if the 'no-stem-darkening'
+   *   CID font drivers, darkens stems as follows (if the `no-stem-darkening`
    *   property isn't set):
    *
    *   ```
@@ -492,7 +506,7 @@ FT_BEGIN_HEADER
    *   control points can be set with the macro
    *   `CFF_CONFIG_OPTION_DARKENING_PARAMETERS`; the CFF, Type~1, and CID
    *   drivers share these values.  At runtime, the control points can be
-   *   changed using the 'darkening-parameters' property (see the example
+   *   changed using the `darkening-parameters` property (see the example
    *   below that demonstrates this for the Type~1 driver).
    *
    *   The x~values give the stem width, and the y~values the darkening
@@ -510,7 +524,7 @@ FT_BEGIN_HEADER
    *
    *   This property can be set via the `FREETYPE_PROPERTIES` environment
    *   variable, using eight comma-separated integers without spaces.  Here
-   *   the above example, using '\' to break the line for readability.
+   *   the above example, using `\` to break the line for readability.
    *
    *   ```
    *     FREETYPE_PROPERTIES=\
@@ -555,7 +569,7 @@ FT_BEGIN_HEADER
    *   the pseudo-random number sequences generated by 'random' are
    *   repeatable.
    *
-   *   The 'random-seed' property does that.  Its argument is a signed 32bit
+   *   The `random-seed` property does that.  Its argument is a signed 32bit
    *   integer; if the value is zero or negative, the seed given by the
    *   `intitialRandomSeed` private DICT operator in a CFF file gets used (or
    *   a default value if there is no such operator).  If the value is
@@ -581,7 +595,7 @@ FT_BEGIN_HEADER
    *   no-long-family-names
    *
    * @description:
-   *   If PCF_CONFIG_OPTION_LONG_FAMILY_NAMES is active while compiling
+   *   If `PCF_CONFIG_OPTION_LONG_FAMILY_NAMES` is active while compiling
    *   FreeType, the PCF driver constructs long family names.
    *
    *   There are many PCF fonts just called 'Fixed' which look completely
@@ -593,7 +607,7 @@ FT_BEGIN_HEADER
    *   checks whether there are 'wide' characters; all put together, family
    *   names like 'Sony Fixed' or 'Misc Fixed Wide' are constructed.
    *
-   *   If 'no-long-family-names' is set, this feature gets switched off.
+   *   If `no-long-family-names` is set, this feature gets switched off.
    *
    * @note:
    *   This property can be used with @FT_Property_Get also.
@@ -658,7 +672,7 @@ FT_BEGIN_HEADER
    *   filtering.
    *
    *   If FreeType has not been compiled with the configuration option
-   *   TT_CONFIG_OPTION_SUBPIXEL_HINTING, selecting version~38 or~40 causes
+   *   `TT_CONFIG_OPTION_SUBPIXEL_HINTING`, selecting version~38 or~40 causes
    *   an `FT_Err_Unimplemented_Feature` error.
    *
    *   Depending on the graphics framework, Microsoft uses different bytecode
@@ -760,8 +774,8 @@ FT_BEGIN_HEADER
    *   interpreter with subpixel hinting support (old 'Infinality' code and
    *   new stripped-down and higher performance 'minimal' code) and one
    *   without, respectively.  The default is subpixel support if
-   *   TT_CONFIG_OPTION_SUBPIXEL_HINTING is defined, and no subpixel support
-   *   otherwise (since it isn't available then).
+   *   `TT_CONFIG_OPTION_SUBPIXEL_HINTING` is defined, and no subpixel
+   *   support otherwise (since it isn't available then).
    *
    *   If subpixel hinting is on, many TrueType bytecode instructions behave
    *   differently compared to B/W or grayscale rendering (except if 'native
@@ -810,6 +824,40 @@ FT_BEGIN_HEADER
   /**************************************************************************
    *
    * @property:
+   *   svg-hooks
+   *
+   * @description:
+   *   Set up the interface between FreeType and an extern SVG rendering
+   *   library like 'librsvg'.  All details on the function hooks can be
+   *   found in section @svg_fonts.
+   *
+   * @example:
+   *   The following example code expects that the four hook functions
+   *   `svg_*` are defined elsewhere.  Error handling is omitted, too.
+   *
+   *   ```
+   *     FT_Library  library;
+   *     SVG_RendererHooks  hooks = {
+   *                          (SVG_Lib_Init_Func)svg_init,
+   *                          (SVG_Lib_Free_Func)svg_free,
+   *                          (SVG_Lib_Render_Func)svg_render,
+   *                          (SVG_Lib_Preset_Slot_Func)svg_preset_slot };
+   *
+   *
+   *     FT_Init_FreeType( &library );
+   *
+   *     FT_Property_Set( library, "ot-svg",
+   *                               "svg-hooks", &hooks );
+   *   ```
+   *
+   * @since:
+   *   2.12
+   */
+
+
+  /**************************************************************************
+   *
+   * @property:
    *   glyph-to-script-map
    *
    * @description:
@@ -830,7 +878,7 @@ FT_BEGIN_HEADER
    *   The mapping between glyph indices and scripts (in the auto-hinter
    *   sense, see the @FT_AUTOHINTER_SCRIPT_XXX values) is stored as an array
    *   with `num_glyphs` elements, as found in the font's @FT_Face structure.
-   *   The 'glyph-to-script-map' property returns a pointer to this array,
+   *   The `glyph-to-script-map` property returns a pointer to this array,
    *   which can be modified as needed.  Note that the modification should
    *   happen before the first glyph gets processed by the auto-hinter so
    *   that the global analysis of the font shapes actually uses the modified
@@ -1026,7 +1074,7 @@ FT_BEGIN_HEADER
    *   If no auto-hinter script module can be assigned to a glyph, a fallback
    *   script gets assigned to it (see also the @glyph-to-script-map
    *   property).  By default, this is @FT_AUTOHINTER_SCRIPT_CJK.  Using the
-   *   'fallback-script' property, this fallback value can be changed.
+   *   `fallback-script` property, this fallback value can be changed.
    *
    * @note:
    *   This property can be used with @FT_Property_Get also.
@@ -1065,7 +1113,7 @@ FT_BEGIN_HEADER
    * @description:
    *   **Experimental only**
    *
-   *   If FreeType gets compiled with FT_CONFIG_OPTION_USE_HARFBUZZ to make
+   *   If FreeType gets compiled with `FT_CONFIG_OPTION_USE_HARFBUZZ` to make
    *   the HarfBuzz library access OpenType features for getting better glyph
    *   coverages, this property sets the (auto-fitter) script to be used for
    *   the default (OpenType) script data of a font's GSUB table.  Features
@@ -1075,7 +1123,7 @@ FT_BEGIN_HEADER
    *   ligature.
    *
    *   By default, this is @FT_AUTOHINTER_SCRIPT_LATIN.  Using the
-   *   'default-script' property, this default value can be changed.
+   *   `default-script` property, this default value can be changed.
    *
    * @note:
    *   This property can be used with @FT_Property_Get also.
@@ -1112,7 +1160,7 @@ FT_BEGIN_HEADER
    *   increase-x-height
    *
    * @description:
-   *   For ppem values in the range 6~<= ppem <= 'increase-x-height', round
+   *   For ppem values in the range 6~<= ppem <= `increase-x-height`, round
    *   up the font's x~height much more often than normally.  If the value is
    *   set to~0, which is the default, this feature is switched off.  Use
    *   this property to improve the legibility of small font sizes if
@@ -1171,48 +1219,18 @@ FT_BEGIN_HEADER
    *   warping
    *
    * @description:
-   *   **Experimental only**
+   *   **Obsolete**
    *
-   *   If FreeType gets compiled with option AF_CONFIG_OPTION_USE_WARPER to
-   *   activate the warp hinting code in the auto-hinter, this property
-   *   switches warping on and off.
+   *   This property was always experimental and probably never worked
+   *   correctly.  It was entirely removed from the FreeType~2 sources.  This
+   *   entry is only here for historical reference.
    *
-   *   Warping only works in 'normal' auto-hinting mode replacing it.  The
-   *   idea of the code is to slightly scale and shift a glyph along the
+   *   Warping only worked in 'normal' auto-hinting mode replacing it.  The
+   *   idea of the code was to slightly scale and shift a glyph along the
    *   non-hinted dimension (which is usually the horizontal axis) so that as
-   *   much of its segments are aligned (more or less) to the grid.  To find
+   *   much of its segments were aligned (more or less) to the grid.  To find
    *   out a glyph's optimal scaling and shifting value, various parameter
-   *   combinations are tried and scored.
-   *
-   *   By default, warping is off.
-   *
-   * @note:
-   *   This property can be used with @FT_Property_Get also.
-   *
-   *   This property can be set via the `FREETYPE_PROPERTIES` environment
-   *   variable (using values 1 and 0 for 'on' and 'off', respectively).
-   *
-   *   The warping code can also change advance widths.  Have a look at the
-   *   `lsb_delta` and `rsb_delta` fields in the @FT_GlyphSlotRec structure
-   *   for details on improving inter-glyph distances while rendering.
-   *
-   *   Since warping is a global property of the auto-hinter it is best to
-   *   change its value before rendering any face.  Otherwise, you should
-   *   reload all faces that get auto-hinted in 'normal' hinting mode.
-   *
-   * @example:
-   *   This example shows how to switch on warping (omitting the error
-   *   handling).
-   *
-   *   ```
-   *     FT_Library  library;
-   *     FT_Bool     warping = 1;
-   *
-   *
-   *     FT_Init_FreeType( &library );
-   *
-   *     FT_Property_Set( library, "autofitter", "warping", &warping );
-   *   ```
+   *   combinations were tried and scored.
    *
    * @since:
    *   2.6

@@ -456,6 +456,25 @@ archive_write_client_write(struct archive_write_filter *f,
 }
 
 static int
+archive_write_client_free(struct archive_write_filter *f)
+{
+	struct archive_write *a = (struct archive_write *)f->archive;
+
+	if (a->client_freer)
+		(*a->client_freer)(&a->archive, a->client_data);
+	a->client_data = NULL;
+
+	/* Clear passphrase. */
+	if (a->passphrase != NULL) {
+		memset(a->passphrase, 0, strlen(a->passphrase));
+		free(a->passphrase);
+		a->passphrase = NULL;
+	}
+
+	return (ARCHIVE_OK);
+}
+
+static int
 archive_write_client_close(struct archive_write_filter *f)
 {
 	struct archive_write *a = (struct archive_write *)f->archive;
@@ -463,6 +482,8 @@ archive_write_client_close(struct archive_write_filter *f)
 	ssize_t block_length;
 	ssize_t target_block_length;
 	ssize_t bytes_written;
+	size_t to_write;
+	char *p;
 	int ret = ARCHIVE_OK;
 
 	/* If there's pending data, pad and write the last block */
@@ -485,21 +506,30 @@ archive_write_client_close(struct archive_write_filter *f)
 			    target_block_length - block_length);
 			block_length = target_block_length;
 		}
-		bytes_written = (a->client_writer)(&a->archive,
-		    a->client_data, state->buffer, block_length);
-		ret = bytes_written <= 0 ? ARCHIVE_FATAL : ARCHIVE_OK;
+		p = state->buffer;
+		to_write = block_length;
+		while (to_write > 0) {
+			bytes_written = (a->client_writer)(&a->archive,
+			    a->client_data, p, to_write);
+			if (bytes_written <= 0) {
+				ret = ARCHIVE_FATAL;
+				break;
+			}
+			if ((size_t)bytes_written > to_write) {
+				archive_set_error(&(a->archive),
+						  -1, "write overrun");
+				ret = ARCHIVE_FATAL;
+				break;
+			}
+			p += bytes_written;
+			to_write -= bytes_written;
+		}
 	}
 	if (a->client_closer)
 		(*a->client_closer)(&a->archive, a->client_data);
 	free(state->buffer);
 	free(state);
-	a->client_data = NULL;
-	/* Clear passphrase. */
-	if (a->passphrase != NULL) {
-		memset(a->passphrase, 0, strlen(a->passphrase));
-		free(a->passphrase);
-		a->passphrase = NULL;
-	}
+
 	/* Clear the close handler myself not to be called again. */
 	f->state = ARCHIVE_WRITE_FILTER_STATE_CLOSED;
 	return (ret);
@@ -509,9 +539,9 @@ archive_write_client_close(struct archive_write_filter *f)
  * Open the archive using the current settings.
  */
 int
-archive_write_open(struct archive *_a, void *client_data,
+archive_write_open2(struct archive *_a, void *client_data,
     archive_open_callback *opener, archive_write_callback *writer,
-    archive_close_callback *closer)
+    archive_close_callback *closer, archive_free_callback *freer)
 {
 	struct archive_write *a = (struct archive_write *)_a;
 	struct archive_write_filter *client_filter;
@@ -524,12 +554,14 @@ archive_write_open(struct archive *_a, void *client_data,
 	a->client_writer = writer;
 	a->client_opener = opener;
 	a->client_closer = closer;
+	a->client_freer = freer;
 	a->client_data = client_data;
 
 	client_filter = __archive_write_allocate_filter(_a);
 	client_filter->open = archive_write_client_open;
 	client_filter->write = archive_write_client_write;
 	client_filter->close = archive_write_client_close;
+	client_filter->free = archive_write_client_free;
 
 	ret = __archive_write_filters_open(a);
 	if (ret < ARCHIVE_WARN) {
@@ -542,6 +574,15 @@ archive_write_open(struct archive *_a, void *client_data,
 	if (a->format_init)
 		ret = (a->format_init)(a);
 	return (ret);
+}
+
+int
+archive_write_open(struct archive *_a, void *client_data,
+    archive_open_callback *opener, archive_write_callback *writer,
+    archive_close_callback *closer)
+{
+	return archive_write_open2(_a, client_data, opener, writer,
+	    closer, NULL);
 }
 
 /*

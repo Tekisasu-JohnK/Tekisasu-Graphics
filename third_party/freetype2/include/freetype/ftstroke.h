@@ -4,7 +4,7 @@
  *
  *   FreeType path stroker (specification).
  *
- * Copyright 2002-2018 by
+ * Copyright (C) 2002-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,15 +19,14 @@
 #ifndef FTSTROKE_H_
 #define FTSTROKE_H_
 
-#include <ft2build.h>
-#include FT_OUTLINE_H
-#include FT_GLYPH_H
+#include <freetype/ftoutln.h>
+#include <freetype/ftglyph.h>
 
 
 FT_BEGIN_HEADER
 
 
-  /************************************************************************
+  /**************************************************************************
    *
    * @section:
    *    glyph_stroker
@@ -44,7 +43,7 @@ FT_BEGIN_HEADER
    *    borders of the stroke.
    *
    *    This can be useful to generate 'bordered' glyph, i.e., glyphs
-   *    displayed with a coloured (and anti-aliased) border around their
+   *    displayed with a colored (and anti-aliased) border around their
    *    shape.
    *
    * @order:
@@ -81,7 +80,7 @@ FT_BEGIN_HEADER
    */
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @type:
    *   FT_Stroker
@@ -92,7 +91,7 @@ FT_BEGIN_HEADER
   typedef struct FT_StrokerRec_*  FT_Stroker;
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_Stroker_LineJoin
@@ -114,25 +113,22 @@ FT_BEGIN_HEADER
    *   FT_STROKER_LINEJOIN_MITER_FIXED ::
    *     Used to render mitered line joins, with fixed bevels if the miter
    *     limit is exceeded.  The outer edges of the strokes for the two
-   *     segments are extended until they meet at an angle.  If the segments
-   *     meet at too sharp an angle (such that the miter would extend from
-   *     the intersection of the segments a distance greater than the product
-   *     of the miter limit value and the border radius), then a bevel join
-   *     (see above) is used instead.  This prevents long spikes being
-   *     created.  FT_STROKER_LINEJOIN_MITER_FIXED generates a miter line
-   *     join as used in PostScript and PDF.
+   *     segments are extended until they meet at an angle.  A bevel join
+   *     (see above) is used if the segments meet at too sharp an angle and
+   *     the outer edges meet beyond a distance corresponding to the meter
+   *     limit.  This prevents long spikes being created.
+   *     `FT_STROKER_LINEJOIN_MITER_FIXED` generates a miter line join as
+   *     used in PostScript and PDF.
    *
    *   FT_STROKER_LINEJOIN_MITER_VARIABLE ::
    *   FT_STROKER_LINEJOIN_MITER ::
    *     Used to render mitered line joins, with variable bevels if the miter
-   *     limit is exceeded.  The intersection of the strokes is clipped at a
-   *     line perpendicular to the bisector of the angle between the strokes,
-   *     at the distance from the intersection of the segments equal to the
-   *     product of the miter limit value and the border radius.  This
-   *     prevents long spikes being created.
-   *     FT_STROKER_LINEJOIN_MITER_VARIABLE generates a mitered line join as
-   *     used in XPS.  FT_STROKER_LINEJOIN_MITER is an alias for
-   *     FT_STROKER_LINEJOIN_MITER_VARIABLE, retained for backward
+   *     limit is exceeded.  The intersection of the strokes is clipped
+   *     perpendicularly to the bisector, at a distance corresponding to
+   *     the miter limit. This prevents long spikes being created.
+   *     `FT_STROKER_LINEJOIN_MITER_VARIABLE` generates a mitered line join
+   *     as used in XPS.  `FT_STROKER_LINEJOIN_MITER` is an alias for
+   *     `FT_STROKER_LINEJOIN_MITER_VARIABLE`, retained for backward
    *     compatibility.
    */
   typedef enum  FT_Stroker_LineJoin_
@@ -146,7 +142,7 @@ FT_BEGIN_HEADER
   } FT_Stroker_LineJoin;
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_Stroker_LineCap
@@ -175,7 +171,7 @@ FT_BEGIN_HEADER
   } FT_Stroker_LineCap;
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_StrokerBorder
@@ -208,7 +204,7 @@ FT_BEGIN_HEADER
   } FT_StrokerBorder;
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Outline_GetInsideBorder
@@ -229,7 +225,7 @@ FT_BEGIN_HEADER
   FT_Outline_GetInsideBorder( FT_Outline*  outline );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Outline_GetOutsideBorder
@@ -250,7 +246,7 @@ FT_BEGIN_HEADER
   FT_Outline_GetOutsideBorder( FT_Outline*  outline );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_New
@@ -264,7 +260,7 @@ FT_BEGIN_HEADER
    *
    * @output:
    *   astroker ::
-   *     A new stroker object handle.  NULL in case of error.
+   *     A new stroker object handle.  `NULL` in case of error.
    *
    * @return:
    *    FreeType error code.  0~means success.
@@ -274,7 +270,7 @@ FT_BEGIN_HEADER
                   FT_Stroker  *astroker );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_Set
@@ -296,12 +292,17 @@ FT_BEGIN_HEADER
    *     The line join style.
    *
    *   miter_limit ::
-   *     The miter limit for the FT_STROKER_LINEJOIN_MITER_FIXED and
-   *     FT_STROKER_LINEJOIN_MITER_VARIABLE line join styles, expressed as
-   *     16.16 fixed-point value.
+   *     The maximum reciprocal sine of half-angle at the miter join,
+   *     expressed as 16.16 fixed point value.
    *
    * @note:
-   *   The radius is expressed in the same units as the outline coordinates.
+   *   The `radius` is expressed in the same units as the outline
+   *   coordinates.
+   *
+   *   The `miter_limit` multiplied by the `radius` gives the maximum size
+   *   of a miter spike, at which it is clipped for
+   *   @FT_STROKER_LINEJOIN_MITER_VARIABLE or replaced with a bevel join for
+   *   @FT_STROKER_LINEJOIN_MITER_FIXED.
    *
    *   This function calls @FT_Stroker_Rewind automatically.
    */
@@ -313,7 +314,7 @@ FT_BEGIN_HEADER
                   FT_Fixed             miter_limit );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_Rewind
@@ -331,7 +332,7 @@ FT_BEGIN_HEADER
   FT_Stroker_Rewind( FT_Stroker  stroker );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_ParseOutline
@@ -356,10 +357,10 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   If 'opened' is~0 (the default), the outline is treated as a closed
+   *   If `opened` is~0 (the default), the outline is treated as a closed
    *   path, and the stroker generates two distinct 'border' outlines.
    *
-   *   If 'opened' is~1, the outline is processed as an open path, and the
+   *   If `opened` is~1, the outline is processed as an open path, and the
    *   stroker generates a single 'stroke' outline.
    *
    *   This function calls @FT_Stroker_Rewind automatically.
@@ -370,7 +371,7 @@ FT_BEGIN_HEADER
                            FT_Bool      opened );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_BeginSubPath
@@ -401,7 +402,7 @@ FT_BEGIN_HEADER
                            FT_Bool     open );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_EndSubPath
@@ -425,7 +426,7 @@ FT_BEGIN_HEADER
   FT_Stroker_EndSubPath( FT_Stroker  stroker );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_LineTo
@@ -453,7 +454,7 @@ FT_BEGIN_HEADER
                      FT_Vector*  to );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_ConicTo
@@ -485,7 +486,7 @@ FT_BEGIN_HEADER
                       FT_Vector*  to );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_CubicTo
@@ -521,7 +522,7 @@ FT_BEGIN_HEADER
                       FT_Vector*  to );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_GetBorderCounts
@@ -567,7 +568,7 @@ FT_BEGIN_HEADER
                               FT_UInt          *anum_contours );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_ExportBorder
@@ -610,7 +611,7 @@ FT_BEGIN_HEADER
                            FT_Outline*       outline );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_GetCounts
@@ -640,7 +641,7 @@ FT_BEGIN_HEADER
                         FT_UInt    *anum_contours );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_Export
@@ -664,7 +665,7 @@ FT_BEGIN_HEADER
                      FT_Outline*  outline );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Stroker_Done
@@ -674,13 +675,13 @@ FT_BEGIN_HEADER
    *
    * @input:
    *   stroker ::
-   *     A stroker handle.  Can be NULL.
+   *     A stroker handle.  Can be `NULL`.
    */
   FT_EXPORT( void )
   FT_Stroker_Done( FT_Stroker  stroker );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Glyph_Stroke
@@ -716,7 +717,7 @@ FT_BEGIN_HEADER
                    FT_Bool      destroy );
 
 
-  /**************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Glyph_StrokeBorder

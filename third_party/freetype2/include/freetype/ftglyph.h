@@ -4,7 +4,7 @@
  *
  *   FreeType convenience functions to handle glyphs (specification).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -33,8 +33,7 @@
 #define FTGLYPH_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -59,8 +58,9 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   This section contains definitions used to manage glyph data through
-   *   generic FT_Glyph objects.  Each of them can contain a bitmap, a vector
-   *   outline, or even images in other formats.
+   *   generic @FT_Glyph objects.  Each of them can contain a bitmap,
+   *   a vector outline, or even images in other formats.  These objects are
+   *   detached from @FT_Face, contrary to @FT_GlyphSlot.
    *
    */
 
@@ -126,7 +126,7 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   A handle to an object used to model a bitmap glyph image.  This is a
-   *   sub-class of @FT_Glyph, and a pointer to @FT_BitmapGlyphRec.
+   *   'sub-class' of @FT_Glyph, and a pointer to @FT_BitmapGlyphRec.
    */
   typedef struct FT_BitmapGlyphRec_*  FT_BitmapGlyph;
 
@@ -142,7 +142,7 @@ FT_BEGIN_HEADER
    *
    * @fields:
    *   root ::
-   *     The root @FT_Glyph fields.
+   *     The root fields of @FT_Glyph.
    *
    *   left ::
    *     The left-side bearing, i.e., the horizontal distance from the
@@ -181,7 +181,7 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   A handle to an object used to model an outline glyph image.  This is a
-   *   sub-class of @FT_Glyph, and a pointer to @FT_OutlineGlyphRec.
+   *   'sub-class' of @FT_Glyph, and a pointer to @FT_OutlineGlyphRec.
    */
   typedef struct FT_OutlineGlyphRec_*  FT_OutlineGlyph;
 
@@ -209,7 +209,7 @@ FT_BEGIN_HEADER
    *
    *   As the outline is extracted from a glyph slot, its coordinates are
    *   expressed normally in 26.6 pixels, unless the flag @FT_LOAD_NO_SCALE
-   *   was used in @FT_Load_Glyph() or @FT_Load_Char().
+   *   was used in @FT_Load_Glyph or @FT_Load_Char.
    *
    *   The outline's tables are always owned by the object and are destroyed
    *   with it.
@@ -220,6 +220,92 @@ FT_BEGIN_HEADER
     FT_Outline   outline;
 
   } FT_OutlineGlyphRec;
+
+
+  /**************************************************************************
+   *
+   * @type:
+   *   FT_SvgGlyph
+   *
+   * @description:
+   *   A handle to an object used to model an SVG glyph.  This is a
+   *   'sub-class' of @FT_Glyph, and a pointer to @FT_SvgGlyphRec.
+   *
+   * @since:
+   *   2.12
+   */
+  typedef struct FT_SvgGlyphRec_*  FT_SvgGlyph;
+
+
+  /**************************************************************************
+   *
+   * @struct:
+   *   FT_SvgGlyphRec
+   *
+   * @description:
+   *   A structure used for OT-SVG glyphs.  This is a 'sub-class' of
+   *   @FT_GlyphRec.
+   *
+   * @fields:
+   *   root ::
+   *     The root @FT_GlyphRec fields.
+   *
+   *   svg_document ::
+   *     A pointer to the SVG document.
+   *
+   *   svg_document_length ::
+   *     The length of `svg_document`.
+   *
+   *   glyph_index ::
+   *     The index of the glyph to be rendered.
+   *
+   *   metrics ::
+   *     A metrics object storing the size information.
+   *
+   *   units_per_EM ::
+   *     The size of the EM square.
+   *
+   *   start_glyph_id ::
+   *     The first glyph ID in the glyph range covered by this document.
+   *
+   *   end_glyph_id ::
+   *     The last glyph ID in the glyph range covered by this document.
+   *
+   *   transform ::
+   *     A 2x2 transformation matrix to apply to the glyph while rendering
+   *     it.
+   *
+   *   delta ::
+   *     Translation to apply to the glyph while rendering.
+   *
+   * @note:
+   *   The Glyph Management API requires @FT_Glyph or its 'sub-class' to have
+   *   all the information needed to completely define the glyph's rendering.
+   *   Outline-based glyphs can directly apply transformations to the outline
+   *   but this is not possible for an SVG document that hasn't been parsed.
+   *   Therefore, the transformation is stored along with the document.  In
+   *   the absence of a 'ViewBox' or 'Width'/'Height' attribute, the size of
+   *   the ViewPort should be assumed to be 'units_per_EM'.
+   */
+  typedef struct  FT_SvgGlyphRec_
+  {
+    FT_GlyphRec  root;
+
+    FT_Byte*  svg_document;
+    FT_ULong  svg_document_length;
+
+    FT_UInt  glyph_index;
+
+    FT_Size_Metrics  metrics;
+    FT_UShort        units_per_EM;
+
+    FT_UShort  start_glyph_id;
+    FT_UShort  end_glyph_id;
+
+    FT_Matrix  transform;
+    FT_Vector  delta;
+
+  } FT_SvgGlyphRec;
 
 
   /**************************************************************************
@@ -337,9 +423,9 @@ FT_BEGIN_HEADER
    *   vector.
    */
   FT_EXPORT( FT_Error )
-  FT_Glyph_Transform( FT_Glyph    glyph,
-                      FT_Matrix*  matrix,
-                      FT_Vector*  delta );
+  FT_Glyph_Transform( FT_Glyph          glyph,
+                      const FT_Matrix*  matrix,
+                      const FT_Vector*  delta );
 
 
   /**************************************************************************
@@ -378,7 +464,7 @@ FT_BEGIN_HEADER
 
 
   /* these constants are deprecated; use the corresponding */
-  /* `FT_Glyph_BBox_Mode' values instead                   */
+  /* `FT_Glyph_BBox_Mode` values instead                   */
 #define ft_glyph_bbox_unscaled   FT_GLYPH_BBOX_UNSCALED
 #define ft_glyph_bbox_subpixels  FT_GLYPH_BBOX_SUBPIXELS
 #define ft_glyph_bbox_gridfit    FT_GLYPH_BBOX_GRIDFIT
@@ -495,12 +581,12 @@ FT_BEGIN_HEADER
    * @note:
    *   This function does nothing if the glyph format isn't scalable.
    *
-   *   The glyph image is translated with the 'origin' vector before
+   *   The glyph image is translated with the `origin` vector before
    *   rendering.
    *
-   *   The first parameter is a pointer to an @FT_Glyph handle, that will be
+   *   The first parameter is a pointer to an @FT_Glyph handle that will be
    *   _replaced_ by this function (with newly allocated data).  Typically,
-   *   you would use (omitting error handling):
+   *   you would do something like the following (omitting error handling).
    *
    *   ```
    *     FT_Glyph        glyph;
@@ -517,7 +603,7 @@ FT_BEGIN_HEADER
    *     if ( glyph->format != FT_GLYPH_FORMAT_BITMAP )
    *     {
    *       error = FT_Glyph_To_Bitmap( &glyph, FT_RENDER_MODE_NORMAL,
-   *                                     0, 1 );
+   *                                   0, 1 );
    *       if ( error ) // `glyph' unchanged
    *         ...
    *     }
@@ -532,7 +618,7 @@ FT_BEGIN_HEADER
    *     FT_Done_Glyph( glyph );
    *   ```
    *
-   *   Here another example, again without error handling:
+   *   Here is another example, again without error handling.
    *
    *   ```
    *     FT_Glyph  glyphs[MAX_GLYPHS]
@@ -569,10 +655,10 @@ FT_BEGIN_HEADER
    *   ```
    */
   FT_EXPORT( FT_Error )
-  FT_Glyph_To_Bitmap( FT_Glyph*       the_glyph,
-                      FT_Render_Mode  render_mode,
-                      FT_Vector*      origin,
-                      FT_Bool         destroy );
+  FT_Glyph_To_Bitmap( FT_Glyph*         the_glyph,
+                      FT_Render_Mode    render_mode,
+                      const FT_Vector*  origin,
+                      FT_Bool           destroy );
 
 
   /**************************************************************************
@@ -609,18 +695,18 @@ FT_BEGIN_HEADER
    *   FT_Matrix_Multiply
    *
    * @description:
-   *   Perform the matrix operation 'b = a*b'.
+   *   Perform the matrix operation `b = a*b`.
    *
    * @input:
    *   a ::
-   *     A pointer to matrix 'a'.
+   *     A pointer to matrix `a`.
    *
    * @inout:
    *   b ::
-   *     A pointer to matrix 'b'.
+   *     A pointer to matrix `b`.
    *
    * @note:
-   *   The result is undefined if either 'a' or 'b' is zero.
+   *   The result is undefined if either `a` or `b` is zero.
    *
    *   Since the function uses wrap-around arithmetic, results become
    *   meaningless if the arguments are very large.

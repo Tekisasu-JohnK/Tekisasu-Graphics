@@ -18,9 +18,9 @@
 #include <vector>
 
 #if __APPLE__
-#include <mach-o/dyld.h>
+  #include <mach-o/dyld.h>
 #elif __FreeBSD__
-#include <sys/sysctl.h>
+  #include <sys/sysctl.h>
 #endif
 
 #include "base/paths.h"
@@ -63,6 +63,11 @@ void move_file(const std::string& src, const std::string& dst)
   if (result != 0)
     // TODO add errno into the exception
     throw std::runtime_error("Error moving file");
+}
+
+void copy_file(const std::string& src, const std::string& dst, bool overwrite)
+{
+  throw std::runtime_error("Error copying file: unimplemented");
 }
 
 void delete_file(const std::string& path)

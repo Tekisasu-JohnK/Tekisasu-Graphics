@@ -4,7 +4,7 @@
  *
  *   FreeType size objects management (specification).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -29,8 +29,7 @@
 #define FTSIZES_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -143,7 +142,7 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   If 'face' is the size's parent face object, this function changes the
+   *   If `face` is the size's parent face object, this function changes the
    *   value of `face->size` to the input size handle.
    */
   FT_EXPORT( FT_Error )

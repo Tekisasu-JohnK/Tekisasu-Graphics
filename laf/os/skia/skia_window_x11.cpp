@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,14 +12,15 @@
 #include "os/skia/skia_window_x11.h"
 
 #include "gfx/size.h"
-#include "os/common/event_queue_with_resize_display.h"
 #include "os/event.h"
 #include "os/event_queue.h"
-#include "os/skia/skia_display.h"
+#include "os/gl/gl_context_glx.h"
 #include "os/skia/skia_surface.h"
+#include "os/skia/skia_window.h"
+#include "os/system.h"
 #include "os/x11/x11.h"
 
-#include "SkBitmap.h"
+#include "include/core/SkBitmap.h"
 
 namespace os {
 
@@ -36,7 +38,7 @@ bool convert_skia_bitmap_to_ximage(const SkBitmap& bitmap, XImage& image)
   image.bitmap_unit = bpp;
   image.bitmap_bit_order = LSBFirst;
   image.bitmap_pad = bpp;
-  image.depth = 24;
+  image.depth = (bitmap.alphaType() == kPremul_SkAlphaType ? 32: 24);
   image.bytes_per_line = bitmap.rowBytes() - 4*bitmap.width();
   image.bits_per_pixel = bpp;
 
@@ -45,47 +47,23 @@ bool convert_skia_bitmap_to_ximage(const SkBitmap& bitmap, XImage& image)
 
 } // anonymous namespace
 
-SkiaWindow::SkiaWindow(EventQueue* queue, SkiaDisplay* display,
-                       int width, int height, int scale)
-  : X11Window(X11::instance()->display(), width, height, scale)
-  , m_queue(queue)
-  , m_display(display)
+SkiaWindowX11::SkiaWindowX11(const WindowSpec& spec)
+  : Base(X11::instance()->display(), spec)
 {
+#if SK_SUPPORT_GPU
+  m_glCtx = std::make_unique<GLContextGLX>(x11display(), x11window());
+#endif
+  initColorSpace();
 }
 
-SkiaWindow::~SkiaWindow()
+void SkiaWindowX11::onPaint(const gfx::Rect& rc)
 {
-}
+#if SK_SUPPORT_GPU
+  if (backend() == Backend::GL)
+    return;
+#endif
 
-void SkiaWindow::setVisible(bool visible)
-{
-  // TODO
-}
-
-void SkiaWindow::maximize()
-{
-  // TODO
-}
-
-bool SkiaWindow::isMaximized() const
-{
-  return false;
-}
-
-bool SkiaWindow::isMinimized() const
-{
-  return false;
-}
-
-void SkiaWindow::onQueueEvent(Event& ev)
-{
-  ev.setDisplay(m_display);
-  m_queue->queueEvent(ev);
-}
-
-void SkiaWindow::onPaint(const gfx::Rect& rc)
-{
-  SkiaSurface* surface = static_cast<SkiaSurface*>(m_display->getSurface());
+  auto surface = static_cast<SkiaSurface*>(this->surface());
   const SkBitmap& bitmap = surface->bitmap();
 
   int scale = this->scale();
@@ -93,7 +71,7 @@ void SkiaWindow::onPaint(const gfx::Rect& rc)
     XImage image;
     if (convert_skia_bitmap_to_ximage(bitmap, image)) {
       XPutImage(
-        x11display(), handle(), gc(), &image,
+        x11display(), x11window(), gc(), &image,
         rc.x, rc.y,
         rc.x, rc.y,
         rc.w, rc.h);
@@ -119,35 +97,20 @@ void SkiaWindow::onPaint(const gfx::Rect& rc)
       SkCanvas canvas(scaled);
       SkRect srcRect = SkRect::Make(SkIRect::MakeXYWH(rc.x/scale, rc.y/scale, rc.w/scale, rc.h/scale));
       SkRect dstRect = SkRect::Make(SkIRect::MakeXYWH(0, 0, rc.w, rc.h));
-      canvas.drawBitmapRect(bitmap, srcRect, dstRect, &paint,
-                            SkCanvas::kStrict_SrcRectConstraint);
+      canvas.drawImageRect(SkImage::MakeFromRaster(bitmap.pixmap(), nullptr, nullptr),
+                           srcRect, dstRect, SkSamplingOptions(),
+                           &paint, SkCanvas::kStrict_SrcRectConstraint);
 
       XImage image;
       if (convert_skia_bitmap_to_ximage(scaled, image)) {
         XPutImage(
-          x11display(), handle(), gc(), &image,
+          x11display(), x11window(), gc(), &image,
           0, 0,
           rc.x, rc.y,
           rc.w, rc.h);
       }
     }
   }
-}
-
-void SkiaWindow::onResize(const gfx::Size& sz)
-{
-  // Set the ResizeDisplay event that will be sent in the near time
-  // (150ms) by the EventQueueWithResizeDisplay.
-  Event ev;
-  ev.setType(Event::ResizeDisplay);
-  ev.setDisplay(m_display);
-  const bool isNewEvent =
-    static_cast<EventQueueWithResizeDisplay*>(EventQueue::instance())
-      ->setResizeDisplayEvent(ev);
-
-  if (isNewEvent) m_resizeSurface.create(m_display);
-  m_display->resize(sz);
-  if (!isNewEvent) m_resizeSurface.draw(m_display);
 }
 
 } // namespace os

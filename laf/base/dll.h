@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2021 Igara Studio S.A.
 // Copyright (c) 2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -25,7 +25,7 @@ inline T get_dll_proc(dll lib, const char* procName) {
   return reinterpret_cast<T>(get_dll_proc_base(lib, procName));
 }
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 class Version;
 // TODO get_dll_filename() could be implemented on Linux with the
 //      non-standard dlinfo() function

@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020-2021  Igara Studio S.A.
 // Copyright (C) 2015  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -12,10 +13,10 @@
 
 namespace os {
 
-  class NativeDialogsWin32 : public NativeDialogs {
+  class NativeDialogsWin : public NativeDialogs {
   public:
-    NativeDialogsWin32();
-    FileDialog* createFileDialog() override;
+    NativeDialogsWin();
+    FileDialogRef makeFileDialog() override;
   };
 
 } // namespace os

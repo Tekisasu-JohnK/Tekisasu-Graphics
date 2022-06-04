@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (c) 2022  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -49,8 +50,7 @@ namespace os {
   // (right-to-left) languages.
   gfx::Rect draw_text(
     Surface* surface, Font* font,
-    const base::utf8_const_iterator& begin,
-    const base::utf8_const_iterator& end,
+    const std::string& text,
     gfx::Color fg, gfx::Color bg,
     int x, int y,
     DrawTextDelegate* delegate);

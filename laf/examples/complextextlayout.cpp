@@ -1,5 +1,5 @@
 // LAF Library
-// Copyright (c) 2019-2020  Igara Studio S.A.
+// Copyright (c) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -29,17 +29,17 @@ public:
   }
 };
 
-os::Font* font = nullptr;
+os::FontRef font = nullptr;
 
-void draw_display(os::Display* display,
+void draw_window(os::Window* window,
                   const gfx::Point& mousePos)
 {
-  os::Surface* surface = display->getSurface();
+  os::Surface* surface = window->surface();
   os::SurfaceLock lock(surface);
   const gfx::Rect rc = surface->bounds();
 
-  os::Surface* backSurface = os::instance()->createSurface(rc.w, rc.h);
-  os::SurfaceLock lock2(backSurface);
+  os::SurfaceRef backSurface = os::instance()->makeSurface(rc.w, rc.h);
+  os::SurfaceLock lock2(backSurface.get());
 
   os::Paint p;
   p.color(gfx::rgba(0, 0, 0));
@@ -59,10 +59,8 @@ void draw_display(os::Display* display,
   gfx::Point pos(0, 0);
   for (auto line : lines) {
     std::string s = base::to_utf8(line);
-    base::utf8_const utf8(s);
     os::draw_text(
-      backSurface, font,
-      utf8.begin(), utf8.end(),
+      backSurface.get(), font.get(), s,
       gfx::rgba(255, 255, 255), gfx::ColorNone,
       pos.x, pos.y,
       &delegate);
@@ -70,19 +68,22 @@ void draw_display(os::Display* display,
     pos.y += font->height() + 4;
   }
 
-  // Flip the back surface to the display surface
-  surface->drawSurface(backSurface, 0, 0);
+  // Flip the back surface to the window surface
+  surface->drawSurface(backSurface.get(), 0, 0);
 
-  // Invalidates the whole display to show it on the screen.
-  display->invalidateRegion(gfx::Region(rc));
+  // Invalidates the whole window to show it on the screen.
+  if (window->isVisible())
+    window->invalidateRegion(gfx::Region(rc));
+  else
+    window->setVisible(true);
 }
 
 int app_main(int argc, char* argv[])
 {
-  os::SystemHandle system(os::create_system());
+  os::SystemRef system = os::make_system();
   system->setAppMode(os::AppMode::GUI);
 
-  os::DisplayHandle display(system->createDisplay(400, 300, 1));
+  os::WindowRef window = system->makeWindow(400, 300);
 
   // TODO use new fonts (SkFont wrappers with system->fontManager())
   font = os::instance()->loadTrueTypeFont("/Library/Fonts/Arial Unicode.ttf", 32);
@@ -91,8 +92,7 @@ int app_main(int argc, char* argv[])
     return 1;
   }
 
-  display->setNativeMouseCursor(os::kArrowCursor);
-  display->setTitle("CTL");
+  window->setTitle("CTL");
 
   system->finishLaunching();
   system->activateApp();
@@ -105,18 +105,18 @@ int app_main(int argc, char* argv[])
   while (running) {
     if (redraw) {
       redraw = false;
-      draw_display(display, mousePos);
+      draw_window(window.get(), mousePos);
     }
     // Wait for an event in the queue, the "true" parameter indicates
     // that we'll wait for a new event, and the next line will not be
     // processed until we receive a new event. If we use "false" and
     // there is no events in the queue, we receive an "ev.type() == Event::None
     os::Event ev;
-    queue->getEvent(ev, true);
+    queue->getEvent(ev);
 
     switch (ev.type()) {
 
-      case os::Event::CloseDisplay:
+      case os::Event::CloseWindow:
         running = false;
         break;
 
@@ -135,7 +135,7 @@ int app_main(int argc, char* argv[])
           case os::kKey8:
           case os::kKey9:
             // Set scale
-            display->setScale(1 + (int)(ev.scancode() - os::kKey1));
+            window->setScale(1 + (int)(ev.scancode() - os::kKey1));
             redraw = true;
             break;
           default:
@@ -144,7 +144,7 @@ int app_main(int argc, char* argv[])
         }
         break;
 
-      case os::Event::ResizeDisplay:
+      case os::Event::ResizeWindow:
         redraw = true;
         break;
 

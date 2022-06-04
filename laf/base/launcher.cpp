@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2018  Igara Studio S.A.
+// Copyright (c) 2018-2021  Igara Studio S.A.
 // Copyright (c) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,7 +16,7 @@
 
 #include <cstdlib>
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 #include <windows.h>
 #ifndef SEE_MASK_DEFAULT
 #define SEE_MASK_DEFAULT 0x00000000
@@ -59,7 +59,7 @@ static int win32_shell_execute(const wchar_t* verb, const wchar_t* file, const w
   else
     return 0;
 }
-#endif  // _WIN32
+#endif  // LAF_WINDOWS
 
 namespace base {
 namespace launcher {
@@ -73,7 +73,7 @@ bool open_file(const std::string& file)
 {
   int ret = -1;
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   ret = win32_shell_execute(L"open",
                             base::from_utf8(file).c_str(), NULL);
@@ -95,7 +95,7 @@ bool open_folder(const std::string& _file)
 {
   std::string file = base::fix_path_separators(_file);
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   int ret;
   if (base::is_directory(file)) {

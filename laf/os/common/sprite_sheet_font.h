@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,8 +11,10 @@
 
 #include "base/debug.h"
 #include "base/string.h"
+#include "base/utf8_decode.h"
 #include "gfx/rect.h"
 #include "os/font.h"
+#include "os/ref.h"
 #include "os/surface.h"
 
 #include <vector>
@@ -21,18 +23,8 @@ namespace os {
 
 class SpriteSheetFont : public Font {
 public:
-
-  SpriteSheetFont() : m_sheet(nullptr) {
-  }
-
-  ~SpriteSheetFont() {
-    ASSERT(m_sheet);
-    m_sheet->dispose();
-  }
-
-  void dispose() override {
-    delete this;
-  }
+  SpriteSheetFont() : m_sheet(nullptr) { }
+  ~SpriteSheetFont() { }
 
   FontType type() override {
     return FontType::SpriteSheet;
@@ -43,12 +35,10 @@ public:
   }
 
   int textLength(const std::string& str) const override {
-    base::utf8_const_iterator it(str.begin()), end(str.end());
+    base::utf8_decode decode(str);
     int x = 0;
-    while (it != end) {
-      x += getCharBounds(*it).w;
-      ++it;
-    }
+    while (int chr = decode.next())
+      x += getCharBounds(chr).w;
     return x;
   }
 
@@ -69,8 +59,8 @@ public:
     return (codepoint >= 0 && codepoint < (int)m_chars.size());
   }
 
-  Surface* getSurfaceSheet() const {
-    return m_sheet;
+  Surface* sheetSurface() const {
+    return m_sheet.get();
   }
 
   gfx::Rect getCharBounds(int chr) const {
@@ -83,14 +73,14 @@ public:
       return gfx::Rect();
   }
 
-  static Font* fromSurface(Surface* sur) {
-    SpriteSheetFont* font = new SpriteSheetFont;
+  static FontRef fromSurface(const SurfaceRef& sur) {
+    auto font = make_ref<SpriteSheetFont>();
     font->m_sheet = sur;
 
-    SurfaceLock lock(sur);
+    SurfaceLock lock(sur.get());
     gfx::Rect bounds(0, 0, 1, 1);
 
-    while (font->findChar(sur, sur->width(), sur->height(), bounds)) {
+    while (font->findChar(sur.get(), sur->width(), sur->height(), bounds)) {
       font->m_chars.push_back(bounds);
       bounds.x += bounds.w;
     }
@@ -130,7 +120,7 @@ private:
   }
 
 private:
-  Surface* m_sheet;
+  Ref<Surface> m_sheet;
   std::vector<gfx::Rect> m_chars;
 };
 

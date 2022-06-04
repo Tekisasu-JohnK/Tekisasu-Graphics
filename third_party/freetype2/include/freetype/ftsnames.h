@@ -7,7 +7,7 @@
  *
  *   This is _not_ used to retrieve glyph names!
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -23,9 +23,8 @@
 #define FTSNAMES_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_PARAMETER_TAGS_H
+#include <freetype/freetype.h>
+#include <freetype/ftparams.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -71,16 +70,16 @@ FT_BEGIN_HEADER
    *
    * @fields:
    *   platform_id ::
-   *     The platform ID for 'string'.  See @TT_PLATFORM_XXX for possible
+   *     The platform ID for `string`.  See @TT_PLATFORM_XXX for possible
    *     values.
    *
    *   encoding_id ::
-   *     The encoding ID for 'string'.  See @TT_APPLE_ID_XXX, @TT_MAC_ID_XXX,
+   *     The encoding ID for `string`.  See @TT_APPLE_ID_XXX, @TT_MAC_ID_XXX,
    *     @TT_ISO_ID_XXX, @TT_MS_ID_XXX, and @TT_ADOBE_ID_XXX for possible
    *     values.
    *
    *   language_id ::
-   *     The language ID for 'string'.  See @TT_MAC_LANGID_XXX and
+   *     The language ID for `string`.  See @TT_MAC_LANGID_XXX and
    *     @TT_MS_LANGID_XXX for possible values.
    *
    *     Registered OpenType values for `language_id` are always smaller than
@@ -90,16 +89,16 @@ FT_BEGIN_HEADER
    *     retrieve the associated language tag.
    *
    *   name_id ::
-   *     An identifier for 'string'.  See @TT_NAME_ID_XXX for possible
+   *     An identifier for `string`.  See @TT_NAME_ID_XXX for possible
    *     values.
    *
    *   string ::
    *     The 'name' string.  Note that its format differs depending on the
    *     (platform,encoding) pair, being either a string of bytes (without a
-   *     terminating NULL byte) or containing UTF-16BE entities.
+   *     terminating `NULL` byte) or containing UTF-16BE entities.
    *
    *   string_len ::
-   *     The length of 'string' in bytes.
+   *     The length of `string` in bytes.
    *
    * @note:
    *   Please refer to the TrueType or OpenType specification for more
@@ -164,8 +163,8 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   The 'string' array returned in the 'aname' structure is not
-   *   null-terminated.  Note that you don't have to deallocate 'string' by
+   *   The `string` array returned in the `aname` structure is not
+   *   null-terminated.  Note that you don't have to deallocate `string` by
    *   yourself; FreeType takes care of it if you call @FT_Done_Face.
    *
    *   Use @FT_Get_Sfnt_Name_Count to get the total number of available
@@ -194,11 +193,11 @@ FT_BEGIN_HEADER
    *
    * @fields:
    *   string ::
-   *     The language tag string, encoded in UTF-16BE (without trailing NULL
-   *     bytes).
+   *     The language tag string, encoded in UTF-16BE (without trailing
+   *     `NULL` bytes).
    *
    *   string_len ::
-   *     The length of 'string' in **bytes**.
+   *     The length of `string` in **bytes**.
    *
    * @note:
    *   Please refer to the TrueType or OpenType specification for more
@@ -241,8 +240,8 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   The 'string' array returned in the `alangTag` structure is not
-   *   null-terminated.  Note that you don't have to deallocate 'string' by
+   *   The `string` array returned in the `alangTag` structure is not
+   *   null-terminated.  Note that you don't have to deallocate `string` by
    *   yourself; FreeType takes care of it if you call @FT_Done_Face.
    *
    *   Only 'name' table format~1 supports language tags.  For format~0

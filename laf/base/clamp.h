@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,8 +11,11 @@
 
 namespace base {
 
+  // Differs from std::clamp() because it doesn't use const T& (so
+  // constant values are used as references, even Clang with -O2 uses
+  // consts/constexprs defined in classes as references).
   template<typename T>
-  T clamp(const T& value, const T& low, const T& high) {
+  T clamp(T value, T low, T high) {
     return (value > high ? high:
             (value < low ? low:
                            value));

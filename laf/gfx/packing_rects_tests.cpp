@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2014 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,7 +11,7 @@
 
 #include <gtest/gtest.h>
 
-#ifdef LAF_WITH_REGION
+#if LAF_WITH_REGION
 
 #include "gfx/packing_rects.h"
 #include "gfx/rect_io.h"

@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2021 Igara Studio S.A.
+// Copyright (c) 2021-2022 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,21 +11,20 @@
 
 #include "base/time.h"
 
-#if _WIN32
+#if LAF_WINDOWS
   #include <windows.h>
 #else
   #include <sys/time.h>
-#endif
-
-#if __APPLE__
-  #include <mach/mach_time.h>
+  #if __APPLE__
+    #include <mach/mach_time.h>
+  #endif
 #endif
 
 namespace base {
 
 bool safe_localtime(const std::time_t time, std::tm* result)
 {
-#if _WIN32
+#if LAF_WINDOWS
   // localtime_s returns errno_t == 0 if there is no error
   return (localtime_s(result, &time) != 0);
 #else
@@ -35,7 +34,7 @@ bool safe_localtime(const std::time_t time, std::tm* result)
 
 Time current_time()
 {
-#if _WIN32
+#if LAF_WINDOWS
 
   SYSTEMTIME st;
   GetLocalTime(&st);
@@ -55,10 +54,19 @@ Time current_time()
 
 tick_t current_tick()
 {
-#if _WIN32
-  // TODO use GetTickCount64 (available from Vista)
-  return GetTickCount();
-#elif defined(__APPLE__)
+#if LAF_WINDOWS
+  // GetTickCount() is limited to the system timer resolution (from 10
+  // to 16 milliseconds), we prefer QueryPerformanceCounter().
+  LARGE_INTEGER counter, freq;
+  if (QueryPerformanceCounter(&counter) &&
+      // TODO Call QueryPerformanceFrequency() just one time
+      QueryPerformanceFrequency(&freq)) {
+    // TODO Some precision is lost, we could return float or double
+    return counter.QuadPart * 1000 / freq.QuadPart;
+  }
+  else
+    return GetTickCount();
+#elif __APPLE__
   static mach_timebase_info_data_t timebase = { 0, 0 };
   if (timebase.denom == 0)
     (void)mach_timebase_info(&timebase);

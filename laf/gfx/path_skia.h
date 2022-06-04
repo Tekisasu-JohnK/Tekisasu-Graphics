@@ -12,7 +12,7 @@
 #include "gfx/point.h"
 #include "gfx/rect.h"
 
-#include "SkPath.h"
+#include "include/core/SkPath.h"
 
 namespace gfx {
 

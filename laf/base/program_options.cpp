@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020  Igara Studio S.A.
+// Copyright (c) 2020-2021 Igara Studio S.A.
 // Copyright (c) 2001-2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -65,7 +65,7 @@ void ProgramOptions::parse(int argc, const char* argv[])
     size_t len = arg.size()-n;
 
     // Ignore process serial number argument (-psn...) when the app is run from command line
-#if __APPLE__
+#if LAF_MACOS
     if (arg.size() >= 4 && arg.substr(0, 4) == "-psn")
       continue;
 #endif

@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020  Igara Studio S.A.
 // Copyright (C) 2016-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -33,11 +34,6 @@ FreeTypeFont::~FreeTypeFont()
 bool FreeTypeFont::isValid() const
 {
   return m_face.isValid();
-}
-
-void FreeTypeFont::dispose()
-{
-  delete this;
 }
 
 FontType FreeTypeFont::type()
@@ -75,15 +71,13 @@ bool FreeTypeFont::hasCodePoint(int codepoint) const
   return m_face.hasCodePoint(codepoint);
 }
 
-FreeTypeFont* load_free_type_font(ft::Lib& lib,
-                                  const char* filename,
-                                  const int height)
+Ref<FreeTypeFont> load_free_type_font(ft::Lib& lib,
+                                      const char* filename,
+                                      const int height)
 {
-  FreeTypeFont* font = new FreeTypeFont(lib, filename, height);
-  if (!font->isValid()) {
-    delete font;
-    font = nullptr;
-  }
+  Ref<FreeTypeFont> font = base::make_ref<FreeTypeFont>(lib, filename, height);
+  if (!font->isValid())
+    font.reset();             // delete font
   return font;
 }
 

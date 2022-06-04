@@ -4,7 +4,7 @@
  *
  *   FreeType API for accessing Windows fnt-specific data.
  *
- * Copyright 2003-2018 by
+ * Copyright (C) 2003-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,8 +19,7 @@
 #ifndef FTWINFNT_H_
 #define FTWINFNT_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -50,17 +49,17 @@ FT_BEGIN_HEADER
    */
 
 
-  /*************************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_WinFNT_ID_XXX
    *
    * @description:
-   *   A list of valid values for the 'charset' byte in @FT_WinFNT_HeaderRec.
-   *   Exact mapping tables for the various cpXXXX encodings (except for
-   *   cp1361) can be found at ftp://ftp.unicode.org/Public in the
-   *   MAPPINGS/VENDORS/MICSFT/WINDOWS subdirectory.  cp1361 is roughly a
-   *   superset of MAPPINGS/OBSOLETE/EASTASIA/KSC/JOHAB.TXT.
+   *   A list of valid values for the `charset` byte in @FT_WinFNT_HeaderRec.
+   *   Exact mapping tables for the various 'cpXXXX' encodings (except for
+   *   'cp1361') can be found at 'ftp://ftp.unicode.org/Public/' in the
+   *   `MAPPINGS/VENDORS/MICSFT/WINDOWS` subdirectory.  'cp1361' is roughly a
+   *   superset of `MAPPINGS/OBSOLETE/EASTASIA/KSC/JOHAB.TXT`.
    *
    * @values:
    *   FT_WinFNT_ID_DEFAULT ::
@@ -79,18 +78,18 @@ FT_BEGIN_HEADER
    *   FT_WinFNT_ID_OEM ::
    *     From Michael Poettgen <michael@poettgen.de>:
    *
-   *     The 'Windows Font Mapping' article says that FT_WinFNT_ID_OEM is
+   *     The 'Windows Font Mapping' article says that `FT_WinFNT_ID_OEM` is
    *     used for the charset of vector fonts, like `modern.fon`,
    *     `roman.fon`, and `script.fon` on Windows.
    *
-   *     The 'CreateFont' documentation says: The FT_WinFNT_ID_OEM value
+   *     The 'CreateFont' documentation says: The `FT_WinFNT_ID_OEM` value
    *     specifies a character set that is operating-system dependent.
    *
    *     The 'IFIMETRICS' documentation from the 'Windows Driver Development
    *     Kit' says: This font supports an OEM-specific character set.  The
    *     OEM character set is system dependent.
    *
-   *     In general OEM, as opposed to ANSI (i.e., cp1252), denotes the
+   *     In general OEM, as opposed to ANSI (i.e., 'cp1252'), denotes the
    *     second default codepage that most international versions of Windows
    *     have.  It is one of the OEM codepages from
    *
@@ -234,7 +233,7 @@ FT_BEGIN_HEADER
   typedef struct FT_WinFNT_HeaderRec_*  FT_WinFNT_Header;
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_Get_WinFNT_Header

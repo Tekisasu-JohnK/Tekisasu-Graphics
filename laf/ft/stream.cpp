@@ -1,4 +1,5 @@
 // LAF FreeType Wrapper
+// Copyright (c) 2020 Igara Studio S.A.
 // Copyright (c) 2016-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -7,6 +8,7 @@
 #include "ft/stream.h"
 
 #include "base/file_handle.h"
+#include "base/debug.h"
 
 #include <ft2build.h>
 

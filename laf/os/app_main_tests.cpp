@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,14 +11,11 @@
 
 #include <gtest/gtest.h>
 
-#include "os/scoped_handle.h"
 #include "os/system.h"
-
-using namespace os;
 
 TEST(System, CtorDtor)
 {
-  SystemHandle sys(create_system());
+  auto system = os::make_system();
 }
 
 int app_main(int argc, char* argv[])

@@ -4,7 +4,7 @@
  *
  *   Additional Mac-specific API.
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * Just van Rossum, David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -18,9 +18,9 @@
 
 /****************************************************************************
  *
- * NOTE: Include this file after FT_FREETYPE_H and after any
+ * NOTE: Include this file after `FT_FREETYPE_H` and after any
  *       Mac-specific headers (because this header uses Mac types such as
- *       Handle, FSSpec, FSRef, etc.)
+ *       'Handle', 'FSSpec', 'FSRef', etc.)
  *
  */
 
@@ -29,7 +29,6 @@
 #define FTMAC_H_
 
 
-#include <ft2build.h>
 
 
 FT_BEGIN_HEADER
@@ -185,7 +184,7 @@ FT_BEGIN_HEADER
    *     The client must allocate this buffer before calling this function.
    *
    *   maxPathSize ::
-   *     Lengths of the buffer 'path' that client allocated.
+   *     Lengths of the buffer `path` that client allocated.
    *
    *   face_index ::
    *     Index of the face.  For passing to @FT_New_Face.

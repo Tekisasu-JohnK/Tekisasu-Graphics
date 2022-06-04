@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -14,9 +14,9 @@
 
 namespace os {
 
-os::ColorSpacePtr convert_nscolorspace_to_os_colorspace(NSColorSpace* nsColorSpace)
+os::ColorSpaceRef convert_nscolorspace_to_os_colorspace(NSColorSpace* nsColorSpace)
 {
-  os::ColorSpacePtr osCS;
+  os::ColorSpaceRef osCS;
   CGColorSpaceRef cgCS = [nsColorSpace CGColorSpace];
   if (cgCS) {
     CFDataRef icc = CGColorSpaceCopyICCProfile(cgCS);
@@ -28,18 +28,18 @@ os::ColorSpacePtr convert_nscolorspace_to_os_colorspace(NSColorSpace* nsColorSpa
         std::string("Display Profile: ") +
         [[nsColorSpace localizedName] UTF8String]);
 
-      osCS = os::instance()->createColorSpace(gfxCS);
+      osCS = os::instance()->makeColorSpace(gfxCS);
       CFRelease(icc);
     }
   }
   return osCS;
 }
 
-void list_display_colorspaces(std::vector<os::ColorSpacePtr>& list)
+void list_display_colorspaces(std::vector<os::ColorSpaceRef>& list)
 {
   // One color profile for each screen
   for (NSScreen* screen in [NSScreen screens]) {
-    os::ColorSpacePtr osCS =
+    os::ColorSpaceRef osCS =
       convert_nscolorspace_to_os_colorspace([screen colorSpace]);
     if (osCS)
       list.push_back(osCS);

@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,8 +9,8 @@
 #define BASE_THREAD_H_INCLUDED
 #pragma once
 
-#ifdef _WIN32
-#include "base/ints.h"
+#if LAF_WINDOWS
+  #include "base/ints.h"
 #endif
 
 namespace base {                // Based on C++0x threads lib
@@ -18,7 +18,7 @@ namespace base {                // Based on C++0x threads lib
   class thread {
   public:
     typedef void* native_handle_type;
-#ifdef _WIN32
+#if LAF_WINDOWS
     typedef uint32_t native_id_type;
 #else
     typedef void* native_id_type;
@@ -60,7 +60,7 @@ namespace base {                // Based on C++0x threads lib
 
   private:
     native_handle_type m_native_handle;
-#ifdef _WIN32
+#if LAF_WINDOWS
     native_id_type m_native_id;
 #endif
 

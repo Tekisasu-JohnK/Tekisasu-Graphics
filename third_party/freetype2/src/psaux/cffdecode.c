@@ -4,7 +4,7 @@
  *
  *   PostScript CFF (Type 2) decoding routines (body).
  *
- * Copyright 2017-2018 by
+ * Copyright (C) 2017-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -16,11 +16,10 @@
  */
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_INTERNAL_DEBUG_H
-#include FT_INTERNAL_SERVICE_H
-#include FT_SERVICE_CFF_TABLE_LOAD_H
+#include <freetype/freetype.h>
+#include <freetype/internal/ftdebug.h>
+#include <freetype/internal/ftserv.h>
+#include <freetype/internal/services/svcfftl.h>
 
 #include "cffdecode.h"
 #include "psobjs.h"
@@ -235,8 +234,8 @@
       return FT_THROW( Syntax_Error );
     }
 
-    adx += decoder->builder.left_bearing.x;
-    ady += decoder->builder.left_bearing.y;
+    adx = ADD_LONG( adx, decoder->builder.left_bearing.x );
+    ady = ADD_LONG( ady, decoder->builder.left_bearing.y );
 
 #ifdef FT_CONFIG_OPTION_INCREMENTAL
     /* Incremental fonts don't necessarily have valid charsets.        */
@@ -249,7 +248,7 @@
     else
 #endif /* FT_CONFIG_OPTION_INCREMENTAL */
     {
-      CFF_Font cff = (CFF_Font)(face->extra.data);
+      CFF_Font cff = (CFF_Font)( face->extra.data );
 
 
       bchar_index = cff_lookup_glyph_by_stdcharcode( cff, bchar );
@@ -330,7 +329,7 @@
     builder->left_bearing.x = 0;
     builder->left_bearing.y = 0;
 
-    builder->pos_x = adx - asb;
+    builder->pos_x = SUB_LONG( adx, asb );
     builder->pos_y = ady;
 
     /* Now load `achar' on top of the base outline. */
@@ -529,6 +528,9 @@
     hinter = (T2_Hints_Funcs)builder->hints_funcs;
 
     builder->path_begun = 0;
+
+    if ( !charstring_base )
+      return FT_Err_Ok;
 
     zone->base           = charstring_base;
     limit = zone->limit  = charstring_base + charstring_len;
@@ -860,7 +862,7 @@
           case cff_op_flex1:
           case cff_op_callsubr:
           case cff_op_callgsubr:
-            /* depracated opcodes */
+            /* deprecated opcodes */
           case cff_op_dotsection:
             /* invalid Type 1 opcodes */
           case cff_op_hsbw:
@@ -1556,9 +1558,9 @@
             }
 
             if ( dx < 0 )
-              dx = -dx;
+              dx = NEG_LONG( dx );
             if ( dy < 0 )
-              dy = -dy;
+              dy = NEG_LONG( dy );
 
             /* strange test, but here it is... */
             horizontal = ( dx > dy );
@@ -1568,7 +1570,7 @@
               x = ADD_LONG( x, args[0] );
               y = ADD_LONG( y, args[1] );
               cff_builder_add_point( builder, x, y,
-                                     (FT_Bool)( count == 3 ) );
+                                     FT_BOOL( count == 3 ) );
               args += 2;
             }
 
@@ -1606,7 +1608,7 @@
               x = ADD_LONG( x, args[0] );
               y = ADD_LONG( y, args[1] );
               cff_builder_add_point( builder, x, y,
-                                     (FT_Bool)( count == 4 || count == 1 ) );
+                                     FT_BOOL( count == 4 || count == 1 ) );
               args += 2;
             }
 
@@ -1748,7 +1750,10 @@
         case cff_op_sqrt:
           FT_TRACE4(( " sqrt\n" ));
 
-          if ( args[0] > 0 )
+          /* without upper limit the loop below might not finish */
+          if ( args[0] > 0x7FFFFFFFL )
+            args[0] = 46341;
+          else if ( args[0] > 0 )
           {
             FT_Fixed  root = args[0];
             FT_Fixed  new_root;
@@ -1821,6 +1826,7 @@
 
             if ( idx >= 0 )
             {
+              idx = idx % count;
               while ( idx > 0 )
               {
                 FT_Fixed  tmp = args[count - 1];
@@ -1835,6 +1841,10 @@
             }
             else
             {
+              /* before C99 it is implementation-defined whether    */
+              /* the result of `%' is negative if the first operand */
+              /* is negative                                        */
+              idx = -( NEG_INT( idx ) % count );
               while ( idx < 0 )
               {
                 FT_Fixed  tmp = args[0];
@@ -1861,7 +1871,7 @@
         case cff_op_put:
           {
             FT_Fixed  val = args[0];
-            FT_Int    idx = (FT_Int)( args[1] >> 16 );
+            FT_UInt   idx = (FT_UInt)( args[1] >> 16 );
 
 
             FT_TRACE4(( " put\n" ));
@@ -1870,20 +1880,20 @@
             /* didn't give a hard-coded size limit of the temporary */
             /* storage array; instead, an argument of the           */
             /* `MultipleMaster' operator set the size               */
-            if ( idx >= 0 && idx < CFF_MAX_TRANS_ELEMENTS )
+            if ( idx < CFF_MAX_TRANS_ELEMENTS )
               decoder->buildchar[idx] = val;
           }
           break;
 
         case cff_op_get:
           {
-            FT_Int    idx = (FT_Int)( args[0] >> 16 );
+            FT_UInt   idx = (FT_UInt)( args[0] >> 16 );
             FT_Fixed  val = 0;
 
 
             FT_TRACE4(( " get\n" ));
 
-            if ( idx >= 0 && idx < CFF_MAX_TRANS_ELEMENTS )
+            if ( idx < CFF_MAX_TRANS_ELEMENTS )
               val = decoder->buildchar[idx];
 
             args[0] = val;
@@ -1904,9 +1914,9 @@
           /* this operator was removed from the Type2 specification */
           /* in version 16-March-2000                               */
           {
-            FT_Int  reg_idx = (FT_Int)args[0];
-            FT_Int  idx     = (FT_Int)args[1];
-            FT_Int  count   = (FT_Int)args[2];
+            FT_UInt  reg_idx = (FT_UInt)args[0];
+            FT_UInt  idx     = (FT_UInt)args[1];
+            FT_UInt  count   = (FT_UInt)args[2];
 
 
             FT_TRACE4(( " load\n" ));
@@ -1914,11 +1924,11 @@
             /* since we currently don't handle interpolation of multiple */
             /* master fonts, we store a vector [1 0 0 ...] in the        */
             /* temporary storage array regardless of the Registry index  */
-            if ( reg_idx >= 0 && reg_idx <= 2             &&
-                 idx >= 0 && idx < CFF_MAX_TRANS_ELEMENTS &&
-                 count >= 0 && count <= num_axes          )
+            if ( reg_idx <= 2                 &&
+                 idx < CFF_MAX_TRANS_ELEMENTS &&
+                 count <= num_axes            )
             {
-              FT_Int  end, i;
+              FT_UInt  end, i;
 
 
               end = FT_MIN( idx + count, CFF_MAX_TRANS_ELEMENTS );
@@ -1945,7 +1955,8 @@
             if ( num_results < 0 )
               goto Syntax_Error;
 
-            if ( num_results * (FT_Int)num_designs > num_args )
+            if ( num_results > num_args                       ||
+                 num_results * (FT_Int)num_designs > num_args )
               goto Stack_Underflow;
 
             /* since we currently don't handle interpolation of multiple */
@@ -2022,20 +2033,31 @@
           break;
 
         case cff_op_callothersubr:
-          /* this is an invalid Type 2 operator; however, there        */
-          /* exist fonts which are incorrectly converted from probably */
-          /* Type 1 to CFF, and some parsers seem to accept it         */
+          {
+            FT_Fixed  arg;
 
-          FT_TRACE4(( " callothersubr (invalid op)\n" ));
 
-          /* subsequent `pop' operands should add the arguments,       */
-          /* this is the implementation described for `unknown' other  */
-          /* subroutines in the Type1 spec.                            */
-          /*                                                           */
-          /* XXX Fix return arguments (see discussion below).          */
-          args -= 2 + ( args[-2] >> 16 );
-          if ( args < stack )
-            goto Stack_Underflow;
+            /* this is an invalid Type 2 operator; however, there      */
+            /* exist fonts which are incorrectly converted from        */
+            /* probably Type 1 to CFF, and some parsers seem to accept */
+            /* it                                                      */
+
+            FT_TRACE4(( " callothersubr (invalid op)\n" ));
+
+            /* subsequent `pop' operands should add the arguments,     */
+            /* this is the implementation described for `unknown'      */
+            /* other subroutines in the Type1 spec.                    */
+            /*                                                         */
+            /* XXX Fix return arguments (see discussion below).        */
+
+            arg = 2 + ( args[-2] >> 16 );
+            if ( arg >= CFF_MAX_OPERANDS )
+              goto Stack_Underflow;
+
+            args -= arg;
+            if ( args < stack )
+              goto Stack_Underflow;
+          }
           break;
 
         case cff_op_pop:
@@ -2131,7 +2153,7 @@
                                       decoder->locals_bias );
 
 
-            FT_TRACE4(( " callsubr (idx %d, entering level %d)\n",
+            FT_TRACE4(( " callsubr (idx %d, entering level %ld)\n",
                         idx,
                         zone - decoder->zones + 1 ));
 
@@ -2175,7 +2197,7 @@
                                       decoder->globals_bias );
 
 
-            FT_TRACE4(( " callgsubr (idx %d, entering level %d)\n",
+            FT_TRACE4(( " callgsubr (idx %d, entering level %ld)\n",
                         idx,
                         zone - decoder->zones + 1 ));
 
@@ -2214,7 +2236,7 @@
           break;
 
         case cff_op_return:
-          FT_TRACE4(( " return (leaving level %d)\n",
+          FT_TRACE4(( " return (leaving level %ld)\n",
                       decoder->zone - decoder->zones ));
 
           if ( decoder->zone <= decoder->zones )
@@ -2249,7 +2271,8 @@
 
     } /* while ip < limit */
 
-    FT_TRACE4(( "..end..\n\n" ));
+    FT_TRACE4(( "..end..\n" ));
+    FT_TRACE4(( "\n" ));
 
   Fail:
     return error;

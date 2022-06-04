@@ -1,6 +1,6 @@
 AC_PREREQ([2.64])
 AC_INIT([HarfBuzz],
-        [1.7.6],
+        [4.0.0],
         [https://github.com/harfbuzz/harfbuzz/issues/new],
         [harfbuzz],
         [http://harfbuzz.org/])
@@ -9,7 +9,7 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/harfbuzz.pc.in])
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE([1.13.0 gnits tar-ustar dist-bzip2 no-dist-gzip -Wall no-define color-tests -Wno-portability])
+AM_INIT_AUTOMAKE([1.13.0 gnits tar-ustar dist-xz no-dist-gzip -Wall no-define color-tests -Wno-portability])
 AM_SILENT_RULES([yes])
 AX_CODE_COVERAGE
 
@@ -19,14 +19,13 @@ LT_PREREQ([2.2])
 LT_INIT([disable-static])
 
 # Check for programs
-AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC
 AC_PROG_CC_C99
 AM_PROG_CC_C_O
 AC_PROG_CXX
-dnl AX_CXX_COMPILE_STDCXX(11, noext, optional)
+AX_CXX_COMPILE_STDCXX(11)
 AC_SYS_LARGEFILE
-PKG_PROG_PKG_CONFIG([0.20])
+PKG_PROG_PKG_CONFIG([0.28])
 AM_MISSING_PROG([RAGEL], [ragel])
 AM_MISSING_PROG([GIT], [git])
 
@@ -47,16 +46,7 @@ AC_SUBST(HB_VERSION)
 # Libtool version
 m4_define([hb_version_int],
 	  m4_eval(hb_version_major*10000 + hb_version_minor*100 + hb_version_micro))
-m4_if(m4_eval(hb_version_minor % 2), [1],
-      dnl for unstable releases
-      [m4_define([hb_libtool_revision], 0)],
-      dnl for stable releases
-      [m4_define([hb_libtool_revision], hb_version_micro)])
-m4_define([hb_libtool_age],
-	  m4_eval(hb_version_int - hb_libtool_revision))
-m4_define([hb_libtool_current],
-	  m4_eval(hb_libtool_age))
-HB_LIBTOOL_VERSION_INFO=hb_libtool_current:hb_libtool_revision:hb_libtool_age
+HB_LIBTOOL_VERSION_INFO=hb_version_int:0:hb_version_int
 AC_SUBST(HB_LIBTOOL_VERSION_INFO)
 
 AC_ARG_WITH([libstdc++],
@@ -77,9 +67,9 @@ GTK_DOC_CHECK([1.15],[--flavour no-tmpl])
 	AM_CONDITIONAL([ENABLE_GTK_DOC], false)
 ])
 
-# Functions, and headers
-AC_CHECK_FUNCS(atexit mprotect sysconf getpagesize mmap isatty newlocale strtod_l setlinebuf)
-AC_CHECK_HEADERS(unistd.h sys/mman.h xlocale.h)
+# Functions and headers
+AC_CHECK_FUNCS(atexit mprotect sysconf getpagesize mmap isatty newlocale uselocale)
+AC_CHECK_HEADERS(unistd.h sys/mman.h stdbool.h xlocale.h)
 
 # Compiler flags
 AC_CANONICAL_HOST
@@ -87,10 +77,15 @@ AC_CHECK_ALIGNOF([struct{char;}])
 if test "x$GCC" = "xyes"; then
 
 	# Make symbols link locally
-	LDFLAGS="$LDFLAGS -Bsymbolic-functions"
+	AX_CHECK_LINK_FLAG([[-Bsymbolic-functions]], [LDFLAGS="$LDFLAGS -Bsymbolic-functions"])
 
-	# Assorted warnings
-	CXXFLAGS="$CXXFLAGS -Wcast-align"
+	# Make it possible to not link to libstdc++
+	# No threadsafe statics in C++ as we do it ourselves.
+	# We don't use these features, so it's safe to disable them
+	# even in the cases where we DO link to libstdc++.
+	# Put -fno-rtti before $CXXFLAGS such that users can re-enable it
+	# by overriding CXXFLAGS.
+	CXXFLAGS="-fno-rtti $CXXFLAGS -fno-exceptions -fno-threadsafe-statics"
 
 	case "$host" in
 		*-*-mingw*)
@@ -124,29 +119,13 @@ AC_MSG_RESULT([$hb_os_win32])
 AM_CONDITIONAL(OS_WIN32, test "$hb_os_win32" = "yes")
 
 have_pthread=false
-if test "$hb_os_win32" = no; then
-	AX_PTHREAD([have_pthread=true])
-fi
+AX_PTHREAD([have_pthread=true])
 if $have_pthread; then
 	AC_DEFINE(HAVE_PTHREAD, 1, [Have POSIX threads])
 fi
 AM_CONDITIONAL(HAVE_PTHREAD, $have_pthread)
 
 dnl ==========================================================================
-
-have_ot=true
-if $have_ot; then
-	AC_DEFINE(HAVE_OT, 1, [Have native OpenType Layout backend])
-fi
-AM_CONDITIONAL(HAVE_OT, $have_ot)
-
-have_fallback=true
-if $have_fallback; then
-	AC_DEFINE(HAVE_FALLBACK, 1, [Have simple TrueType Layout backend])
-fi
-AM_CONDITIONAL(HAVE_FALLBACK, $have_fallback)
-
-dnl ===========================================================================
 
 AC_ARG_WITH(glib,
 	[AS_HELP_STRING([--with-glib=@<:@yes/no/auto@:>@],
@@ -215,6 +194,10 @@ AC_ARG_WITH(cairo,
 have_cairo=false
 if test "x$with_cairo" = "xyes" -o "x$with_cairo" = "xauto"; then
 	PKG_CHECK_MODULES(CAIRO, cairo >= 1.8.0, have_cairo=true, :)
+	save_libs=$LIBS
+	LIBS="$LIBS $CAIRO_LIBS"
+	AC_CHECK_FUNCS(cairo_user_font_face_set_render_color_glyph_func)
+	LIBS=$save_libs
 fi
 if test "x$with_cairo" = "xyes" -a "x$have_cairo" != "xtrue"; then
 	AC_MSG_ERROR([cairo support requested but not found])
@@ -235,21 +218,21 @@ AM_CONDITIONAL(HAVE_CAIRO_FT, $have_cairo_ft)
 
 dnl ==========================================================================
 
-AC_ARG_WITH(fontconfig,
-	[AS_HELP_STRING([--with-fontconfig=@<:@yes/no/auto@:>@],
-			[Use fontconfig @<:@default=auto@:>@])],,
-	[with_fontconfig=auto])
-have_fontconfig=false
-if test "x$with_fontconfig" = "xyes" -o "x$with_fontconfig" = "xauto"; then
-	PKG_CHECK_MODULES(FONTCONFIG, fontconfig, have_fontconfig=true, :)
+AC_ARG_WITH(chafa,
+	[AS_HELP_STRING([--with-chafa=@<:@yes/no/auto@:>@],
+			[Use chafa @<:@default=auto@:>@])],,
+	[with_chafa=auto])
+have_chafa=false
+if test "x$with_chafa" = "xyes" -o "x$with_chafa" = "xauto"; then
+	PKG_CHECK_MODULES(CHAFA, chafa >= 1.6.0, have_chafa=true, :)
 fi
-if test "x$with_fontconfig" = "xyes" -a "x$have_fontconfig" != "xtrue"; then
-	AC_MSG_ERROR([fontconfig support requested but not found])
+if test "x$with_chafa" = "xyes" -a "x$have_chafa" != "xtrue"; then
+	AC_MSG_ERROR([chafa support requested but not found])
 fi
-if $have_fontconfig; then
-	AC_DEFINE(HAVE_FONTCONFIG, 1, [Have fontconfig library])
+if $have_chafa; then
+	AC_DEFINE(HAVE_CHAFA, 1, [Have chafa terminal graphics library])
 fi
-AM_CONDITIONAL(HAVE_FONTCONFIG, $have_fontconfig)
+AM_CONDITIONAL(HAVE_CHAFA, $have_chafa)
 
 dnl ==========================================================================
 
@@ -260,25 +243,6 @@ AC_ARG_WITH(icu,
 have_icu=false
 if test "x$with_icu" = "xyes" -o "x$with_icu" = "xbuiltin" -o "x$with_icu" = "xauto"; then
 	PKG_CHECK_MODULES(ICU, icu-uc, have_icu=true, :)
-
-	dnl Fallback to icu-config if ICU pkg-config files could not be found
-	if test "$have_icu" != "true"; then
-		AC_CHECK_TOOL(ICU_CONFIG, icu-config, no)
-		AC_MSG_CHECKING([for ICU by using icu-config fallback])
-		if test "$ICU_CONFIG" != "no" && "$ICU_CONFIG" --version >/dev/null; then
-			have_icu=true
-			# We don't use --cflags as this gives us a lot of things that we don't
-			# necessarily want, like debugging and optimization flags
-			# See man (1) icu-config for more info.
-			ICU_CFLAGS=`$ICU_CONFIG --cppflags`
-			ICU_LIBS=`$ICU_CONFIG --ldflags-searchpath --ldflags-libsonly`
-			AC_SUBST(ICU_CFLAGS)
-			AC_SUBST(ICU_LIBS)
-			AC_MSG_RESULT([yes])
-		else
-			AC_MSG_RESULT([no])
-		fi
-	fi
 fi
 if test \( "x$with_icu" = "xyes" -o "x$with_icu" = "xbuiltin" \) -a "x$have_icu" != "xtrue"; then
 	AC_MSG_ERROR([icu support requested but icu-uc not found])
@@ -296,27 +260,12 @@ AM_CONDITIONAL(HAVE_ICU_BUILTIN, $have_icu && test "x$with_icu" = "xbuiltin")
 
 dnl ===========================================================================
 
-AC_ARG_WITH(ucdn,
-	[AS_HELP_STRING([--with-ucdn=@<:@yes/no@:>@],
-			[Use builtin UCDN library @<:@default=yes@:>@])],,
-	[with_ucdn=yes])
-have_ucdn=false
-if test "x$with_ucdn" = "xyes"; then
-	have_ucdn=true
-fi
-if $have_ucdn; then
-	AC_DEFINE(HAVE_UCDN, 1, [Have UCDN Unicode functions])
-fi
-AM_CONDITIONAL(HAVE_UCDN, $have_ucdn)
-
-dnl ==========================================================================
-
 AC_ARG_WITH(graphite2,
 	[AS_HELP_STRING([--with-graphite2=@<:@yes/no/auto@:>@],
 			[Use the graphite2 library @<:@default=no@:>@])],,
 	[with_graphite2=no])
 have_graphite2=false
-GRAPHITE2_DEPS="graphite2"
+GRAPHITE2_DEPS="graphite2 >= 1.2.0"
 AC_SUBST(GRAPHITE2_DEPS)
 if test "x$with_graphite2" = "xyes" -o "x$with_graphite2" = "xauto"; then
 	PKG_CHECK_MODULES(GRAPHITE2, $GRAPHITE2_DEPS, have_graphite2=true, :)
@@ -388,6 +337,28 @@ AM_CONDITIONAL(HAVE_UNISCRIBE, $have_uniscribe)
 
 dnl ===========================================================================
 
+AC_ARG_WITH(gdi,
+	[AS_HELP_STRING([--with-gdi=@<:@yes/no/auto@:>@],
+			[Provide GDI integration helpers @<:@default=no@:>@])],,
+	[with_gdi=no])
+have_gdi=false
+if test "x$with_gdi" = "xyes" -o "x$with_gdi" = "xauto"; then
+	AC_CHECK_HEADERS(windows.h, have_gdi=true)
+fi
+if test "x$with_gdi" = "xyes" -a "x$have_gdi" != "xtrue"; then
+	AC_MSG_ERROR([gdi support requested but not found])
+fi
+if $have_gdi; then
+	GDI_CFLAGS=
+	GDI_LIBS="-lgdi32"
+	AC_SUBST(GDI_CFLAGS)
+	AC_SUBST(GDI_LIBS)
+	AC_DEFINE(HAVE_GDI, 1, [Have GDI library])
+fi
+AM_CONDITIONAL(HAVE_GDI, $have_gdi)
+
+dnl ===========================================================================
+
 AC_ARG_WITH(directwrite,
 	[AS_HELP_STRING([--with-directwrite=@<:@yes/no/auto@:>@],
 			[Use the DirectWrite library (experimental) @<:@default=no@:>@])],,
@@ -403,7 +374,7 @@ if test "x$with_directwrite" = "xyes" -a "x$have_directwrite" != "xtrue"; then
 fi
 if $have_directwrite; then
 	DIRECTWRITE_CXXFLAGS=
-	DIRECTWRITE_LIBS="-ldwrite"
+	DIRECTWRITE_LIBS=
 	AC_SUBST(DIRECTWRITE_CXXFLAGS)
 	AC_SUBST(DIRECTWRITE_LIBS)
 	AC_DEFINE(HAVE_DIRECTWRITE, 1, [Have DirectWrite library])
@@ -450,73 +421,47 @@ AM_CONDITIONAL(HAVE_CORETEXT, $have_coretext)
 
 dnl ===========================================================================
 
-AC_CACHE_CHECK([for Intel atomic primitives], hb_cv_have_intel_atomic_primitives, [
-	hb_cv_have_intel_atomic_primitives=false
-	AC_TRY_LINK([
-		void memory_barrier (void) { __sync_synchronize (); }
-		int atomic_add (int *i) { return __sync_fetch_and_add (i, 1); }
-		int mutex_trylock (int *m) { return __sync_lock_test_and_set (m, 1); }
-		void mutex_unlock (int *m) { __sync_lock_release (m); }
-		], [], hb_cv_have_intel_atomic_primitives=true
-	)
-])
-if $hb_cv_have_intel_atomic_primitives; then
-	AC_DEFINE(HAVE_INTEL_ATOMIC_PRIMITIVES, 1, [Have Intel __sync_* atomic primitives])
-fi
-
-dnl ===========================================================================
-
-AC_CACHE_CHECK([for Solaris atomic operations], hb_cv_have_solaris_atomic_ops, [
-	hb_cv_have_solaris_atomic_ops=false
-	AC_TRY_LINK([
-		#include <atomic.h>
-		/* This requires Solaris Studio 12.2 or newer: */
-		#include <mbarrier.h>
-		void memory_barrier (void) { __machine_rw_barrier (); }
-		int atomic_add (volatile unsigned *i) { return atomic_add_int_nv (i, 1); }
-		void *atomic_ptr_cmpxchg (volatile void **target, void *cmp, void *newval) { return atomic_cas_ptr (target, cmp, newval); }
-		], [], hb_cv_have_solaris_atomic_ops=true
-	)
-])
-if $hb_cv_have_solaris_atomic_ops; then
-	AC_DEFINE(HAVE_SOLARIS_ATOMIC_OPS, 1, [Have Solaris __machine_*_barrier and atomic_* operations])
-fi
-
-if test "$os_win32" = no && ! $have_pthread; then
-	AC_CHECK_HEADERS(sched.h)
-	AC_SEARCH_LIBS(sched_yield,rt,AC_DEFINE(HAVE_SCHED_YIELD, 1, [Have sched_yield]))
-fi
-
-dnl ===========================================================================
-
 AC_CONFIG_FILES([
 Makefile
 src/Makefile
-src/hb-version.h
 src/harfbuzz-config.cmake
-src/hb-ucdn/Makefile
 util/Makefile
 test/Makefile
 test/api/Makefile
 test/fuzzing/Makefile
-test/shaping/Makefile
-test/shaping/data/Makefile
-test/shaping/data/in-house/Makefile
-test/shaping/data/text-rendering-tests/Makefile
+test/shape/Makefile
+test/shape/data/Makefile
+test/shape/data/aots/Makefile
+test/shape/data/in-house/Makefile
+test/shape/data/text-rendering-tests/Makefile
 test/subset/Makefile
 test/subset/data/Makefile
+test/subset/data/repack_tests/Makefile
 docs/Makefile
 docs/version.xml
 ])
 
 AC_OUTPUT
 
+echo
+echo "C++ compiler version:"
+$CXX --version
+echo
+
+AC_MSG_NOTICE([
+
+Autotools is no longer our supported build system for building the library
+for *nix distributions, please migrate to meson.
+
+])
+
+
 AC_MSG_NOTICE([
 
 Build configuration:
 
 Unicode callbacks (you want at least one):
-	Builtin (UCDN):		${have_ucdn}
+	Builtin			true
 	Glib:			${have_glib}
 	ICU:			${have_icu}
 
@@ -525,15 +470,16 @@ Font callbacks (the more the merrier):
 
 Tools used for command-line utilities:
 	Cairo:			${have_cairo}
-	Fontconfig:		${have_fontconfig}
+	Chafa:			${have_chafa}
 
-Additional shapers (the more the merrier):
+Additional shapers:
 	Graphite2:		${have_graphite2}
 
 Platform shapers (not normally needed):
 	CoreText:		${have_coretext}
-	Uniscribe:		${have_uniscribe}
 	DirectWrite:		${have_directwrite}
+	GDI:			${have_gdi}
+	Uniscribe:		${have_uniscribe}
 
 Other features:
 	Documentation:		${enable_gtk_doc}

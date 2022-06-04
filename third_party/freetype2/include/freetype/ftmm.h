@@ -4,7 +4,7 @@
  *
  *   FreeType Multiple Master font interface (specification).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -20,8 +20,7 @@
 #define FTMM_H_
 
 
-#include <ft2build.h>
-#include FT_TYPE1_TABLES_H
+#include <freetype/t1tables.h>
 
 
 FT_BEGIN_HEADER
@@ -47,6 +46,9 @@ FT_BEGIN_HEADER
    *   OpenType variation fonts.  Some of the routines only work with Adobe
    *   MM fonts, others will work with all three types.  They are similar
    *   enough that a consistent interface makes sense.
+   *
+   *   For Adobe MM fonts, macro @FT_IS_SFNT returns false.  For GX and
+   *   OpenType variation fonts, it returns true.
    *
    */
 
@@ -149,7 +151,7 @@ FT_BEGIN_HEADER
    *     OpenType variation fonts.  Not meaningful for Adobe MM fonts.
    *
    * @note:
-   *   The fields 'minimum', 'def', and 'maximum' are 16.16 fractional values
+   *   The fields `minimum`, `def`, and `maximum` are 16.16 fractional values
    *   for TrueType GX and OpenType variation fonts.  For Adobe MM fonts, the
    *   values are integers.
    */
@@ -316,7 +318,7 @@ FT_BEGIN_HEADER
    * @input:
    *   library ::
    *     A handle of the face's parent library object that was used in the
-   *     call to @FT_Get_MM_Var to create 'amaster'.
+   *     call to @FT_Get_MM_Var to create `amaster`.
    *
    * @return:
    *   FreeType error code.  0~means success.
@@ -356,7 +358,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *   [Since 2.8.1] To reset all axes to the default values, call the
-   *   function with `num_coords` set to zero and 'coords' set to NULL.
+   *   function with `num_coords` set to zero and `coords` set to `NULL`.
    *
    *   [Since 2.9] If `num_coords` is larger than zero, this function sets
    *   the @FT_FACE_FLAG_VARIATION bit in @FT_Face's `face_flags` field
@@ -397,7 +399,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *   [Since 2.8.1] To reset all axes to the default values, call the
-   *   function with `num_coords` set to zero and 'coords' set to NULL.
+   *   function with `num_coords` set to zero and `coords` set to `NULL`.
    *   [Since 2.9] 'Default values' means the currently selected named
    *   instance (or the base font if no named instance is selected).
    *
@@ -478,7 +480,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *   [Since 2.8.1] To reset all axes to the default values, call the
-   *   function with `num_coords` set to zero and 'coords' set to NULL.
+   *   function with `num_coords` set to zero and `coords` set to `NULL`.
    *   [Since 2.9] 'Default values' means the currently selected named
    *   instance (or the base font if no named instance is selected).
    *
@@ -563,6 +565,98 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
+   * @function:
+   *   FT_Set_MM_WeightVector
+   *
+   * @description:
+   *   For Adobe MM fonts, choose an interpolated font design by directly
+   *   setting the weight vector.
+   *
+   *   This function can't be used with TrueType GX or OpenType variation
+   *   fonts.
+   *
+   * @inout:
+   *   face ::
+   *     A handle to the source face.
+   *
+   * @input:
+   *   len ::
+   *     The length of the weight vector array.  If it is larger than the
+   *     number of designs, the extra values are ignored.  If it is less than
+   *     the number of designs, the remaining values are set to zero.
+   *
+   *   weightvector ::
+   *     An array representing the weight vector.
+   *
+   * @return:
+   *   FreeType error code.  0~means success.
+   *
+   * @note:
+   *   Adobe Multiple Master fonts limit the number of designs, and thus the
+   *   length of the weight vector to~16.
+   *
+   *   If `len` is zero and `weightvector` is `NULL`, the weight vector array
+   *   is reset to the default values.
+   *
+   *   The Adobe documentation also states that the values in the
+   *   WeightVector array must total 1.0 +/-~0.001.  In practice this does
+   *   not seem to be enforced, so is not enforced here, either.
+   *
+   * @since:
+   *   2.10
+   */
+  FT_EXPORT( FT_Error )
+  FT_Set_MM_WeightVector( FT_Face    face,
+                          FT_UInt    len,
+                          FT_Fixed*  weightvector );
+
+
+  /**************************************************************************
+   *
+   * @function:
+   *   FT_Get_MM_WeightVector
+   *
+   * @description:
+   *   For Adobe MM fonts, retrieve the current weight vector of the font.
+   *
+   *   This function can't be used with TrueType GX or OpenType variation
+   *   fonts.
+   *
+   * @inout:
+   *   face ::
+   *     A handle to the source face.
+   *
+   *   len ::
+   *     A pointer to the size of the array to be filled.  If the size of the
+   *     array is less than the number of designs, `FT_Err_Invalid_Argument`
+   *     is returned, and `len` is set to the required size (the number of
+   *     designs).  If the size of the array is greater than the number of
+   *     designs, the remaining entries are set to~0.  On successful
+   *     completion, `len` is set to the number of designs (i.e., the number
+   *     of values written to the array).
+   *
+   * @output:
+   *   weightvector ::
+   *     An array to be filled.
+   *
+   * @return:
+   *   FreeType error code.  0~means success.
+   *
+   * @note:
+   *   Adobe Multiple Master fonts limit the number of designs, and thus the
+   *   length of the WeightVector to~16.
+   *
+   * @since:
+   *   2.10
+   */
+  FT_EXPORT( FT_Error )
+  FT_Get_MM_WeightVector( FT_Face    face,
+                          FT_UInt*   len,
+                          FT_Fixed*  weightvector );
+
+
+  /**************************************************************************
+   *
    * @enum:
    *   FT_VAR_AXIS_FLAG_XXX
    *
@@ -588,7 +682,7 @@ FT_BEGIN_HEADER
    * @description:
    *   Get the 'flags' field of an OpenType Variation Axis Record.
    *
-   *   Not meaningful for Adobe MM fonts ('*flags' is always zero).
+   *   Not meaningful for Adobe MM fonts (`*flags` is always zero).
    *
    * @input:
    *   master ::

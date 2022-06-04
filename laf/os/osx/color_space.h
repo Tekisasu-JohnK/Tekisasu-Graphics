@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -19,10 +19,10 @@
 namespace os {
 
 #ifdef __OBJC__
-os::ColorSpacePtr convert_nscolorspace_to_os_colorspace(NSColorSpace* nsColorSpace);
+os::ColorSpaceRef convert_nscolorspace_to_os_colorspace(NSColorSpace* nsColorSpace);
 #endif
 
-void list_display_colorspaces(std::vector<os::ColorSpacePtr>& list);
+void list_display_colorspaces(std::vector<os::ColorSpaceRef>& list);
 
 } // namespace os
 

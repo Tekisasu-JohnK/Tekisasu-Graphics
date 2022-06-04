@@ -4,7 +4,7 @@
  *
  *   FreeType incremental loading (specification).
  *
- * Copyright 2002-2018 by
+ * Copyright (C) 2002-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,9 +19,8 @@
 #ifndef FTINCREM_H_
 #define FTINCREM_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_PARAMETER_TAGS_H
+#include <freetype/freetype.h>
+#include <freetype/ftparams.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -32,7 +31,7 @@
 
 FT_BEGIN_HEADER
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @section:
    *    incremental
@@ -60,7 +59,7 @@ FT_BEGIN_HEADER
    */
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @type:
    *   FT_Incremental
@@ -86,7 +85,7 @@ FT_BEGIN_HEADER
   typedef struct FT_IncrementalRec_*  FT_Incremental;
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @struct:
    *   FT_Incremental_MetricsRec
@@ -110,7 +109,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *   These correspond to horizontal or vertical metrics depending on the
-   *   value of the 'vertical' argument to the function
+   *   value of the `vertical` argument to the function
    *   @FT_Incremental_GetGlyphMetricsFunc.
    *
    */
@@ -124,7 +123,7 @@ FT_BEGIN_HEADER
   } FT_Incremental_MetricsRec;
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @struct:
    *   FT_Incremental_Metrics
@@ -136,7 +135,7 @@ FT_BEGIN_HEADER
    typedef struct FT_Incremental_MetricsRec_*  FT_Incremental_Metrics;
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @type:
    *   FT_Incremental_GetGlyphDataFunc
@@ -183,7 +182,7 @@ FT_BEGIN_HEADER
                                       FT_Data*        adata );
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @type:
    *   FT_Incremental_FreeGlyphDataFunc
@@ -207,16 +206,21 @@ FT_BEGIN_HEADER
                                        FT_Data*        data );
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @type:
    *   FT_Incremental_GetGlyphMetricsFunc
    *
    * @description:
    *   A function used to retrieve the basic metrics of a given glyph index
-   *   before accessing its data.  This is necessary because, in certain
-   *   formats like TrueType, the metrics are stored in a different place
-   *   from the glyph images proper.
+   *   before accessing its data.  This allows for handling font types such
+   *   as PCL~XL Format~1, Class~2 downloaded TrueType fonts, where the glyph
+   *   metrics (`hmtx` and `vmtx` tables) are permitted to be omitted from
+   *   the font, and the relevant metrics included in the header of the glyph
+   *   outline data.  Importantly, this is not intended to allow custom glyph
+   *   metrics (for example, Postscript Metrics dictionaries), because that
+   *   conflicts with the requirements of outline hinting.  Such custom
+   *   metrics must be handled separately, by the calling application.
    *
    * @input:
    *   incremental ::
@@ -236,7 +240,7 @@ FT_BEGIN_HEADER
    *
    * @output:
    *   ametrics ::
-   *     The replacement glyph metrics in font units.
+   *     The glyph metrics in font units.
    *
    */
   typedef FT_Error
@@ -265,7 +269,7 @@ FT_BEGIN_HEADER
    *
    *   get_glyph_metrics ::
    *     The function to get glyph metrics.  May be null if the font does not
-   *     provide overriding glyph metrics.
+   *     require it.
    *
    */
   typedef struct  FT_Incremental_FuncsRec_
@@ -277,7 +281,7 @@ FT_BEGIN_HEADER
   } FT_Incremental_FuncsRec;
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @struct:
    *   FT_Incremental_InterfaceRec
@@ -321,7 +325,7 @@ FT_BEGIN_HEADER
   } FT_Incremental_InterfaceRec;
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @type:
    *   FT_Incremental_Interface

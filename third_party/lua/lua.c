@@ -1,5 +1,5 @@
 /*
-** $Id: lua.c,v 1.234 2018/03/06 20:30:17 roberto Exp roberto $
+** $Id: lua.c $
 ** Lua stand-alone interpreter
 ** See Copyright Notice in lua.h
 */
@@ -37,6 +37,26 @@ static lua_State *globalL = NULL;
 static const char *progname = LUA_PROGNAME;
 
 
+#if defined(LUA_USE_POSIX)   /* { */
+
+/*
+** Use 'sigaction' when available.
+*/
+static void setsignal (int sig, void (*handler)(int)) {
+  struct sigaction sa;
+  sa.sa_handler = handler;
+  sa.sa_flags = 0;
+  sigemptyset(&sa.sa_mask);  /* do not mask any signal */
+  sigaction(sig, &sa, NULL);
+}
+
+#else           /* }{ */
+
+#define setsignal            signal
+
+#endif                               /* } */
+
+
 /*
 ** Hook set by signal function to stop the interpreter.
 */
@@ -54,8 +74,9 @@ static void lstop (lua_State *L, lua_Debug *ar) {
 ** interpreter.
 */
 static void laction (int i) {
-  signal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
-  lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
+  int flag = LUA_MASKCALL | LUA_MASKRET | LUA_MASKLINE | LUA_MASKCOUNT;
+  setsignal(i, SIG_DFL); /* if another SIGINT happens, terminate process */
+  lua_sethook(globalL, lstop, flag, 1);
 }
 
 
@@ -73,6 +94,7 @@ static void print_usage (const char *badoption) {
   "  -l name  require library 'name' into global 'name'\n"
   "  -v       show version information\n"
   "  -E       ignore environment variables\n"
+  "  -W       turn warnings on\n"
   "  --       stop handling options\n"
   "  -        stop handling options and execute stdin\n"
   ,
@@ -133,9 +155,9 @@ static int docall (lua_State *L, int narg, int nres) {
   lua_pushcfunction(L, msghandler);  /* push message handler */
   lua_insert(L, base);  /* put it under function and args */
   globalL = L;  /* to be available to 'laction' */
-  signal(SIGINT, laction);  /* set C-signal handler */
+  setsignal(SIGINT, laction);  /* set C-signal handler */
   status = lua_pcall(L, narg, nres, base);
-  signal(SIGINT, SIG_DFL); /* reset C-signal handler */
+  setsignal(SIGINT, SIG_DFL); /* reset C-signal handler */
   lua_remove(L, base);  /* remove message handler from the stack */
   return status;
 }
@@ -259,14 +281,18 @@ static int collectargs (char **argv, int *first) {
       case '\0':  /* '-' */
         return args;  /* script "name" is '-' */
       case 'E':
-        if (argv[i][2] != '\0')  /* extra characters after 1st? */
+        if (argv[i][2] != '\0')  /* extra characters? */
           return has_error;  /* invalid option */
         args |= has_E;
+        break;
+      case 'W':
+        if (argv[i][2] != '\0')  /* extra characters? */
+          return has_error;  /* invalid option */
         break;
       case 'i':
         args |= has_i;  /* (-i implies -v) *//* FALLTHROUGH */
       case 'v':
-        if (argv[i][2] != '\0')  /* extra characters after 1st? */
+        if (argv[i][2] != '\0')  /* extra characters? */
           return has_error;  /* invalid option */
         args |= has_v;
         break;
@@ -289,7 +315,8 @@ static int collectargs (char **argv, int *first) {
 
 
 /*
-** Processes options 'e' and 'l', which involve running Lua code.
+** Processes options 'e' and 'l', which involve running Lua code, and
+** 'W', which also affects the state.
 ** Returns 0 if some code raises an error.
 */
 static int runargs (lua_State *L, char **argv, int n) {
@@ -297,15 +324,21 @@ static int runargs (lua_State *L, char **argv, int n) {
   for (i = 1; i < n; i++) {
     int option = argv[i][1];
     lua_assert(argv[i][0] == '-');  /* already checked */
-    if (option == 'e' || option == 'l') {
-      int status;
-      const char *extra = argv[i] + 2;  /* both options need an argument */
-      if (*extra == '\0') extra = argv[++i];
-      lua_assert(extra != NULL);
-      status = (option == 'e')
-               ? dostring(L, extra, "=(command line)")
-               : dolibrary(L, extra);
-      if (status != LUA_OK) return 0;
+    switch (option) {
+      case 'e':  case 'l': {
+        int status;
+        const char *extra = argv[i] + 2;  /* both options need an argument */
+        if (*extra == '\0') extra = argv[++i];
+        lua_assert(extra != NULL);
+        status = (option == 'e')
+                 ? dostring(L, extra, "=(command line)")
+                 : dolibrary(L, extra);
+        if (status != LUA_OK) return 0;
+        break;
+      }
+      case 'W':
+        lua_warning(L, "@on", 0);  /* warnings on */
+        break;
     }
   }
   return 1;
@@ -383,8 +416,7 @@ static int handle_luainit (lua_State *L) {
 
 #include <readline/readline.h>
 #include <readline/history.h>
-#define lua_initreadline(L)  \
-	((void)L, rl_readline_name="lua", rl_inhibit_completion=1)
+#define lua_initreadline(L)	((void)L, rl_readline_name="lua")
 #define lua_readline(L,b,p)	((void)L, ((b)=readline(p)) != NULL)
 #define lua_saveline(L,line)	((void)L, add_history(line))
 #define lua_freeline(L,b)	((void)L, free(b))
@@ -404,14 +436,18 @@ static int handle_luainit (lua_State *L) {
 
 
 /*
-** Returns the string to be used as a prompt by the interpreter.
+** Return the string to be used as a prompt by the interpreter. Leave
+** the string (or nil, if using the default value) on the stack, to keep
+** it anchored.
 */
 static const char *get_prompt (lua_State *L, int firstline) {
-  const char *p;
-  lua_getglobal(L, firstline ? "_PROMPT" : "_PROMPT2");
-  p = lua_tostring(L, -1);
-  if (p == NULL) p = (firstline ? LUA_PROMPT : LUA_PROMPT2);
-  return p;
+  if (lua_getglobal(L, firstline ? "_PROMPT" : "_PROMPT2") == LUA_TNIL)
+    return (firstline ? LUA_PROMPT : LUA_PROMPT2);  /* use the default */
+  else {  /* apply 'tostring' over the value */
+    const char *p = luaL_tolstring(L, -1, NULL);
+    lua_remove(L, -2);  /* remove original value */
+    return p;
+  }
 }
 
 /* mark in error messages for incomplete statements */

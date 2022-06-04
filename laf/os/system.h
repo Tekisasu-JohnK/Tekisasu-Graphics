@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -14,8 +14,12 @@
 #include "os/capabilities.h"
 #include "os/color_space.h"
 #include "os/keys.h"
-#include "os/scoped_handle.h"
+#include "os/ref.h"
+#include "os/screen.h"
+#include "os/window.h"
+#include "os/window_spec.h"
 
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -23,7 +27,6 @@
 namespace os {
 
   class ColorSpaceConversion;
-  class Display;
   class EventQueue;
   class Font;
   class FontManager;
@@ -31,12 +34,15 @@ namespace os {
   class Menus;
   class NativeDialogs;
   class Surface;
+  class System;
 
-  // TODO why we just don't return nullptr if the display creation fails?
+  using SystemRef = Ref<System>;
+
+  // TODO why we just don't return nullptr if the window creation fails?
   //      maybe an error handler function?
-  class DisplayCreationException : public std::runtime_error {
+  class WindowCreationException : public std::runtime_error {
   public:
-    DisplayCreationException(const char* msg) throw()
+    WindowCreationException(const char* msg) throw()
       : std::runtime_error(msg) { }
   };
 
@@ -61,11 +67,10 @@ namespace os {
     WintabPackets = 2,
   };
 
-  class System {
+  class System : public RefCount {
   protected:
     virtual ~System() { }
   public:
-    virtual void dispose() = 0;
 
     // Windows-specific: The app name at the moment is used to receive
     // DDE messages (WM_DDE_INITIATE) and convert WM_DDE_EXECUTE
@@ -129,26 +134,53 @@ namespace os {
     virtual void setTabletAPI(TabletAPI api) = 0;
     virtual TabletAPI tabletAPI() const = 0;
 
+    // Sub-interfaces
     virtual Logger* logger() = 0;
     virtual Menus* menus() = 0;
     virtual NativeDialogs* nativeDialogs() = 0;
     virtual EventQueue* eventQueue() = 0;
+
     virtual bool gpuAcceleration() const = 0;
     virtual void setGpuAcceleration(bool state) = 0;
-    virtual gfx::Size defaultNewDisplaySize() = 0;
-    virtual Display* defaultDisplay() = 0;
-    virtual Display* createDisplay(int width, int height, int scale) = 0;
-    virtual Surface* createSurface(int width, int height, const os::ColorSpacePtr& colorSpace = nullptr) = 0;
-    virtual Surface* createRgbaSurface(int width, int height, const os::ColorSpacePtr& colorSpace = nullptr) = 0;
-    virtual Surface* loadSurface(const char* filename) = 0;
-    virtual Surface* loadRgbaSurface(const char* filename) = 0;
+
+    // Returns the main screen
+    virtual ScreenRef mainScreen() = 0;
+
+    // Returns a list of screens attached to the computer.
+    virtual void listScreens(ScreenList& screens) = 0;
+
+    virtual Window* defaultWindow() = 0;
+
+    // Creates a new window in the operating system with the given
+    // specs (width, height, etc.).
+    virtual WindowRef makeWindow(const WindowSpec& spec) = 0;
+
+    WindowRef makeWindow(const int contentWidth,
+                           const int contentHeight,
+                           const int scale = 1) {
+      return makeWindow(WindowSpec(contentWidth, contentHeight, scale));
+    }
+
+    virtual Ref<Surface> makeSurface(int width, int height, const os::ColorSpaceRef& colorSpace = nullptr) = 0;
+    virtual Ref<Surface> makeRgbaSurface(int width, int height, const os::ColorSpaceRef& colorSpace = nullptr) = 0;
+    virtual Ref<Surface> loadSurface(const char* filename) = 0;
+    virtual Ref<Surface> loadRgbaSurface(const char* filename) = 0;
+
+    // Creates a new cursor with the given surface.
+    //
+    // Warning: On Windows there is a limit of 10,000 GDI objects per
+    // process and creating a cursor needs 3 GDI objects (a HCURSOR
+    // and two HBITMAPs).
+    virtual Ref<Cursor> makeCursor(const Surface* surface,
+                                   const gfx::Point& focus,
+                                   const int scale) = 0;
 
     // New font manager
     virtual FontManager* fontManager() = 0;
 
     // Old font functions (to be removed)
-    virtual Font* loadSpriteSheetFont(const char* filename, int scale = 1) = 0;
-    virtual Font* loadTrueTypeFont(const char* filename, int height) = 0;
+    virtual Ref<Font> loadSpriteSheetFont(const char* filename, int scale = 1) = 0;
+    virtual Ref<Font> loadTrueTypeFont(const char* filename, int height) = 0;
 
     // Returns true if the the given scancode key is pressed/actived.
     virtual bool isKeyPressed(KeyScancode scancode) = 0;
@@ -163,27 +195,62 @@ namespace os {
     // Indicates if you want to use dead keys or not. By default it's
     // false, which behaves as regular shortcuts. You should set this
     // to true when you're inside a text field in your app.
+    //
+    // TODO Improve this API using different input modes,
+    //      e.g. GameLike, TextInput, TextInputWithDeadKeys
     virtual void setTranslateDeadKeys(bool state) = 0;
+
+    // Returns the mouse position in the screen. Try to avoid using
+    // this and prefer the Event mouse position.
+    virtual gfx::Point mousePosition() const = 0;
+
+    // Sets the mouse position to a specific point in the screen.
+    virtual void setMousePosition(const gfx::Point& screenPosition) = 0;
+
+    // Gets a color from the desktop in given screen position.
+    //
+    // WARNING for macOS: This function will ask the user for
+    // permissions to record the screen. If the app is not in a signed
+    // bundle, the color will be from the wallpaper, but if the
+    // function is used in a signed bundled app, the color will be
+    // from any opened window.
+    virtual gfx::Color getColorFromScreen(const gfx::Point& screenPosition) const = 0;
 
     // Color management
     virtual void listColorSpaces(
-      std::vector<os::ColorSpacePtr>& list) = 0;
-    virtual os::ColorSpacePtr createColorSpace(
-      const gfx::ColorSpacePtr& colorSpace) = 0;
-    virtual std::unique_ptr<ColorSpaceConversion> convertBetweenColorSpace(
-      const os::ColorSpacePtr& src,
-      const os::ColorSpacePtr& dst) = 0;
+      std::vector<os::ColorSpaceRef>& list) = 0;
+    virtual os::ColorSpaceRef makeColorSpace(
+      const gfx::ColorSpaceRef& colorSpace) = 0;
+    virtual Ref<ColorSpaceConversion> convertBetweenColorSpace(
+      const os::ColorSpaceRef& src,
+      const os::ColorSpaceRef& dst) = 0;
 
-    // Set a default color profile for all displays (nullptr to use
-    // the active monitor color profile and change it dynamically when
-    // the window changes to another monitor).
-    virtual void setDisplaysColorSpace(const os::ColorSpacePtr& cs) = 0;
-    virtual os::ColorSpacePtr displaysColorSpace() = 0;
+    // Set a default color profile for all windows (nullptr to use the
+    // active monitor color profile and change it dynamically when the
+    // window changes to another monitor).
+    virtual void setWindowsColorSpace(const os::ColorSpaceRef& cs) = 0;
+    virtual os::ColorSpaceRef windowsColorSpace() = 0;
+
+    // Function called to handle a "live resize"/resizing loop of a
+    // native window. If this is nullptr, an Event::ResizeWindow is
+    // generated when the resizing is finished.
+    //
+    // TODO I think we should have a SystemDelegate or something
+    //      similar instead of a public property.
+    std::function<void(os::Window*)> handleWindowResize = nullptr;
+
+#if LAF_WINDOWS
+    // Only useful on Windows, the delegate must be a pointer to a
+    // WintabAPI::Delegate, and it must be deleted by the user
+    // manually (it's not owned by the os::System impl).
+    //
+    // This can be used to get information about the wintab32.dll
+    // vendor (company name, etc.)
+    virtual void setWintabDelegate(void* delegate) { }
+#endif
   };
 
-  typedef ScopedHandle<System> SystemHandle;
-
-  SystemHandle create_system();
+  SystemRef make_system();
   System* instance();
   void set_instance(System* system);
 

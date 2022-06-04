@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2021  Igara Studio S.A.
 // Copyright (C) 2016-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -13,11 +13,14 @@
 
 #include "base/convert_to.h"
 #include "base/debug.h"
+#include "base/file_handle.h"
 #include "base/fs.h"
 #include "base/log.h"
 #include "base/sha1.h"
 #include "base/string.h"
 #include "base/version.h"
+#include "base/win/ver_query_values.h"
+#include "os/win/system.h"
 
 #include <iostream>
 #include <algorithm>
@@ -46,57 +49,103 @@ WTOverlap_Func WTOverlap;
 WTQueueSizeGet_Func WTQueueSizeGet;
 WTQueueSizeSet_Func WTQueueSizeSet;
 
+// Detects if WTOpen() crashes (which can happen if the stylus driver
+// is in a buggy state), writes a .crash file to avoid loading
+// wintab32.dll again in the next run, until the file is deleted,
+// i.e. when the System::setTabletAPI() is called again with the
+// TabletAPI::Wintab value.
+//
+// This is also useful to restore our original
+// UnhandledExceptionFilter() (e.g. base::MemoryDump handler) because
+// some wintab32.dll will overwrite our callback just loading the dll.
+class HandleSigSegv {
+ public:
+  HandleSigSegv() {
+    m_file = getFilename();
+    m_oldHandler = SetUnhandledExceptionFilter(&HandleSigSegv::handler);
+  }
+
+  ~HandleSigSegv() {
+    SetUnhandledExceptionFilter(m_oldHandler);
+    m_file.clear();
+  }
+
+  bool crashed() const {
+    return base::is_file(m_file);
+  }
+
+  static void deleteFile() {
+    try {
+      std::string fn = getFilename();
+      if (base::is_file(fn))
+        base::delete_file(fn);
+    }
+    catch (...) {
+      // What can we do?
+    }
+  }
+
+private:
+  static std::string getFilename() {
+    std::string appName = ((SystemWin*)os::instance())->appName();
+    return base::join_path(base::get_temp_path(),
+                           appName + "-wintab32.crash");
+  }
+
+  static LONG API handler(_EXCEPTION_POINTERS* info) {
+    // Write a "wintab32.lock" file so we don't use wintab32 the next
+    // execution.
+    {
+      base::FileHandle fh(base::open_file(m_file, "w"));
+    }
+    if (m_oldHandler)
+      return (*m_oldHandler)(info);
+    else {
+      // Tried a EXCEPTION_CONTINUE_EXECUTION here but it's not
+      // possible. The program aborts anyway.
+      return EXCEPTION_EXECUTE_HANDLER;
+    }
+  }
+
+  static std::string m_file;
+  static LPTOP_LEVEL_EXCEPTION_FILTER m_oldHandler;
+};
+
+std::string HandleSigSegv::m_file;
+LPTOP_LEVEL_EXCEPTION_FILTER HandleSigSegv::m_oldHandler = nullptr;
+
 } // anonymous namespace
 
 WintabAPI::WintabAPI()
-  : m_wintabLib(nullptr)
 {
 }
 
 WintabAPI::~WintabAPI()
 {
-  if (!m_wintabLib)
-    return;
+  if (m_wintabLib)
+    base::unload_dll(m_wintabLib);
+}
 
-  base::unload_dll(m_wintabLib);
-  m_wintabLib = nullptr;
+void WintabAPI::setDelegate(Delegate* delegate)
+{
+  m_delegate = delegate;
 }
 
 HCTX WintabAPI::open(HWND hwnd, bool moveMouse)
 {
+  // We have to use this before calling loadWintab() because just
+  // loading the wintab32.dll can overwrite our
+  // UnhandledExceptionFilter() (e.g. the base::MemoryDump callback).
+  HandleSigSegv handler;
+
+  // Load the library just once (if m_wintabLib wasn't already loaded)
   if (!m_wintabLib && !loadWintab())
     return nullptr;
 
-  // Only on INFO or VERBOSE modes for debugging purposes
-  if (base::get_log_level() >= INFO) {
-    // Log Wintab ID
-    UINT nchars = WTInfo(WTI_INTERFACE, IFC_WINTABID, nullptr);
-    if (nchars > 0 && nchars < 1024) {
-      // Some buggy wintab implementations may not report the right
-      // string size in the WTInfo call above (eg.: the Genius EasyPen
-      // i405X wintab). When this happens, the WTInfo call for getting
-      // the tablet id will get only a part of the string, therefore
-      // without the null terminating character. This will lead to a
-      // buffer overrun and may just crash instantly, or cause a heap
-      // corruption that will lead to a crash latter. A quick
-      // workaround to this kind of wintab misinformation is to
-      // oversize the buffer to guarantee that for the most common
-      // string lenghts it will be enough.
-      std::vector<WCHAR> buf(std::max<UINT>(128, nchars+1), 0);
-      WTInfo(WTI_INTERFACE, IFC_WINTABID, &buf[0]);
-      LOG("PEN: Wintab ID \"%s\"\n", base::to_utf8(&buf[0]).c_str());
-    }
-
-    // Log Wintab version
-    WORD specVer = 0;
-    WORD implVer = 0;
-    UINT options = 0;
-    WTInfo(WTI_INTERFACE, IFC_SPECVERSION, &specVer);
-    WTInfo(WTI_INTERFACE, IFC_IMPLVERSION, &implVer);
-    WTInfo(WTI_INTERFACE, IFC_CTXOPTIONS, &options);
-    LOG("PEN: Wintab spec v%d.%d impl v%d.%d options 0x%x\n",
-        (specVer & 0xff00) >> 8, (specVer & 0xff),
-        (implVer & 0xff00) >> 8, (implVer & 0xff), options);
+  // Check if WTOpen() crashed in a previous execution.
+  if (handler.crashed()) {
+    m_crashedBefore = true;
+    return nullptr;
   }
 
   LOGCONTEXTW logctx;
@@ -134,9 +183,7 @@ HCTX WintabAPI::open(HWND hwnd, bool moveMouse)
       logctx.lcOutOrgX, logctx.lcOutOrgY, logctx.lcOutExtX, logctx.lcOutExtY,
       logctx.lcSysOrgX, logctx.lcSysOrgY, logctx.lcSysExtX, logctx.lcSysExtY);
 
-  logctx.lcOptions |=
-    CXO_MESSAGES |
-    CXO_CSRMESSAGES;
+  logctx.lcOptions |= CXO_MESSAGES;
   logctx.lcPktData = PACKETDATA;
   logctx.lcPktMode = PACKETMODE;
   logctx.lcMoveMask = PACKETDATA;
@@ -158,7 +205,17 @@ HCTX WintabAPI::open(HWND hwnd, bool moveMouse)
   LOG("PEN: Opening context, options 0x%x\n", logctx.lcOptions);
   HCTX ctx = WTOpen(hwnd, &logctx, TRUE);
   if (!ctx) {
-    LOG("PEN: Error attaching pen to display\n");
+    LOG("PEN: Error attaching pen to window\n");
+
+#if 0 // This is not possible because because we cannot reach this
+      // point: if the WTOpen() segfaults, the program aborts
+      // automatically.
+    if (handler.crashed()) { // Check if WTOpen() crashed in this run
+      m_crashedBefore = true;
+      LOG("PEN: WTOpen() crashed!\n");
+    }
+#endif
+
     return nullptr;
   }
 
@@ -183,7 +240,7 @@ HCTX WintabAPI::open(HWND hwnd, bool moveMouse)
   m_queueSize = q = WTQueueSizeGet(ctx);
   LOG("PEN: New queue size=%d\n", q);
 
-  LOG("PEN: Pen attached to display, new context %p\n", ctx);
+  LOG("PEN: Pen attached to window, new context %p\n", ctx);
   return ctx;
 }
 
@@ -284,10 +341,30 @@ bool WintabAPI::loadWintab()
 {
   ASSERT(!m_wintabLib);
 
+  // Don't try to call LoadLibrary() multiple times because it's
+  // really slow.
+  if (m_alreadyTried)
+    return false;
+
   m_wintabLib = base::load_dll("wintab32.dll");
+
+  m_alreadyTried = true;
   if (!m_wintabLib) {
     LOG(ERROR, "PEN: wintab32.dll is not present\n");
     return false;
+  }
+
+  // The delegate might want to get some information about the Wintab
+  // .dll (e.g. just for debugging purposes / end-user support)
+  if (m_delegate) {
+    static bool first = true;
+    if (first) {
+      first = false;
+
+      auto fields = base::ver_query_values(m_wintabLib);
+      if (!fields.empty())
+        m_delegate->onWintabFields(fields);
+    }
   }
 
   if (!checkDll()) {
@@ -308,6 +385,43 @@ bool WintabAPI::loadWintab()
       !WTQueueSizeGet || !WTQueueSizeSet) {
     LOG(ERROR, "PEN: wintab32.dll does not contain all required functions\n");
     return false;
+  }
+
+  // Only on INFO or VERBOSE modes for debugging purposes
+  if (base::get_log_level() >= INFO) {
+    // Log Wintab ID
+    UINT nchars = WTInfo(WTI_INTERFACE, IFC_WINTABID, nullptr);
+    if (nchars > 0 && nchars < 1024) {
+      // Some buggy wintab implementations may not report the right
+      // string size in the WTInfo call above (eg.: the Genius EasyPen
+      // i405X wintab). When this happens, the WTInfo call for getting
+      // the tablet id will get only a part of the string, therefore
+      // without the null terminating character. This will lead to a
+      // buffer overrun and may just crash instantly, or cause a heap
+      // corruption that will lead to a crash latter. A quick
+      // workaround to this kind of wintab misinformation is to
+      // oversize the buffer to guarantee that for the most common
+      // string lenghts it will be enough.
+      std::vector<WCHAR> buf(std::max<UINT>(128, nchars+1), 0);
+      WTInfo(WTI_INTERFACE, IFC_WINTABID, &buf[0]);
+      buf[buf.size()-1] = 0;
+      std::string id = base::to_utf8(&buf[0]);
+      LOG("PEN: Wintab ID \"%s\"\n", id.c_str());
+
+      if (m_delegate)
+        m_delegate->onWintabID(id);
+    }
+
+    // Log Wintab version
+    WORD specVer = 0;
+    WORD implVer = 0;
+    UINT options = 0;
+    WTInfo(WTI_INTERFACE, IFC_SPECVERSION, &specVer);
+    WTInfo(WTI_INTERFACE, IFC_IMPLVERSION, &implVer);
+    WTInfo(WTI_INTERFACE, IFC_CTXOPTIONS, &options);
+    LOG("PEN: Wintab spec v%d.%d impl v%d.%d options 0x%x\n",
+        (specVer & 0xff00) >> 8, (specVer & 0xff),
+        (implVer & 0xff00) >> 8, (implVer & 0xff), options);
   }
 
   LOG("PEN: Wintab library loaded\n");
@@ -332,6 +446,12 @@ bool WintabAPI::checkDll()
     return false;
 
   return true;
+}
+
+void WintabAPI::resetCrashFileIfPresent()
+{
+  m_crashedBefore = false;
+  HandleSigSegv::deleteFile();
 }
 
 } // namespace os

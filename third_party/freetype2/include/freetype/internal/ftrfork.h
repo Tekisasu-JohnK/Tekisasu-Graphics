@@ -4,7 +4,7 @@
  *
  *   Embedded resource forks accessor (specification).
  *
- * Copyright 2004-2018 by
+ * Copyright (C) 2004-2022 by
  * Masatake YAMATO and Redhat K.K.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -25,8 +25,7 @@
 #define FTRFORK_H_
 
 
-#include <ft2build.h>
-#include FT_INTERNAL_OBJECTS_H
+#include <freetype/internal/ftobjs.h>
 
 
 FT_BEGIN_HEADER
@@ -118,8 +117,8 @@ FT_BEGIN_HEADER
    * @output:
    *   new_names ::
    *     An array of guessed file names in which the resource forks may
-   *     exist.  If 'new_names[N]' is NULL, the guessed file name is equal to
-   *     `base_name`.
+   *     exist.  If 'new_names[N]' is `NULL`, the guessed file name is equal
+   *     to `base_name`.
    *
    *   offsets ::
    *     An array of guessed file offsets.  'offsets[N]' holds the file

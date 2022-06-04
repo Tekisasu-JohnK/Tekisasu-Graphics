@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2021 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -26,6 +26,7 @@ namespace base {
   size_t file_size(const std::string& path);
 
   void move_file(const std::string& src, const std::string& dst);
+  void copy_file(const std::string& src, const std::string& dst, bool overwrite);
   void delete_file(const std::string& path);
 
   bool has_readonly_attr(const std::string& path);
@@ -94,7 +95,7 @@ namespace base {
 
   int compare_filenames(const std::string& a, const std::string& b);
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   class Version;
   Version get_file_version(const std::string& filename);
   Version get_file_version(const wchar_t* filename);

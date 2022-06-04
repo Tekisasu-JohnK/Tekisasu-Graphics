@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2021-2022  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,20 +17,6 @@ namespace os {
   name = base::get_dll_proc<name##_Func>(dll, #name)
 
 WinAPI::WinAPI()
-  : EnableMouseInPointer(nullptr)
-  , IsMouseInPointerEnabled(nullptr)
-  , GetPointerInfo(nullptr)
-  , GetPointerPenInfo(nullptr)
-  , CreateInteractionContext(nullptr)
-  , DestroyInteractionContext(nullptr)
-  , StopInteractionContext(nullptr)
-  , RegisterOutputCallbackInteractionContext(nullptr)
-  , AddPointerInteractionContext(nullptr)
-  , RemovePointerInteractionContext(nullptr)
-  , SetInteractionConfigurationInteractionContext(nullptr)
-  , ProcessPointerFramesInteractionContext(nullptr)
-  , m_user32(nullptr)
-  , m_ninput(nullptr)
 {
   m_user32 = base::load_dll("user32.dll");
   m_ninput = base::load_dll("ninput.dll");
@@ -38,6 +25,7 @@ WinAPI::WinAPI()
     GET_PROC(m_user32, IsMouseInPointerEnabled);
     GET_PROC(m_user32, GetPointerInfo);
     GET_PROC(m_user32, GetPointerPenInfo);
+    GET_PROC(m_user32, SetProcessDpiAwarenessContext);
   }
   if (m_ninput) {
     GET_PROC(m_ninput, CreateInteractionContext);
@@ -49,6 +37,13 @@ WinAPI::WinAPI()
     GET_PROC(m_ninput, SetInteractionConfigurationInteractionContext);
     GET_PROC(m_ninput, SetPropertyInteractionContext);
     GET_PROC(m_ninput, ProcessPointerFramesInteractionContext);
+  }
+
+  // Set this process as DPI aware (in this way we can position
+  // windows using real pixel units)
+  if (SetProcessDpiAwarenessContext) {
+    if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+      SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
   }
 }
 

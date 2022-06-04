@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2019-2020  Igara Studio S.A.
+// Copyright (c) 2019-2021  Igara Studio S.A.
 // Copyright (c) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -36,8 +36,12 @@ Version::Version(const std::string& from)
       number = from.substr(i, j - i);
       i = j+1;
     }
-    else
+    else {
+      if (from.size() == i) // Empty string
+        break;
+
       number = from.substr(i);
+    }
 
     m_numbers.push_back(convert_to<int>(number));
   }

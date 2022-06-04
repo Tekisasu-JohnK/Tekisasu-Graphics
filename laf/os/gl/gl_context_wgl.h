@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2022  Igara Studio S.A.
 // Copyright (C) 2015-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -25,14 +26,21 @@ public:
     destroyGLContext();
   }
 
+  bool isValid() override {
+    return m_glrc != nullptr;
+  }
+
   bool createGLContext() override {
+    HDC olddc = wglGetCurrentDC();
+    HGLRC oldglrc = wglGetCurrentContext();
     HDC hdc = GetDC(m_hwnd);
 
     PIXELFORMATDESCRIPTOR pfd = {
       sizeof(PIXELFORMATDESCRIPTOR),
       1,                                // version number
       PFD_DRAW_TO_WINDOW |              // support window
-      PFD_SUPPORT_OPENGL,               // support OpenGL
+      PFD_SUPPORT_OPENGL |              // support OpenGL
+      PFD_DOUBLEBUFFER,                 // double buffered
       PFD_TYPE_RGBA,                    // RGBA type
       24,                               // 24-bit color depth
       0, 0, 0, 0, 0, 0,                 // color bits ignored
@@ -56,7 +64,6 @@ public:
       return false;
     }
 
-    wglMakeCurrent(hdc, m_glrc);
     ReleaseDC(m_hwnd, hdc);
     return true;
   }
@@ -69,17 +76,16 @@ public:
     }
   }
 
-  int getStencilBits() override {
+  void makeCurrent() override {
     HDC hdc = GetDC(m_hwnd);
-    int pixelFormat = GetPixelFormat(hdc);
-    PIXELFORMATDESCRIPTOR pfd;
-    DescribePixelFormat(hdc, pixelFormat, sizeof(pfd), &pfd);
+    wglMakeCurrent(hdc, m_glrc);
     ReleaseDC(m_hwnd, hdc);
-    return pfd.cStencilBits;
   }
 
-  int getSampleCount() override {
-    return 0;
+  void swapBuffers() override {
+    HDC hdc = GetDC(m_hwnd);
+    SwapBuffers(hdc);
+    ReleaseDC(m_hwnd, hdc);
   }
 
 private:

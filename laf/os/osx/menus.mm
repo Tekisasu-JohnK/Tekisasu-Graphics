@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -18,15 +18,15 @@ namespace os {
   class MenuItemOSX;
 }
 
-@interface OSXNSMenu : NSMenu
+@interface NSMenuOSX : NSMenu
 - (BOOL)performKeyEquivalent:(NSEvent*)event;
 @end
 
-@interface OSXNSMenuItem : NSMenuItem {
+@interface NSMenuItemOSX : NSMenuItem {
 @public
-  os::MenuItemOSX* original;
+  os::Ref<os::MenuItemOSX> original;
 }
-+ (OSXNSMenuItem*)alloc:(os::MenuItemOSX*)original;
++ (NSMenuItemOSX*)alloc:(const os::Ref<os::MenuItemOSX>&)original;
 - (void)executeMenuItem:(id)sender;
 - (void)validateMenuItem;
 @end
@@ -39,22 +39,22 @@ class MenuItemOSX : public MenuItem {
 public:
   MenuItemOSX(const MenuItemInfo& info);
   ~MenuItemOSX();
-  void dispose() override;
   void setText(const std::string& text) override;
-  void setSubmenu(Menu* submenu) override;
+  void setSubmenu(const MenuRef& submenu) override;
   void setEnabled(bool state) override;
   void setChecked(bool state) override;
   void setShortcut(const Shortcut& shortcut) override;
   NSMenuItem* handle() { return m_handle; }
 
-  // Called by OSXNSMenuItem.executeMenuItem
+  // Called by NSMenuItemOSX.executeMenuItem
   void execute();
   void validate();
 
 private:
   void syncTitle();
+
   NSMenuItem* m_handle;
-  Menu* m_submenu;
+  MenuRef m_submenu;
   std::function<void()> m_execute;
   std::function<void(os::MenuItem*)> m_validate;
 };
@@ -63,10 +63,9 @@ class MenuOSX : public Menu {
 public:
   MenuOSX();
   ~MenuOSX();
-  void dispose() override;
-  void addItem(MenuItem* item) override;
-  void insertItem(const int index, MenuItem* item) override;
-  void removeItem(MenuItem* item) override;
+  void addItem(const MenuItemRef& item) override;
+  void insertItem(const int index, const MenuItemRef& item) override;
+  void removeItem(const MenuItemRef& item) override;
   NSMenu* handle() { return m_handle; }
 private:
   NSMenu* m_handle;
@@ -74,7 +73,7 @@ private:
 
 } // namespace os
 
-@implementation OSXNSMenu
+@implementation NSMenuOSX
 - (BOOL)performKeyEquivalent:(NSEvent*)event
 {
   BOOL result = [super performKeyEquivalent:event];
@@ -84,10 +83,10 @@ private:
 }
 @end
 
-@implementation OSXNSMenuItem
-+ (OSXNSMenuItem*)alloc:(os::MenuItemOSX*)original
+@implementation NSMenuItemOSX
++ (NSMenuItemOSX*)alloc:(const os::Ref<os::MenuItemOSX>&)original
 {
-  OSXNSMenuItem* item = [super alloc];
+  NSMenuItemOSX* item = [super alloc];
   item->original = original;
   return item;
 }
@@ -100,7 +99,7 @@ private:
   // here, because if the callback invalidates some Display region
   // (SkiaWindow::invalidateRegion()) the display is not updated
   // inmediately when the event queue is locked/waiting for events
-  // (OSXEventQueue::getEvent with canWait=true) until we move the
+  // (EventQueueOSX::getEvent with canWait=true) until we move the
   // mouse (i.e. some kind of event is generated).
   os::Event ev;
   ev.setType(os::Event::Callback);
@@ -118,7 +117,7 @@ namespace os {
 //////////////////////////////////////////////////////////////////////
 // os::MenuItem impl
 
-  MenuItemOSX::MenuItemOSX(const MenuItemInfo& info)
+MenuItemOSX::MenuItemOSX(const MenuItemInfo& info)
   : m_handle(nullptr)
   , m_submenu(nullptr)
 {
@@ -133,9 +132,9 @@ namespace os {
           sel = @selector(executeMenuItem:);
 
           // TODO this is strange, it doesn't work, we receive the
-          // message in OSXAppDelegate anyway. So
-          // OSXAppDelegate.executeMenuItem: will redirect the message
-          // to OSXNSMenuItem.executeMenuItem:
+          // message in AppDelegateOSX anyway. So
+          // AppDelegateOSX.executeMenuItem: will redirect the message
+          // to NSMenuItemOSX.executeMenuItem:
           target = m_handle;
           break;
 
@@ -165,7 +164,7 @@ namespace os {
       }
 
       m_handle =
-        [[OSXNSMenuItem alloc:this]
+        [[NSMenuItemOSX alloc:AddRef(this)]
             initWithTitle:[NSString stringWithUTF8String:info.text.c_str()]
                    action:sel
             keyEquivalent:@""];
@@ -188,15 +187,10 @@ namespace os {
 MenuItemOSX::~MenuItemOSX()
 {
   if (m_submenu)
-    m_submenu->dispose();
+    m_submenu.reset();
 
   if (m_handle.parentItem)
     [m_handle.parentItem.submenu removeItem:m_handle];
-}
-
-void MenuItemOSX::dispose()
-{
-  delete this;
 }
 
 void MenuItemOSX::setText(const std::string& text)
@@ -205,16 +199,16 @@ void MenuItemOSX::setText(const std::string& text)
   syncTitle();
 }
 
-void MenuItemOSX::setSubmenu(Menu* submenu)
+void MenuItemOSX::setSubmenu(const MenuRef& submenu)
 {
   if (m_submenu) {
-    ASSERT(m_handle.submenu == ((MenuOSX*)m_submenu)->handle());
-    m_submenu->dispose();
+    ASSERT(m_handle.submenu == ((MenuOSX*)m_submenu.get())->handle());
+    m_submenu.reset();
   }
 
   m_submenu = submenu;
   if (submenu) {
-    [m_handle setSubmenu:((MenuOSX*)submenu)->handle()];
+    [m_handle setSubmenu:((MenuOSX*)submenu.get())->handle()];
     syncTitle();
   }
   else
@@ -273,7 +267,7 @@ void MenuItemOSX::syncTitle()
   // UI instead of the MenuItem title (so here we copy the menu item
   // title to the submenu title)
   if (m_submenu)
-    [((MenuOSX*)m_submenu)->handle() setTitle:m_handle.title];
+    [((MenuOSX*)m_submenu.get())->handle() setTitle:m_handle.title];
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -281,7 +275,7 @@ void MenuItemOSX::syncTitle()
 
 MenuOSX::MenuOSX()
 {
-  m_handle = [[OSXNSMenu alloc] init];
+  m_handle = [[NSMenuOSX alloc] init];
 }
 
 MenuOSX::~MenuOSX()
@@ -293,36 +287,31 @@ MenuOSX::~MenuOSX()
   }
 
   for (NSMenuItem* nsItem : items) {
-    if ([nsItem isKindOfClass:[OSXNSMenuItem class]]) {
-      auto item = (OSXNSMenuItem*)nsItem;
+    if ([nsItem isKindOfClass:[NSMenuItemOSX class]]) {
+      auto item = (NSMenuItemOSX*)nsItem;
       item->original->dispose();
     }
   }
 #endif
 }
 
-void MenuOSX::dispose()
-{
-  delete this;
-}
-
-void MenuOSX::addItem(MenuItem* item)
+void MenuOSX::addItem(const MenuItemRef& item)
 {
   ASSERT(item);
-  [m_handle addItem:((MenuItemOSX*)item)->handle()];
+  [m_handle addItem:((MenuItemOSX*)item.get())->handle()];
 }
 
-void MenuOSX::insertItem(const int index, MenuItem* item)
+void MenuOSX::insertItem(const int index, const MenuItemRef& item)
 {
   ASSERT(item);
-  [m_handle insertItem:((MenuItemOSX*)item)->handle()
+  [m_handle insertItem:((MenuItemOSX*)item.get())->handle()
                atIndex:index];
 }
 
-void MenuOSX::removeItem(MenuItem* item)
+void MenuOSX::removeItem(const MenuItemRef& item)
 {
   ASSERT(item);
-  [m_handle removeItem:((MenuItemOSX*)item)->handle()];
+  [m_handle removeItem:((MenuItemOSX*)item.get())->handle()];
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -332,20 +321,20 @@ MenusOSX::MenusOSX()
 {
 }
 
-Menu* MenusOSX::createMenu()
+MenuRef MenusOSX::makeMenu()
 {
-  return new MenuOSX;
+  return make_ref<MenuOSX>();
 }
 
-MenuItem* MenusOSX::createMenuItem(const MenuItemInfo& info)
+MenuItemRef MenusOSX::makeMenuItem(const MenuItemInfo& info)
 {
-  return new MenuItemOSX(info);
+  return make_ref<MenuItemOSX>(info);
 }
 
-void MenusOSX::setAppMenu(Menu* menu)
+void MenusOSX::setAppMenu(const MenuRef& menu)
 {
   if (menu)
-    [NSApp setMainMenu:((MenuOSX*)menu)->handle()];
+    [NSApp setMainMenu:((MenuOSX*)menu.get())->handle()];
   else
     [NSApp setMainMenu:nil];
 }

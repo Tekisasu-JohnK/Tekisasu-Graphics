@@ -4,7 +4,7 @@
  *
  *   FreeType API for validating OpenType tables (specification).
  *
- * Copyright 2004-2018 by
+ * Copyright (C) 2004-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -30,8 +30,7 @@
 #ifndef FTOTVAL_H_
 #define FTOTVAL_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -67,7 +66,7 @@ FT_BEGIN_HEADER
    */
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *    FT_VALIDATE_OTXXX
@@ -114,7 +113,7 @@ FT_BEGIN_HEADER
                           FT_VALIDATE_MATH )
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_OpenType_Validate
@@ -157,7 +156,7 @@ FT_BEGIN_HEADER
    *   otherwise.
    *
    *   After use, the application should deallocate the five tables with
-   *   @FT_OpenType_Free.  A NULL value indicates that the table either
+   *   @FT_OpenType_Free.  A `NULL` value indicates that the table either
    *   doesn't exist in the font, or the application hasn't asked for
    *   validation.
    */
@@ -171,7 +170,7 @@ FT_BEGIN_HEADER
                         FT_Bytes  *JSTF_table );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_OpenType_Free

@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (c) 2018-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -30,31 +30,31 @@ ColorSpace::ColorSpace(const Type type,
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeNone()
+ColorSpaceRef ColorSpace::MakeNone()
 {
-  return std::make_shared<ColorSpace>(None);
+  return base::make_ref<ColorSpace>(None);
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeSRGB()
+ColorSpaceRef ColorSpace::MakeSRGB()
 {
-  return std::make_shared<ColorSpace>(sRGB);
+  return base::make_ref<ColorSpace>(sRGB);
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeLinearSRGB()
+ColorSpaceRef ColorSpace::MakeLinearSRGB()
 {
-  return std::make_shared<ColorSpace>(sRGB, HasGamma, 1.0);
+  return base::make_ref<ColorSpace>(sRGB, HasGamma, 1.0);
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeSRGBWithGamma(float gamma)
+ColorSpaceRef ColorSpace::MakeSRGBWithGamma(float gamma)
 {
-  return std::make_shared<ColorSpace>(sRGB, HasGamma, gamma);
+  return base::make_ref<ColorSpace>(sRGB, HasGamma, gamma);
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeRGB(const ColorSpaceTransferFn& fn,
+ColorSpaceRef ColorSpace::MakeRGB(const ColorSpaceTransferFn& fn,
                                   const ColorSpacePrimaries& p)
 {
   std::vector<uint8_t> data(sizeof(ColorSpaceTransferFn) + sizeof(ColorSpacePrimaries));
@@ -64,43 +64,43 @@ ColorSpacePtr ColorSpace::MakeRGB(const ColorSpaceTransferFn& fn,
   std::copy(((const uint8_t*)&p),
             ((const uint8_t*)&p) + sizeof(ColorSpacePrimaries),
             data.begin() + sizeof(ColorSpaceTransferFn));
-  return std::make_shared<ColorSpace>(
+  return base::make_ref<ColorSpace>(
     RGB, Flag(HasTransferFn | HasPrimaries), 1.0, std::move(data));
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeRGBWithSRGBGamut(const ColorSpaceTransferFn& fn)
+ColorSpaceRef ColorSpace::MakeRGBWithSRGBGamut(const ColorSpaceTransferFn& fn)
 {
   std::vector<uint8_t> data(sizeof(ColorSpaceTransferFn));
   std::copy(((const uint8_t*)&fn),
             ((const uint8_t*)&fn) + sizeof(ColorSpaceTransferFn),
             data.begin());
-  return std::make_shared<ColorSpace>(sRGB, HasTransferFn, 1.0, std::move(data));
+  return base::make_ref<ColorSpace>(sRGB, HasTransferFn, 1.0, std::move(data));
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeRGBWithSRGBGamma(const ColorSpacePrimaries& p)
+ColorSpaceRef ColorSpace::MakeRGBWithSRGBGamma(const ColorSpacePrimaries& p)
 {
   std::vector<uint8_t> data(sizeof(ColorSpacePrimaries));
   std::copy(((const uint8_t*)&p),
             ((const uint8_t*)&p) + sizeof(ColorSpacePrimaries),
             data.begin());
-  return std::make_shared<ColorSpace>(sRGB, HasPrimaries, 1.0, std::move(data));
+  return base::make_ref<ColorSpace>(sRGB, HasPrimaries, 1.0, std::move(data));
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeICC(const void* data, size_t n)
+ColorSpaceRef ColorSpace::MakeICC(const void* data, size_t n)
 {
   std::vector<uint8_t> newData(n);
   std::copy(((const uint8_t*)data),
             ((const uint8_t*)data)+n, newData.begin());
-  return std::make_shared<ColorSpace>(ICC, HasICC, 1.0, std::move(newData));
+  return base::make_ref<ColorSpace>(ICC, HasICC, 1.0, std::move(newData));
 }
 
 // static
-ColorSpacePtr ColorSpace::MakeICC(std::vector<uint8_t>&& data)
+ColorSpaceRef ColorSpace::MakeICC(std::vector<uint8_t>&& data)
 {
-  return std::make_shared<ColorSpace>(ICC, HasICC, 1.0, std::move(data));
+  return base::make_ref<ColorSpace>(ICC, HasICC, 1.0, std::move(data));
 }
 
 // Based on code in skia/src/core/SkICC.cpp by Google Inc.

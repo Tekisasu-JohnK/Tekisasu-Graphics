@@ -1,5 +1,5 @@
 # LAF Gfx Library
-# Copyright (c) 2018-2019  Igara Studio S.A.
+# Copyright (c) 2018-2022  Igara Studio S.A.
 # Copyright (C) 2001-2017  David Capello
 
 set(LAF_GFX_EXTRA_SOURCES)
@@ -15,6 +15,10 @@ else()
     set(LAF_GFX_EXTRA_SOURCES
       packing_rects.cpp
       region_pixman.cpp)
+  elseif(WIN32)
+    set(LAF_GFX_EXTRA_SOURCES
+      packing_rects.cpp
+      region_win.cpp)
   endif()
 endif()
 
@@ -34,6 +38,12 @@ elseif(PIXMAN_LIBRARY)
   target_link_libraries(laf-gfx ${PIXMAN_LIBRARY})
   target_include_directories(laf-gfx PRIVATE ${PIXMAN_INCLUDE_DIR})
   target_compile_definitions(laf-gfx PUBLIC LAF_WITH_REGION LAF_PIXMAN)
+elseif(WIN32)
+  # Don't define min/max() macros when including <windows.h>
+  target_compile_options(laf-gfx PRIVATE -DNOMINMAX)
+
+  # Alternative HRGN implementation for gfx::Region just for testing
+  target_compile_definitions(laf-gfx PUBLIC LAF_WITH_REGION)
 endif()
 
 if(LAF_WITH_TESTS)

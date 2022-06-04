@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2012-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -19,11 +19,11 @@
 
 namespace os {
 
-class OSXApp::Impl {
+class AppOSX::Impl {
 public:
   bool init() {
-    m_app = [OSXNSApplication sharedApplication];
-    m_appDelegate = [OSXAppDelegate new];
+    m_app = [NSApplicationOSX sharedApplication];
+    m_appDelegate = [AppDelegateOSX new];
 
     [m_app setDelegate:m_appDelegate];
 
@@ -59,51 +59,51 @@ public:
 
 private:
   NSApplication* m_app;
-  OSXAppDelegate* m_appDelegate;
+  AppDelegateOSX* m_appDelegate;
 };
 
-static OSXApp* g_instance = nullptr;
+static AppOSX* g_instance = nullptr;
 
 // static
-OSXApp* OSXApp::instance()
+AppOSX* AppOSX::instance()
 {
   return g_instance;
 }
 
-OSXApp::OSXApp()
+AppOSX::AppOSX()
   : m_impl(new Impl)
 {
   ASSERT(!g_instance);
   g_instance = this;
 }
 
-OSXApp::~OSXApp()
+AppOSX::~AppOSX()
 {
   ASSERT(g_instance == this);
   g_instance = nullptr;
 }
 
-bool OSXApp::init()
+bool AppOSX::init()
 {
   return m_impl->init();
 }
 
-void OSXApp::setAppMode(AppMode appMode)
+void AppOSX::setAppMode(AppMode appMode)
 {
   m_impl->setAppMode(appMode);
 }
 
-void OSXApp::markCliFileAsProcessed(const std::string& fn)
+void AppOSX::markCliFileAsProcessed(const std::string& fn)
 {
   m_impl->markCliFileAsProcessed(fn);
 }
 
-void OSXApp::finishLaunching()
+void AppOSX::finishLaunching()
 {
   m_impl->finishLaunching();
 }
 
-void OSXApp::activateApp()
+void AppOSX::activateApp()
 {
   m_impl->activateApp();
 }

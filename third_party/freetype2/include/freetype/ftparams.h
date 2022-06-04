@@ -4,7 +4,7 @@
  *
  *   FreeType API for possible FT_Parameter tags (specification only).
  *
- * Copyright 2017-2018 by
+ * Copyright (C) 2017-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,8 +19,7 @@
 #ifndef FTPARAMS_H_
 #define FTPARAMS_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -51,7 +50,7 @@ FT_BEGIN_HEADER
    */
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_PARAM_TAG_IGNORE_TYPOGRAPHIC_FAMILY
@@ -75,7 +74,7 @@ FT_BEGIN_HEADER
           FT_PARAM_TAG_IGNORE_TYPOGRAPHIC_FAMILY
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_PARAM_TAG_IGNORE_TYPOGRAPHIC_SUBFAMILY
@@ -99,7 +98,7 @@ FT_BEGIN_HEADER
           FT_PARAM_TAG_IGNORE_TYPOGRAPHIC_SUBFAMILY
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_PARAM_TAG_INCREMENTAL
@@ -111,6 +110,21 @@ FT_BEGIN_HEADER
    */
 #define FT_PARAM_TAG_INCREMENTAL \
           FT_MAKE_TAG( 'i', 'n', 'c', 'r' )
+
+
+  /**************************************************************************
+   *
+   * @enum:
+   *   FT_PARAM_TAG_IGNORE_SBIX
+   *
+   * @description:
+   *   A tag for @FT_Parameter to make @FT_Open_Face ignore an 'sbix' table
+   *   while loading a font.  Use this if @FT_FACE_FLAG_SBIX is set and you
+   *   want to access the outline glyphs in the font.
+   *
+   */
+#define FT_PARAM_TAG_IGNORE_SBIX \
+          FT_MAKE_TAG( 'i', 's', 'b', 'x' )
 
 
   /**************************************************************************
@@ -175,7 +189,7 @@ FT_BEGIN_HEADER
           FT_MAKE_TAG( 'd', 'a', 'r', 'k' )
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_PARAM_TAG_UNPATENTED_HINTING

@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2021  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -8,11 +9,11 @@
 #include "config.h"
 #endif
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include "os/win/event_queue.h"
-#elif __APPLE__
+#elif LAF_MACOS
   #include "os/osx/event_queue.h"
-#else
+#elif LAF_LINUX
   #include "os/x11/event_queue.h"
 #endif
 

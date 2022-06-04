@@ -1,5 +1,5 @@
 // LAF FreeType Wrapper
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2022 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,6 +9,7 @@
 #define FT_HB_SHAPER_H_INCLUDED
 #pragma once
 
+#include "base/utf8_decode.h"
 #include "ft/hb_face.h"
 
 #include <vector>
@@ -18,24 +19,27 @@ namespace ft {
   template<typename HBFace>
   class HBShaper {
   public:
-    HBShaper(HBFace& face) : m_face(face) {
-    }
 
-    bool initialize(const base::utf8_const_iterator& begin,
-                    const base::utf8_const_iterator& end) {
-      m_index = 0;
-      m_glyphCount = 0;
-      if (begin == end)
-        return false;
-
+    HBShaper(HBFace& face, const std::string& str)
+      : m_face(face) {
       hb_buffer_t* buf = hb_buffer_create();
       hb_buffer_t* chrBuf = hb_buffer_create();
       hb_script_t script = HB_SCRIPT_UNKNOWN;
 
-      for (auto it=begin; it!=end; ++it) {
+      base::utf8_decode decode(str);
+      if (decode.is_end())
+        return;
+
+      const auto begin = str.begin();
+      while (true) {
+        const auto pos = decode.pos();
+        const int chr = decode.next();
+        if (!chr)
+          break;
+
         // Get the script of the next character in *it
         hb_buffer_set_content_type(chrBuf, HB_BUFFER_CONTENT_TYPE_UNICODE);
-        hb_buffer_add(chrBuf, *it, 0);
+        hb_buffer_add(chrBuf, chr, 0);
         hb_buffer_guess_segment_properties(chrBuf);
         hb_script_t newScript = hb_buffer_get_script(chrBuf);
         hb_buffer_reset(chrBuf);
@@ -46,26 +50,26 @@ namespace ft {
           script = newScript;
         }
 
-        hb_buffer_add(buf, *it, it - begin);
+        hb_buffer_add(buf, chr, pos - begin);
       }
       addBuffer(buf, script);
 
       hb_buffer_destroy(buf);
       hb_buffer_destroy(chrBuf);
-
-      return (m_glyphCount > 0);
     }
 
-    bool nextChar() {
-      ++m_index;
-      return (m_index < m_glyphCount);
+    int next() {
+      if (++m_index < m_glyphCount)
+        return m_glyphInfo[m_index].codepoint;
+      else
+        return 0;
     }
 
     int unicodeChar() const {
       return m_glyphInfo[m_index].codepoint;
     }
 
-    int charIndex() {
+    int charIndex() const {
       return m_glyphInfo[m_index].cluster;
     }
 
@@ -115,8 +119,8 @@ namespace ft {
     HBFace& m_face;
     std::vector<hb_glyph_info_t> m_glyphInfo;
     std::vector<hb_glyph_position_t> m_glyphPos;
-    unsigned int m_glyphCount;
-    unsigned int m_index;
+    int m_glyphCount = 0;
+    int m_index = -1;
   };
 
 } // namespace ft

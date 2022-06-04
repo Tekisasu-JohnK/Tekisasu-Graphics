@@ -8,6 +8,8 @@
 
 #include "base/thread_pool.h"
 
+#include <atomic>
+
 using namespace base;
 
 TEST(ThreadPool, Basic)

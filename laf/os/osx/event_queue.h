@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2015-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -17,12 +17,13 @@
 
 namespace os {
 
-class OSXEventQueue : public EventQueue {
+class EventQueueOSX : public EventQueue {
 public:
-  OSXEventQueue();
+  EventQueueOSX();
 
-  void getEvent(Event& ev, bool canWait) override;
+  void getEvent(Event& ev, double timeout) override;
   void queueEvent(const Event& ev) override;
+  void clearEvents() override;
 
 private:
   void wakeUpQueue();
@@ -31,7 +32,7 @@ private:
   std::atomic<bool> m_sleeping;
 };
 
-typedef OSXEventQueue EventQueueImpl;
+using EventQueueImpl = EventQueueOSX;
 
 } // namespace os
 

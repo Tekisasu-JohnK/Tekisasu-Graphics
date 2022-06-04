@@ -1,4 +1,5 @@
 // LAF FreeType Wrapper
+// Copyright (c) 2022 Igara Studio S.A.
 // Copyright (c) 2016-2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,6 +10,7 @@
 #pragma once
 
 #include "base/string.h"
+#include "base/utf8_decode.h"
 #include "ft/freetype_headers.h"
 #include "ft/hb_shaper.h"
 #include "gfx/rect.h"
@@ -18,29 +20,26 @@ namespace ft {
   template<typename FaceFT>
   class DefaultShaper {
   public:
-    typedef typename FaceFT::Glyph Glyph;
+    using Glyph = typename FaceFT::Glyph;
 
-    DefaultShaper(FaceFT& face) : m_face(face) {
+    DefaultShaper(FaceFT& face,
+                  const std::string& str)
+      : m_face(face)
+      , m_begin(str.begin())
+      , m_decode(str) {
     }
 
-    bool initialize(const base::utf8_const_iterator& it,
-                    const base::utf8_const_iterator& end) {
-      m_begin = m_it = it;
-      m_end = end;
-      return (m_it != end);
-    }
-
-    bool nextChar() {
-      ++m_it;
-      return (m_it != m_end);
+    int next() {
+      m_pos = m_decode.pos();
+      return (m_char = m_decode.next());
     }
 
     int unicodeChar() const {
-      return *m_it;
+      return m_char;
     }
 
-    int charIndex() {
-      return m_it - m_begin;
+    int charIndex() const {
+      return m_pos - m_begin;
     }
 
     unsigned int glyphIndex() {
@@ -58,7 +57,10 @@ namespace ft {
 
   private:
     FaceFT& m_face;
-    base::utf8_const_iterator m_begin, m_end, m_it;
+    std::string::const_iterator m_begin;
+    std::string::const_iterator m_pos;
+    base::utf8_decode m_decode;
+    int m_char = 0;
   };
 
   template<typename FaceFT,
@@ -67,9 +69,9 @@ namespace ft {
   public:
     typedef typename FaceFT::Glyph Glyph;
 
-    ForEachGlyph(FaceFT& face)
+    ForEachGlyph(FaceFT& face, const std::string& str)
       : m_face(face)
-      , m_shaper(face)
+      , m_shaper(face, str)
       , m_glyph(nullptr)
       , m_useKerning(FT_HAS_KERNING(((FT_Face)face)) ? true: false)
       , m_prevGlyph(0)
@@ -85,23 +87,16 @@ namespace ft {
 
     const Glyph* glyph() const { return m_glyph; }
 
-    bool initialize(const base::utf8_const_iterator& it,
-                    const base::utf8_const_iterator& end) {
-      bool res = m_shaper.initialize(it, end);
-      if (res)
-        prepareGlyph();
-      return res;
-    }
+    int next() {
+      if (m_glyph)
+        m_prevGlyph = m_shaper.glyphIndex();
 
-    bool nextChar() {
-      m_prevGlyph = m_shaper.glyphIndex();
-
-      if (m_shaper.nextChar()) {
+      if (int chr = m_shaper.next()) {
         prepareGlyph();
-        return true;
+        return chr;
       }
       else
-        return false;
+        return 0;
     }
 
   private:
@@ -156,16 +151,13 @@ namespace ft {
   template<typename FaceFT>
   gfx::Rect calc_text_bounds(FaceFT& face, const std::string& str) {
     gfx::Rect bounds(0, 0, 0, 0);
-    ForEachGlyph<FaceFT> feg(face);
-    if (feg.initialize(base::utf8_const_iterator(str.begin()),
-                       base::utf8_const_iterator(str.end()))) {
-      do {
-        if (auto glyph = feg.glyph())
-          bounds |= gfx::Rect(int(glyph->x),
-                              int(glyph->y),
-                              glyph->bitmap->width,
-                              glyph->bitmap->rows);
-      } while (feg.nextChar());
+    ForEachGlyph<FaceFT> feg(face, str);
+    while (feg.next()) {
+      if (auto glyph = feg.glyph())
+        bounds |= gfx::Rect(int(glyph->x),
+                            int(glyph->y),
+                            glyph->bitmap->width,
+                            glyph->bitmap->rows);
     }
     return bounds;
   }

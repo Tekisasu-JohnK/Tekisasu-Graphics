@@ -4,7 +4,7 @@
  *
  *   Quick computation of advance widths (specification only).
  *
- * Copyright 2008-2018 by
+ * Copyright (C) 2008-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -20,8 +20,7 @@
 #define FTADVANC_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -62,7 +61,7 @@ FT_BEGIN_HEADER
    *   FT_ADVANCE_FLAG_FAST_ONLY
    *
    * @description:
-   *   A bit-flag to be OR-ed with the 'flags' parameter of the
+   *   A bit-flag to be OR-ed with the `flags` parameter of the
    *   @FT_Get_Advance and @FT_Get_Advances functions.
    *
    *   If set, it indicates that you want these functions to fail if the
@@ -96,6 +95,7 @@ FT_BEGIN_HEADER
    *   load_flags ::
    *     A set of bit flags similar to those used when calling
    *     @FT_Load_Glyph, used to determine what kind of advances you need.
+   *
    * @output:
    *   padvance ::
    *     The advance value.  If scaling is performed (based on the value of
@@ -149,7 +149,7 @@ FT_BEGIN_HEADER
    * @output:
    *   padvance ::
    *     The advance values.  This array, to be provided by the caller, must
-   *     contain at least 'count' elements.
+   *     contain at least `count` elements.
    *
    *     If scaling is performed (based on the value of `load_flags`), the
    *     advance values are in 16.16 format.  Otherwise, they are in font

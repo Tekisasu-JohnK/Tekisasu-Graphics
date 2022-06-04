@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -7,7 +8,7 @@
 #ifndef BASE_WIN_REGISTRY_H_INCLUDED
 #define BASE_WIN_REGISTRY_H_INCLUDED
 
-#if !defined(_WIN32)
+#if !LAF_WINDOWS
   #error This header file can be used only on Windows platform
 #endif
 

@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,28 +15,48 @@
 
 #include "os/win/event_queue.h"
 
+#include "base/time.h"
+
 namespace os {
 
-void WinEventQueue::getEvent(Event& ev, bool canWait)
+void EventQueueWin::queueEvent(const Event& ev)
 {
+  m_events.push(ev);
+}
+
+void EventQueueWin::clearEvents()
+{
+  m_events.clear();
+}
+
+void EventQueueWin::getEvent(Event& ev, double timeout)
+{
+  const base::tick_t untilTick = base::current_tick() + timeout*1000.0;
   MSG msg;
+
+  ev.setWindow(nullptr);
 
   while (m_events.empty()) {
     BOOL res;
 
-    checkResizeDisplayEvent(canWait);
-
-    if (canWait) {
+    if (timeout == kWithoutTimeout) {
       res = GetMessage(&msg, nullptr, 0, 0);
     }
     else {
+      const base::tick_t now = base::current_tick();
+      if (untilTick > now) {
+        const base::tick_t msecs = (untilTick - now);
+        MsgWaitForMultipleObjects(0, nullptr, FALSE,
+                                  (DWORD)msecs, // Milliseconds to wait
+                                  QS_ALLINPUT | QS_ALLPOSTMESSAGE);
+      }
       res = PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE);
     }
 
     if (res) {
       // Avoid transforming WM_KEYDOWN/UP into WM_DEADCHAR/WM_CHAR
       // messages. Dead keys are converted manually in the
-      // WM_KEYDOWN processing on our WinWindow<T> class.
+      // WM_KEYDOWN processing on our WindowWin<T> class.
       //
       // From MSDN TranslateMessage() documentation:
       //   "WM_KEYDOWN and WM_KEYUP combinations produce a WM_CHAR
@@ -48,7 +68,7 @@ void WinEventQueue::getEvent(Event& ev, bool canWait)
       }
       DispatchMessage(&msg);
     }
-    else if (!canWait)
+    else if (timeout != kWithoutTimeout)
       break;
   }
 

@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021-2022 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,8 +12,9 @@
 #include "base/fs.h"
 #include "base/split_string.h"
 #include "base/string.h"
+#include "base/utf8_decode.h"
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include "base/fs_win32.h"
 #else
   #include "base/fs_unix.h"
@@ -25,7 +27,7 @@
 
 namespace base {
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   const std::string::value_type path_separator = '\\';
 #else
   const std::string::value_type path_separator = '/';
@@ -57,7 +59,7 @@ std::string get_absolute_path(const std::string& filename)
 {
   std::string fn = filename;
   if (fn.size() > 2 &&
-#ifdef _WIN32
+#if LAF_WINDOWS
       fn[1] != ':'
 #else
       fn[0] != '/'
@@ -261,33 +263,42 @@ bool has_file_extension(const std::string& filename, const base::paths& extensio
 
 int compare_filenames(const std::string& a, const std::string& b)
 {
-  utf8_const_iterator a_begin(a.begin()), a_end(a.end());
-  utf8_const_iterator b_begin(b.begin()), b_end(b.end());
-  utf8_const_iterator a_it(a_begin);
-  utf8_const_iterator b_it(b_begin);
+  utf8_decode a_dec(a), b_dec(b);
 
-  for (; a_it != a_end && b_it != b_end; ) {
-    int a_chr = *a_it;
-    int b_chr = *b_it;
+  while (!a_dec.is_end() && !b_dec.is_end()) {
+    int a_chr = a_dec.next();
+    if (!a_chr)
+      break;
+
+    int b_chr = b_dec.next();
+    if (!b_chr)
+      break;
 
     if ((a_chr >= '0') && (a_chr <= '9') && (b_chr >= '0') && (b_chr <= '9')) {
-      utf8_const_iterator a_it2 = a_it;
-      utf8_const_iterator b_it2 = b_it;
+      auto a_dec2 = a_dec;
+      auto b_dec2 = b_dec;
 
-      while (a_it2 != a_end && (*a_it2 >= '0') && (*a_it2 <= '9')) ++a_it2;
-      while (b_it2 != b_end && (*b_it2 >= '0') && (*b_it2 <= '9')) ++b_it2;
+      int a_num = (a_chr - '0');
+      while (int c = a_dec2.next()) {
+        if ((c >= '0') && (c <= '9'))
+          a_num = (a_num*10 + (c - '0'));
+        else
+          break;
+      }
 
-      int a_num = std::strtol(std::string(a_it, a_it2).c_str(), NULL, 10);
-      int b_num = std::strtol(std::string(b_it, b_it2).c_str(), NULL, 10);
+      int b_num = (b_chr - '0');
+      while (int c = b_dec2.next()) {
+        if ((c >= '0') && (c <= '9'))
+          b_num = (b_num*10 + (c - '0'));
+        else
+          break;
+      }
+
       if (a_num != b_num)
         return a_num - b_num < 0 ? -1: 1;
-
-      a_it = a_it2;
-      b_it = b_it2;
     }
     else if (is_path_separator(a_chr) && is_path_separator(b_chr)) {
-      ++a_it;
-      ++b_it;
+      // Go to next char
     }
     else {
       a_chr = std::tolower(a_chr);
@@ -295,15 +306,12 @@ int compare_filenames(const std::string& a, const std::string& b)
 
       if (a_chr != b_chr)
         return a_chr - b_chr < 0 ? -1: 1;
-
-      ++a_it;
-      ++b_it;
     }
   }
 
-  if (a_it == a_end && b_it == b_end)
+  if (a_dec.is_end() && b_dec.is_end())
     return 0;
-  else if (a_it == a_end)
+  else if (a_dec.is_end())
     return -1;
   else
     return 1;

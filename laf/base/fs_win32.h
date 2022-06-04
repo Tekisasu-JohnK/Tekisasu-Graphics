@@ -49,6 +49,13 @@ void move_file(const std::string& src, const std::string& dst)
     throw Win32Exception("Error moving file");
 }
 
+void copy_file(const std::string& src, const std::string& dst, bool overwrite)
+{
+  BOOL result = ::CopyFile(from_utf8(src).c_str(), from_utf8(dst).c_str(), !overwrite);
+  if (result == 0)
+    throw Win32Exception("Error copying file");
+}
+
 void delete_file(const std::string& path)
 {
   BOOL result = ::DeleteFile(from_utf8(path).c_str());

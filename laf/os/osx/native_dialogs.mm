@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020-2021  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,20 +10,20 @@
 
 #include "base/fs.h"
 #include "os/common/file_dialog.h"
-#include "os/display.h"
 #include "os/keys.h"
 #include "os/native_cursor.h"
 #include "os/osx/native_dialogs.h"
+#include "os/window.h"
 
 @interface OpenSaveHelper : NSObject {
 @private
   NSSavePanel* panel;
-  os::Display* display;
+  os::Window* window;
   int result;
 }
 - (id)init;
 - (void)setPanel:(NSSavePanel*)panel;
-- (void)setDisplay:(os::Display*)display;
+- (void)setWindow:(os::Window*)window;
 - (void)runModal;
 - (int)result;
 @end
@@ -42,17 +43,17 @@
   panel = newPanel;
 }
 
-- (void)setDisplay:(os::Display*)newDisplay
+- (void)setWindow:(os::Window*)newWindow
 {
-  display = newDisplay;
+  window = newWindow;
 }
 
 // This is executed in the main thread.
 - (void)runModal
 {
   [[[NSApplication sharedApplication] mainMenu] setAutoenablesItems:NO];
-  os::NativeCursor oldCursor = display->nativeMouseCursor();
-  display->setNativeMouseCursor(os::kArrowCursor);
+  os::NativeCursor oldCursor = window->nativeCursor();
+  window->setCursor(os::NativeCursor::Arrow);
 
 #ifndef __MAC_10_6              // runModalForTypes is deprecated in 10.6
   if ([panel isKindOfClass:[NSOpenPanel class]]) {
@@ -68,9 +69,9 @@
     result = [panel runModal];
   }
 
-  display->setNativeMouseCursor(oldCursor);
-  NSWindow *window = (__bridge NSWindow *)display->nativeHandle();
-  [window makeKeyAndOrderFront:nil];
+  window->setCursor(oldCursor);
+  NSWindow* nsWindow = (__bridge NSWindow *)window->nativeHandle();
+  [nsWindow makeKeyAndOrderFront:nil];
   [[[NSApplication sharedApplication] mainMenu] setAutoenablesItems:YES];
 }
 
@@ -100,7 +101,7 @@ public:
     m_filename = filename;
   }
 
-  bool show(Display* display) override {
+  bool show(Window* window) override {
     bool retValue = false;
     @autoreleasepool {
       NSSavePanel* panel = nil;
@@ -142,7 +143,7 @@ public:
 
       OpenSaveHelper* helper = [OpenSaveHelper new];
       [helper setPanel:panel];
-      [helper setDisplay:display];
+      [helper setWindow:window];
       [helper performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
 
       if ([helper result] == NSFileHandlingPanelOKButton) {
@@ -173,9 +174,9 @@ NativeDialogsOSX::NativeDialogsOSX()
 {
 }
 
-FileDialog* NativeDialogsOSX::createFileDialog()
+FileDialogRef NativeDialogsOSX::makeFileDialog()
 {
-  return new FileDialogOSX();
+  return make_ref<FileDialogOSX>();
 }
 
 } // namespace os

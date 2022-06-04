@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -24,7 +24,7 @@
 
 namespace os {
 
-// Global variable used between View and OSXNSMenu to check if the
+// Global variable used between View and NSMenuOSX to check if the
 // keyDown: event was used by a key equivalent in the menu.
 //
 // TODO I'm not proud of this, but it does the job
@@ -40,6 +40,7 @@ namespace {
 int g_pressedKeys[kKeyScancodes];
 bool g_translateDeadKeys = false;
 UInt32 g_lastDeadKeyState = 0;
+NSCursor* g_emptyNsCursor = nil;
 
 gfx::Point get_local_mouse_pos(NSView* view, NSEvent* event)
 {
@@ -47,7 +48,7 @@ gfx::Point get_local_mouse_pos(NSView* view, NSEvent* event)
                             fromView:nil];
   int scale = 1;
   if ([view window])
-    scale = [(OSXWindow*)[view window] scale];
+    scale = [(WindowOSXObjc*)[view window] scale];
 
   // "os" layer coordinates expect (X,Y) origin at the top-left corner.
   return gfx::Point(point.x / scale,
@@ -120,7 +121,7 @@ void osx_set_async_view(bool state)
 
 using namespace os;
 
-@implementation OSXView
+@implementation ViewOSX
 
 - (id)initWithFrame:(NSRect)frameRect
 {
@@ -149,7 +150,28 @@ using namespace os;
   return self;
 }
 
+- (void)dealloc
+{
+  [self destroyMouseTrackingArea];
+}
+
+- (void)removeImpl
+{
+  m_impl = nullptr;
+}
+
 - (BOOL)acceptsFirstResponder
+{
+  return YES;
+}
+
+- (BOOL)acceptsFirstMouse:(NSEvent*)event
+{
+  [super acceptsFirstMouse:event];
+  return YES;
+}
+
+- (BOOL)mouseDownCanMoveWindow
 {
   return YES;
 }
@@ -178,7 +200,7 @@ using namespace os;
   [super viewDidMoveToWindow];
 
   if ([self window]) {
-    m_impl = [((OSXWindow*)[self window]) impl];
+    m_impl = [((WindowOSXObjc*)[self window]) impl];
     if (m_impl)
       m_impl->onWindowChanged();
   }
@@ -278,7 +300,7 @@ using namespace os;
 - (void)flagsChanged:(NSEvent*)event
 {
   [super flagsChanged:event];
-  [OSXView updateKeyFlags:event];
+  [ViewOSX updateKeyFlags:event];
 }
 
 + (void)updateKeyFlags:(NSEvent*)event
@@ -348,10 +370,8 @@ using namespace os;
 - (void)mouseExited:(NSEvent*)event
 {
   // Restore arrow cursor
-  if (!m_visibleMouse) {
+  if (!m_visibleMouse)
     m_visibleMouse = true;
-    [NSCursor unhide];
-  }
   [[NSCursor arrowCursor] set];
 
   Event ev;
@@ -460,7 +480,7 @@ using namespace os;
   [self destroyMouseTrackingArea];
   [self createMouseTrackingArea];
 
-  // Call OSXWindowImpl::onResize handler
+  // Call WindowOSX::onResize handler
   if (m_impl) {
     m_impl->onResize(gfx::Size(newSize.width,
                                newSize.height));
@@ -477,9 +497,18 @@ using namespace os;
 
   int scale = 1;
   if (self.window)
-    scale = [(OSXWindow*)self.window scale];
+    scale = [(WindowOSXObjc*)self.window scale];
 
-  if (event.hasPreciseScrollingDeltas) {
+  if (event.hasPreciseScrollingDeltas &&
+      // Here we check if this event is coming from a real precise
+      // scrolling device like a magic mouse or a touchpad (which use
+      // the phase/momentumPhase properties correctly). Some mice,
+      // like Logitech MX Master, return the scroll wheel data as
+      // preciseScrollingDelta, resulting in unexpected behavior as we
+      // don't know how to interpret the scrollingDelta values
+      // accurately from those devices.
+      (event.phase != NSEventPhaseNone ||
+       event.momentumPhase != NSEventPhaseNone)) {
     ev.setPointerType(os::PointerType::Touchpad);
     // TODO we shouldn't change the sign
     ev.setWheelDelta(gfx::Point(-event.scrollingDeltaX / scale,
@@ -552,8 +581,9 @@ using namespace os;
         initWithRect:self.bounds
              options:(NSTrackingMouseEnteredAndExited |
                       NSTrackingMouseMoved |
-                      NSTrackingActiveAlways |
-                      NSTrackingEnabledDuringMouseDrag)
+                      NSTrackingActiveInActiveApp |
+                      NSTrackingEnabledDuringMouseDrag |
+                      NSTrackingCursorUpdate)
                owner:self
             userInfo:nil];
   [self addTrackingArea:m_trackingArea];
@@ -561,22 +591,31 @@ using namespace os;
 
 - (void)destroyMouseTrackingArea
 {
-  [self removeTrackingArea:m_trackingArea];
-  m_trackingArea = nil;
+  if (m_trackingArea) {
+    [self removeTrackingArea:m_trackingArea];
+    m_trackingArea = nil;
+  }
 }
 
 - (void)updateCurrentCursor
 {
   if (m_nsCursor) {
-    if (!m_visibleMouse) {
+    if (!m_visibleMouse)
       m_visibleMouse = true;
-      [NSCursor unhide];
-    }
     [m_nsCursor set];
   }
   else if (m_visibleMouse) {
     m_visibleMouse = false;
-    [NSCursor hide];
+
+    // Instead of using [NSCursor hide], we use a NSCursor with an
+    // empty image. This is better because [NSCursor hide/unhide]
+    // functions are hard to balance.
+    if (!g_emptyNsCursor) {
+      NSImage* img = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
+      g_emptyNsCursor = [[NSCursor alloc] initWithImage:img
+                                                hotSpot:NSMakePoint(0, 0)];
+    }
+    [g_emptyNsCursor set];
   }
 }
 
@@ -613,7 +652,6 @@ using namespace os;
 
 - (void)queueEvent:(os::Event&)ev
 {
-  ASSERT(m_impl);
   if (m_impl)
     m_impl->queueEvent(ev);
   else

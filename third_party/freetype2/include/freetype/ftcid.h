@@ -4,7 +4,7 @@
  *
  *   FreeType API for accessing CID font information (specification).
  *
- * Copyright 2007-2018 by
+ * Copyright (C) 2007-2022 by
  * Dereg Clegg and Michael Toftdal.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,8 +19,7 @@
 #ifndef FTCID_H_
 #define FTCID_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -50,7 +49,7 @@ FT_BEGIN_HEADER
    */
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_Get_CID_Registry_Ordering_Supplement
@@ -90,7 +89,7 @@ FT_BEGIN_HEADER
                                            FT_Int       *supplement );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_Get_CID_Is_Internally_CID_Keyed
@@ -123,7 +122,7 @@ FT_BEGIN_HEADER
                                       FT_Bool  *is_cid );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_Get_CID_From_Glyph_Index

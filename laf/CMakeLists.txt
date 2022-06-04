@@ -1,5 +1,5 @@
 # LAF
-# Copyright (C) 2019-2020  Igara Studio S.A.
+# Copyright (C) 2019-2022  Igara Studio S.A.
 # Copyright (C) 2016-2018  David Capello
 
 cmake_minimum_required(VERSION 3.16)
@@ -8,10 +8,11 @@ cmake_minimum_required(VERSION 3.16)
 # the static version of the libc runtime
 set(CMAKE_USER_MAKE_RULES_OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_flag_overrides.cmake)
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_flag_overrides.cmake)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 project(laf C CXX)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Search in the "cmake" directory for additional CMake modules.
@@ -66,11 +67,15 @@ endif()
 
 if(LAF_BACKEND STREQUAL "skia")
   target_compile_definitions(laf-base PUBLIC LAF_SKIA)
+
+  # Flag for harfbuzz
+  target_compile_definitions(laf-base INTERFACE -DHAVE_CONFIG_OVERRIDE_H=1)
 endif()
 
 # Information
 
 message(STATUS "laf backend: ${LAF_BACKEND}")
+message(STATUS "laf zlib: ${ZLIB_LIBRARIES}")
 message(STATUS "laf pixman: ${PIXMAN_LIBRARY}")
 message(STATUS "laf freetype: ${FREETYPE_LIBRARIES}")
 message(STATUS "laf harfbuzz: ${HARFBUZZ_LIBRARIES}")

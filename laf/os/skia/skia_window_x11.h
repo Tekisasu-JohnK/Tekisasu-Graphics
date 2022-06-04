@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2021-2022  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,8 +11,9 @@
 
 #include "base/disable_copying.h"
 #include "gfx/size.h"
+#include "os/gl/gl_context_glx.h"
 #include "os/native_cursor.h"
-#include "os/skia/resize_surface.h"
+#include "os/skia/skia_window_base.h"
 #include "os/x11/window.h"
 
 #include <string>
@@ -19,36 +21,19 @@
 
 namespace os {
 
-class EventQueue;
-class SkiaDisplay;
-
-class SkiaWindow : public X11Window {
+class SkiaWindowX11 : public SkiaWindowBase<WindowX11> {
 public:
-  enum class Backend { NONE, GL };
+  SkiaWindowX11(const WindowSpec& spec);
 
-  SkiaWindow(EventQueue* queue, SkiaDisplay* display,
-             int width, int height, int scale);
-  ~SkiaWindow();
-
-  void setVisible(bool visible);
-  void maximize();
-  bool isMaximized() const;
-  bool isMinimized() const;
-
-  std::string getLayout() { return ""; }
-  void setLayout(const std::string& layout) { }
+  std::string getLayout() override { return ""; }
+  void setLayout(const std::string& layout) override { }
 
 private:
-  void onQueueEvent(Event& ev) override;
   void onPaint(const gfx::Rect& rc) override;
-  void onResize(const gfx::Size& sz) override;
 
-  EventQueue* m_queue;
-  SkiaDisplay* m_display;
-  ResizeSurface m_resizeSurface;
   std::vector<uint8_t> m_buffer;
 
-  DISABLE_COPYING(SkiaWindow);
+  DISABLE_COPYING(SkiaWindowX11);
 };
 
 } // namespace os

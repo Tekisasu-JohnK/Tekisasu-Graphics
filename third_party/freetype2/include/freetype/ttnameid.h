@@ -4,7 +4,7 @@
  *
  *   TrueType name ID definitions (specification only).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -20,7 +20,6 @@
 #define TTNAMEID_H_
 
 
-#include <ft2build.h>
 
 
 FT_BEGIN_HEADER
@@ -41,7 +40,7 @@ FT_BEGIN_HEADER
    */
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_PLATFORM_XXX
@@ -73,7 +72,7 @@ FT_BEGIN_HEADER
    *     Used by Microsoft to indicate Windows-specific charmaps.  See
    *     @TT_MS_ID_XXX for a list of corresponding `encoding_id` values.
    *     Note that most fonts contain a Unicode charmap using
-   *     (TT_PLATFORM_MICROSOFT, @TT_MS_ID_UNICODE_CS).
+   *     (`TT_PLATFORM_MICROSOFT`, @TT_MS_ID_UNICODE_CS).
    *
    *   TT_PLATFORM_CUSTOM ::
    *     Used to indicate application-specific charmaps.
@@ -92,7 +91,7 @@ FT_BEGIN_HEADER
 #define TT_PLATFORM_ADOBE          7 /* artificial */
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_APPLE_ID_XXX
@@ -135,7 +134,7 @@ FT_BEGIN_HEADER
 #define TT_APPLE_ID_FULL_UNICODE      6 /* used with type 13 cmaps       */
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_MAC_ID_XXX
@@ -181,7 +180,7 @@ FT_BEGIN_HEADER
 #define TT_MAC_ID_UNINTERP             32
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_ISO_ID_XXX
@@ -206,7 +205,7 @@ FT_BEGIN_HEADER
 #define TT_ISO_ID_8859_1      2
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_MS_ID_XXX
@@ -258,7 +257,7 @@ FT_BEGIN_HEADER
 #define TT_MS_ID_GB2312  TT_MS_ID_PRC
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_ADOBE_ID_XXX
@@ -284,7 +283,7 @@ FT_BEGIN_HEADER
 #define TT_ADOBE_ID_LATIN_1   3
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_MAC_LANGID_XXX
@@ -424,7 +423,7 @@ FT_BEGIN_HEADER
 #define TT_MAC_LANGID_AZERBAIJANI_ROMAN_SCRIPT    150
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_MS_LANGID_XXX
@@ -592,7 +591,7 @@ FT_BEGIN_HEADER
 #define TT_MS_LANGID_MALAY_MALAYSIA                    0x043E
 #define TT_MS_LANGID_MALAY_BRUNEI_DARUSSALAM           0x083E
 #define TT_MS_LANGID_KAZAKH_KAZAKHSTAN                 0x043F
-#define TT_MS_LANGID_KYRGYZ_KYRGYZSTAN /* Cyrillic*/   0x0440
+#define TT_MS_LANGID_KYRGYZ_KYRGYZSTAN /* Cyrillic */  0x0440
 #define TT_MS_LANGID_KISWAHILI_KENYA                   0x0441
 #define TT_MS_LANGID_TURKMEN_TURKMENISTAN              0x0442
 #define TT_MS_LANGID_UZBEK_UZBEKISTAN_LATIN            0x0443
@@ -780,7 +779,7 @@ FT_BEGIN_HEADER
           TT_MS_LANGID_UIGHUR_PRC
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_NAME_ID_XXX
@@ -834,7 +833,7 @@ FT_BEGIN_HEADER
 #define TT_NAME_ID_PREFERRED_SUBFAMILY  TT_NAME_ID_TYPOGRAPHIC_SUBFAMILY
 
 
-  /***********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   TT_UCR_XXX

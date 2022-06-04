@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2021  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,17 +12,17 @@
 #include "base/memory.h"
 #include "base/string.h"
 
-#if _WIN32
+#if LAF_WINDOWS
   #include <windows.h>
-#elif __APPLE__
+#elif LAF_MACOS
   #include "os/osx/app.h"
-#else
+#elif LAF_LINUX
   #include "os/x11/x11.h"
 #endif
 
 extern int app_main(int argc, char* argv[]);
 
-#if _WIN32
+#if LAF_WINDOWS
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     PWSTR lpCmdLine, int nCmdShow) {
   int argc = __argc;
@@ -56,11 +57,11 @@ int wmain(int argc, wchar_t* wargv[], wchar_t* envp[]) {
 #endif
 
 int main(int argc, char* argv[]) {
-#if __APPLE__
-  os::OSXApp app;
+#if LAF_MACOS
+  os::AppOSX app;
   if (!app.init())
     return 1;
-#elif !defined(_WIN32)
+#elif LAF_LINUX
   os::X11 x11;
 #endif
   return app_main(argc, argv);

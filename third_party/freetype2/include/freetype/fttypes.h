@@ -4,7 +4,7 @@
  *
  *   FreeType simple types definitions (specification only).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -22,8 +22,8 @@
 
 #include <ft2build.h>
 #include FT_CONFIG_CONFIG_H
-#include FT_SYSTEM_H
-#include FT_IMAGE_H
+#include <freetype/ftsystem.h>
+#include <freetype/ftimage.h>
 
 #include <stddef.h>
 
@@ -413,7 +413,7 @@ FT_BEGIN_HEADER
   typedef struct  FT_Data_
   {
     const FT_Byte*  pointer;
-    FT_Int          length;
+    FT_UInt         length;
 
   } FT_Data;
 
@@ -430,7 +430,7 @@ FT_BEGIN_HEADER
    *
    * @input:
    *   The address of the FreeType object that is under finalization.  Its
-   *   client data is accessed through its 'generic' field.
+   *   client data is accessed through its `generic` field.
    */
   typedef void  (*FT_Generic_Finalizer)( void*  object );
 
@@ -445,14 +445,14 @@ FT_BEGIN_HEADER
    *   variety of FreeType core objects.  For example, a text layout API
    *   might want to associate a glyph cache to a given size object.
    *
-   *   Some FreeType object contains a 'generic' field, of type FT_Generic,
+   *   Some FreeType object contains a `generic` field, of type `FT_Generic`,
    *   which usage is left to client applications and font servers.
    *
    *   It can be used to store a pointer to client-specific data, as well as
    *   the address of a 'finalizer' function, which will be called by
    *   FreeType when the object is destroyed (for example, the previous
    *   client example would put the address of the glyph cache destructor in
-   *   the 'finalizer' field).
+   *   the `finalizer` field).
    *
    * @fields:
    *   data ::
@@ -461,8 +461,8 @@ FT_BEGIN_HEADER
    *
    *   finalizer ::
    *     A pointer to a 'generic finalizer' function, which will be called
-   *     when the object is destroyed.  If this field is set to NULL, no code
-   *     will be called.
+   *     when the object is destroyed.  If this field is set to `NULL`, no
+   *     code will be called.
    */
   typedef struct  FT_Generic_
   {
@@ -479,18 +479,17 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   This macro converts four-letter tags that are used to label TrueType
-   *   tables into an unsigned long, to be used within FreeType.
+   *   tables into an `FT_Tag` type, to be used within FreeType.
    *
    * @note:
    *   The produced values **must** be 32-bit integers.  Don't redefine this
    *   macro.
    */
-#define FT_MAKE_TAG( _x1, _x2, _x3, _x4 ) \
-          (FT_Tag)                        \
-          ( ( (FT_ULong)_x1 << 24 ) |     \
-            ( (FT_ULong)_x2 << 16 ) |     \
-            ( (FT_ULong)_x3 <<  8 ) |     \
-              (FT_ULong)_x4         )
+#define FT_MAKE_TAG( _x1, _x2, _x3, _x4 )                  \
+          ( ( FT_STATIC_BYTE_CAST( FT_Tag, _x1 ) << 24 ) | \
+            ( FT_STATIC_BYTE_CAST( FT_Tag, _x2 ) << 16 ) | \
+            ( FT_STATIC_BYTE_CAST( FT_Tag, _x3 ) <<  8 ) | \
+              FT_STATIC_BYTE_CAST( FT_Tag, _x4 )         )
 
 
   /*************************************************************************/
@@ -544,10 +543,10 @@ FT_BEGIN_HEADER
    *
    * @fields:
    *   prev ::
-   *     The previous element in the list.  NULL if first.
+   *     The previous element in the list.  `NULL` if first.
    *
    *   next ::
-   *     The next element in the list.  NULL if last.
+   *     The next element in the list.  `NULL` if last.
    *
    *   data ::
    *     A typeless pointer to the listed object.
@@ -588,13 +587,13 @@ FT_BEGIN_HEADER
 
 
 #define FT_IS_EMPTY( list )  ( (list).head == 0 )
-#define FT_BOOL( x )  ( (FT_Bool)( x ) )
+#define FT_BOOL( x )         FT_STATIC_CAST( FT_Bool, (x) != 0 )
 
   /* concatenate C tokens */
 #define FT_ERR_XCAT( x, y )  x ## y
 #define FT_ERR_CAT( x, y )   FT_ERR_XCAT( x, y )
 
-  /* see `ftmoderr.h' for descriptions of the following macros */
+  /* see `ftmoderr.h` for descriptions of the following macros */
 
 #define FT_ERR( e )  FT_ERR_CAT( FT_ERR_PREFIX, e )
 

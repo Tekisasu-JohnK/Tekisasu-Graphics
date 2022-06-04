@@ -182,3 +182,11 @@ some other text
 </ul>
 ````````````````````````````````
 
+Issue #383 - emphasis parsing.
+
+```````````````````````````````` example
+*****Hello*world****
+.
+<p>**<em><strong>Hello<em>world</em></strong></em></p>
+````````````````````````````````
+

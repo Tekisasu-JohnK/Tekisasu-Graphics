@@ -49,9 +49,14 @@ typedef struct bracket {
   bool bracket_after;
 } bracket;
 
+#define FLAG_SKIP_HTML_CDATA        (1u << 0)
+#define FLAG_SKIP_HTML_DECLARATION  (1u << 1)
+#define FLAG_SKIP_HTML_PI           (1u << 2)
+
 typedef struct {
   cmark_mem *mem;
   cmark_chunk input;
+  unsigned flags;
   int line;
   bufsize_t pos;
   int block_offset;
@@ -190,6 +195,7 @@ static void subject_from_buf(cmark_mem *mem, int line_number, int block_offset, 
   int i;
   e->mem = mem;
   e->input = *chunk;
+  e->flags = 0;
   e->line = line_number;
   e->pos = 0;
   e->block_offset = block_offset;
@@ -637,10 +643,12 @@ static void process_emphasis(subject *subj, delimiter *stack_bottom) {
   delimiter *closer = subj->last_delim;
   delimiter *opener;
   delimiter *old_closer;
+  delimiter *new_stack_bottom;
   bool opener_found;
+
   int openers_bottom_index = 0;
   delimiter *openers_bottom[6] = {stack_bottom, stack_bottom, stack_bottom,
-                                  stack_bottom, stack_bottom, stack_bottom};
+                                  stack_bottom};
 
   // move back to first relevant delim.
   while (closer != NULL && closer->previous != stack_bottom) {
@@ -661,7 +669,7 @@ static void process_emphasis(subject *subj, delimiter *stack_bottom) {
         openers_bottom_index = 2;
         break;
       case '*':
-        openers_bottom_index = 3 + (closer->length % 3);
+        openers_bottom_index = 3;
         break;
       default:
         assert(false);
@@ -670,6 +678,8 @@ static void process_emphasis(subject *subj, delimiter *stack_bottom) {
       // Now look backwards for first matching opener:
       opener = closer->previous;
       opener_found = false;
+      new_stack_bottom = closer->previous;
+
       while (opener != NULL && opener != openers_bottom[openers_bottom_index]) {
         if (opener->can_open && opener->delim_char == closer->delim_char) {
           // interior closer of size 2 can't match opener of size 1
@@ -679,7 +689,13 @@ static void process_emphasis(subject *subj, delimiter *stack_bottom) {
               (opener->length + closer->length) % 3 != 0) {
             opener_found = true;
             break;
-          }
+          } else {
+	    // If we failed to match because of the mod-3 rule,
+	    // then we want to make sure the stack bottom extends
+	    // back to here at least, since a later closer might
+	    // match this same opener... (see #383)
+	    new_stack_bottom = opener->previous;
+	  }
         }
         opener = opener->previous;
       }
@@ -704,8 +720,8 @@ static void process_emphasis(subject *subj, delimiter *stack_bottom) {
         closer = closer->next;
       }
       if (!opener_found) {
-        // set lower bound for future searches for openers
-        openers_bottom[openers_bottom_index] = old_closer->previous;
+        // set lower bound for future searches for openers (see #383).
+        openers_bottom[openers_bottom_index] = new_stack_bottom;
         if (!old_closer->can_open) {
           // we can remove a closer that can't be an
           // opener, once we've seen there's no
@@ -885,7 +901,52 @@ static cmark_node *handle_pointy_brace(subject *subj, int options) {
   }
 
   // finally, try to match an html tag
-  matchlen = scan_html_tag(&subj->input, subj->pos);
+  if (subj->pos + 2 <= subj->input.len) {
+    int c = subj->input.data[subj->pos];
+    if (c == '!') {
+      c = subj->input.data[subj->pos+1];
+      if (c == '-') {
+        matchlen = scan_html_comment(&subj->input, subj->pos + 2);
+        if (matchlen > 0)
+          matchlen += 2; // prefix "<-"
+      } else if (c == '[') {
+        if ((subj->flags & FLAG_SKIP_HTML_CDATA) == 0) {
+          matchlen = scan_html_cdata(&subj->input, subj->pos + 2);
+          if (matchlen > 0) {
+            // The regex doesn't require the final "]]>". But if we're not at
+            // the end of input, it must come after the match. Otherwise,
+            // disable subsequent scans to avoid quadratic behavior.
+            matchlen += 5; // prefix "![", suffix "]]>"
+            if (subj->pos + matchlen > subj->input.len) {
+              subj->flags |= FLAG_SKIP_HTML_CDATA;
+              matchlen = 0;
+            }
+          }
+        }
+      } else if ((subj->flags & FLAG_SKIP_HTML_DECLARATION) == 0) {
+        matchlen = scan_html_declaration(&subj->input, subj->pos + 1);
+        if (matchlen > 0) {
+          matchlen += 2; // prefix "!", suffix ">"
+          if (subj->pos + matchlen > subj->input.len) {
+            subj->flags |= FLAG_SKIP_HTML_DECLARATION;
+            matchlen = 0;
+          }
+        }
+      }
+    } else if (c == '?') {
+      if ((subj->flags & FLAG_SKIP_HTML_PI) == 0) {
+        // Note that we allow an empty match.
+        matchlen = scan_html_pi(&subj->input, subj->pos + 1);
+        matchlen += 3; // prefix "?", suffix "?>"
+        if (subj->pos + matchlen > subj->input.len) {
+          subj->flags |= FLAG_SKIP_HTML_PI;
+          matchlen = 0;
+        }
+      }
+    } else {
+      matchlen = scan_html_tag(&subj->input, subj->pos);
+    }
+  }
   if (matchlen > 0) {
     const unsigned char *src = subj->input.data + subj->pos - 1;
     bufsize_t len = matchlen + 1;

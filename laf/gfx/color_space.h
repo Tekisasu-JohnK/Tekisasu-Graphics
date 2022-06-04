@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (c) 2018-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -8,24 +8,28 @@
 #define GFX_COLOR_SPACE_H_INCLUDED
 #pragma once
 
+#include "base/ref.h"
+
 #include <algorithm>
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <vector>
+
+#pragma push_macro("None")
+#undef None // Undefine the X11 None macro
 
 namespace gfx {
 
   class ColorSpace;
-  typedef std::shared_ptr<ColorSpace> ColorSpacePtr;
+  using ColorSpaceRef = base::Ref<ColorSpace>;
 
   // Gamut white point and primaries as in Skia's SkColorSpacePrimaries.
   struct ColorSpacePrimaries {
-    float wx, wy;                 // White point XY
     float rx, ry, gx, gy, bx, by; // Red/Green/Blue XY
+    float wx, wy;                 // White point XY
   };
 
-  // Transfer coefficients as in Skia's SkColorSpaceTransferFn, to
+  // Transfer coefficients as in Skia's skcms_TransferFunction, to
   // transform from a curved space to linear:
   //
   //   LinearVal = C*InputVal + F        , for 0.0f <= InputVal <  D
@@ -35,7 +39,7 @@ namespace gfx {
     float g, a, b, c, d, e, f;
   };
 
-  class ColorSpace {
+  class ColorSpace : public base::RefCountT<ColorSpace> {
   public:
     enum Type { None,
                 sRGB,
@@ -53,16 +57,16 @@ namespace gfx {
                const float gamma = 1.0,
                std::vector<uint8_t>&& rawData = std::vector<uint8_t>());
 
-    static ColorSpacePtr MakeNone();   // Use display color space
-    static ColorSpacePtr MakeSRGB();
-    static ColorSpacePtr MakeLinearSRGB();
-    static ColorSpacePtr MakeSRGBWithGamma(float gamma);
-    static ColorSpacePtr MakeRGB(const ColorSpaceTransferFn& fn,
+    static ColorSpaceRef MakeNone();   // Use display color space
+    static ColorSpaceRef MakeSRGB();
+    static ColorSpaceRef MakeLinearSRGB();
+    static ColorSpaceRef MakeSRGBWithGamma(float gamma);
+    static ColorSpaceRef MakeRGB(const ColorSpaceTransferFn& fn,
                                  const ColorSpacePrimaries& p);
-    static ColorSpacePtr MakeRGBWithSRGBGamut(const ColorSpaceTransferFn& fn);
-    static ColorSpacePtr MakeRGBWithSRGBGamma(const ColorSpacePrimaries& p);
-    static ColorSpacePtr MakeICC(const void* data, size_t n);
-    static ColorSpacePtr MakeICC(std::vector<uint8_t>&& data);
+    static ColorSpaceRef MakeRGBWithSRGBGamut(const ColorSpaceTransferFn& fn);
+    static ColorSpaceRef MakeRGBWithSRGBGamma(const ColorSpacePrimaries& p);
+    static ColorSpaceRef MakeICC(const void* data, size_t n);
+    static ColorSpaceRef MakeICC(std::vector<uint8_t>&& data);
 
     Type type() const { return m_type; }
     Flag flags() const { return m_flags; }
@@ -127,5 +131,7 @@ namespace gfx {
   };
 
 } // namespace gfx
+
+#pragma pop_macro("None")
 
 #endif

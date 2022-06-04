@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2019  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,16 +10,18 @@
 #pragma once
 
 #include "base/time.h"
+#include "gfx/border.h"
 #include "gfx/color_space.h"    // Include here avoid error with None
 #include "gfx/fwd.h"
 #include "gfx/size.h"
 #include "os/color_space.h"
 #include "os/event.h"
 #include "os/native_cursor.h"
+#include "os/screen.h"
 #include "os/surface_list.h"
+#include "os/window.h"
 
 #include <X11/Xatom.h>
-#include <X11/Xcursor/Xcursor.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
@@ -29,68 +31,108 @@
 namespace os {
 
 class Surface;
+class WindowSpec;
 
-class X11Window {
+class WindowX11 : public Window {
 public:
-  X11Window(::Display* display, int width, int height, int scale);
-  ~X11Window();
+  WindowX11(::Display* display,
+            const WindowSpec& spec);
+  ~WindowX11();
 
-  void queueEvent(Event& ev);
+  os::ScreenRef screen() const override;
+  os::ColorSpaceRef colorSpace() const override;
 
-  os::ColorSpacePtr colorSpace() const;
+  int scale() const override { return m_scale; }
+  void setScale(const int scale) override;
 
-  int scale() const { return m_scale; }
-  void setScale(const int scale);
+  bool isVisible() const override;
+  void setVisible(bool visible) override;
 
-  void setTitle(const std::string& title);
-  void setIcons(const SurfaceList& icons);
+  void activate() override;
+  void maximize() override;
+  void minimize() override;
+  bool isMaximized() const override;
+  bool isMinimized() const override;
+  bool isTransparent() const override;
+
+  bool isFullscreen() const override;
+  void setFullscreen(bool state) override;
+
+  void setTitle(const std::string& title) override;
+  void setIcons(const SurfaceList& icons) override;
+
+  gfx::Rect frame() const override;
+  void setFrame(const gfx::Rect& bounds) override;
+  gfx::Rect contentRect() const override;
+  gfx::Rect restoredFrame() const override;
+  std::string title() const override;
 
   gfx::Size clientSize() const;
-  gfx::Size restoredSize() const;
-  void captureMouse();
-  void releaseMouse();
-  void setMousePosition(const gfx::Point& position);
-  void invalidateRegion(const gfx::Region& rgn);
-  bool setNativeMouseCursor(NativeCursor cursor);
-  bool setNativeMouseCursor(const os::Surface* surface,
-                            const gfx::Point& focus,
-                            const int scale);
+  void captureMouse() override;
+  void releaseMouse() override;
+  void setMousePosition(const gfx::Point& position) override;
+  void invalidateRegion(const gfx::Region& rgn) override;
+  bool setCursor(NativeCursor cursor) override;
+  bool setCursor(const CursorRef& cursor) override;
+
+  void performWindowAction(const WindowAction action,
+                           const Event* event) override;
 
   ::Display* x11display() const { return m_display; }
-  ::Window handle() const { return m_window; }
+  ::Window x11window() const { return m_window; }
   ::GC gc() const { return m_gc; }
 
+  NativeHandle nativeHandle() const override { return (NativeHandle)x11window(); }
+
   void setTranslateDeadKeys(bool state) {
-    // TODO
+    g_translateDeadKeys = state;
+  }
+
+  static bool translateDeadKeys() {
+    return g_translateDeadKeys;
   }
 
   void processX11Event(XEvent& event);
-  static X11Window* getPointerFromHandle(Window handle);
+  static WindowX11* getPointerFromHandle(::Window handle);
+
+  // Only used for debugging purposes.
+  static size_t countActiveWindows();
 
 protected:
-  virtual void onQueueEvent(Event& event) = 0;
   virtual void onPaint(const gfx::Rect& rc) = 0;
   virtual void onResize(const gfx::Size& sz) = 0;
 
 private:
   void setWMClass(const std::string& res_class);
+  void setAllowedActions();
   bool setX11Cursor(::Cursor xcursor);
-  static void addWindow(X11Window* window);
-  static void removeWindow(X11Window* window);
+  bool requestX11FrameExtents();
+  void getX11FrameExtents();
+  static void addWindow(WindowX11* window);
+  static void removeWindow(WindowX11* window);
 
   ::Display* m_display;
   ::Window m_window;
   ::GC m_gc;
-  ::Cursor m_cursor;
-  ::XcursorImage* m_xcursorImage;
   ::XIC m_xic;
   int m_scale;
   gfx::Point m_lastMousePos;
   gfx::Size m_lastClientSize;
+  gfx::Border m_frameExtents;
+  bool m_initializingActions = true;
+  bool m_fullscreen = false;
+  bool m_borderless = false;
+  bool m_closable = false;
+  bool m_maximizable = false;
+  bool m_minimizable = false;
+  bool m_resizable = false;
+  bool m_transparent = false;
 
   // Double-click info
   Event::MouseButton m_doubleClickButton;
   base::tick_t m_doubleClickTick;
+
+  static bool g_translateDeadKeys;
 };
 
 } // namespace os

@@ -33,6 +33,14 @@ namespace base {
       return m_digest[index];
     }
 
+    const uint8_t *digest() const {
+      return m_digest.data();
+    }
+
+    size_t size() const {
+      return m_digest.size();
+    }
+
   private:
     std::vector<uint8_t> m_digest;
   };

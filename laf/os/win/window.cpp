@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -13,7 +13,9 @@
 
 #include <windowsx.h>
 #include <commctrl.h>
+#include <dwmapi.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 
 #include <algorithm>
 #include <sstream>
@@ -26,14 +28,20 @@
 #include "base/log.h"
 #include "base/string.h"
 #include "base/thread.h"
+#include "base/win/comptr.h"
+#include "gfx/border.h"
 #include "gfx/region.h"
 #include "gfx/size.h"
 #include "os/event.h"
 #include "os/native_cursor.h"
 #include "os/win/color_space.h"
 #include "os/win/keys.h"
+#include "os/win/screen.h"
 #include "os/win/system.h"
 #include "os/win/window_dde.h"
+#include "os/window_spec.h"
+
+#include <algorithm>
 
 // TODO the window name should be customized from the CMakeLists.txt
 //      properties (see LAF_X11_WM_CLASS too)
@@ -56,6 +64,26 @@
 #endif
 
 namespace os {
+
+// Converts an os::Hit to a Win32 hit test value
+static int hit2hittest[] = {
+  HTNOWHERE,                    // os::Hit::None
+  HTCLIENT,                     // os::Hit::Content
+  HTCAPTION,                    // os::Hit::TitleBar
+  HTTOPLEFT,                    // os::Hit::TopLeft
+  HTTOP,                        // os::Hit::Top
+  HTTOPRIGHT,                   // os::Hit::TopRight
+  HTLEFT,                       // os::Hit::Left
+  HTRIGHT,                      // os::Hit::Right
+  HTBOTTOMLEFT,                 // os::Hit::BottomLeft
+  HTBOTTOM,                     // os::Hit::Bottom
+  HTBOTTOMRIGHT,                // os::Hit::BottomRight
+  HTMINBUTTON,                  // os::Hit::MinimizeButton
+  HTMAXBUTTON,                  // os::Hit::MaximizeButton
+  HTCLOSE,                      // os::Hit::CloseButton
+};
+
+static int hit2hittest_entries = sizeof(hit2hittest) / sizeof(hit2hittest[0]);
 
 static PointerType wt_packet_pkcursor_to_pointer_type(int pkCursor)
 {
@@ -104,7 +132,12 @@ static BOOL CALLBACK log_monitor_info(HMONITOR monitor,
   return TRUE;
 }
 
-WinWindow::Touch::Touch()
+PointerType WindowWin::m_pointerType = PointerType::Unknown;
+float WindowWin::m_pressure = 0.0f;
+std::vector<PACKET> WindowWin::m_packets;
+Event WindowWin::m_lastWintabEvent;
+
+WindowWin::Touch::Touch()
   : fingers(0)
   , canBeMouse(false)
   , asMouse(false)
@@ -112,19 +145,15 @@ WinWindow::Touch::Touch()
 {
 }
 
-WinWindow::WinWindow(int width, int height, int scale)
-  : m_hwnd(nullptr)
-  , m_hcursor(nullptr)
-  , m_clientSize(1, 1)
-  , m_restoredSize(0, 0)
-  , m_scale(scale)
+WindowWin::WindowWin(const WindowSpec& spec)
+  : m_clientSize(1, 1)
+  , m_scale(spec.scale())
   , m_isCreated(false)
+  , m_adjustShadow(true)
   , m_translateDeadKeys(false)
   , m_hasMouse(false)
   , m_captureMouse(false)
-  , m_customHcursor(false)
   , m_usePointerApi(false)
-  , m_lastPointerId(0)
   , m_ictx(nullptr)
   , m_ignoreRandomMouseEvents(0)
   // True by default, we prefer to interpret one finger as mouse movement
@@ -137,12 +166,14 @@ WinWindow::WinWindow(int width, int height, int scale)
   , m_pointerDownCount(0)
 #endif
   , m_hpenctx(nullptr)
-  , m_pointerType(PointerType::Unknown)
-  , m_pressure(0.0f)
+  , m_fullscreen(false)
+  , m_titled(spec.titled())
+  , m_borderless(spec.borderless())
+  , m_fixingPos(false)
 {
   auto& winApi = system()->winApi();
   if (
-#ifdef OS_USE_POINTER_API_FOR_MOUSE
+#if OS_USE_POINTER_API_FOR_MOUSE
       winApi.EnableMouseInPointer &&
       winApi.IsMouseInPointerEnabled &&
 #endif
@@ -173,7 +204,7 @@ WinWindow::WinWindow(int width, int height, int scale)
       HRESULT hr = winApi.CreateInteractionContext(&m_ictx);
       if (SUCCEEDED(hr)) {
         hr = winApi.RegisterOutputCallbackInteractionContext(
-          m_ictx, &WinWindow::staticInteractionContextCallback, this);
+          m_ictx, &WindowWin::staticInteractionContextCallback, this);
       }
       if (SUCCEEDED(hr)) {
         INTERACTION_CONTEXT_CONFIGURATION cfg[] = {
@@ -214,7 +245,7 @@ WinWindow::WinWindow(int width, int height, int scale)
 
   // The HWND returned by CreateWindowEx() is different than the
   // HWND used in WM_CREATE message.
-  m_hwnd = createHwnd(this, width, height);
+  m_hwnd = createHwnd(this, spec);
   if (!m_hwnd)
     throw std::runtime_error("Error creating window");
 
@@ -225,6 +256,10 @@ WinWindow::WinWindow(int width, int height, int scale)
   // add the scrollbars to the window. (As the T type could not be
   // fully initialized yet.)
   m_isCreated = true;
+
+  // We activate main windows by default only (TODO we could add a
+  // WindowSpec::activate() flag for this)
+  m_activate = (spec.parent() == nullptr);
 
   // Log information about the system (for debugging/user support
   // purposes in case the window doesn't display anything)
@@ -242,26 +277,57 @@ WinWindow::WinWindow(int width, int height, int scale)
         GetSystemMetrics(SM_SAMEDISPLAYFORMAT) ? ", same display format": "");
     EnumDisplayMonitors(nullptr, nullptr, log_monitor_info, 0);
   }
+
+  // TODO check if this is correct, or if Windows still need the
+  //      scroll bars even when we use the pointers API, anyway at the
+  //      moment we are always using the hack
+  if (useScrollBarsHack()) {
+    // Set scroll info to receive WM_HSCROLL/VSCROLL events (events
+    // generated by some trackpad drivers).
+    SCROLLINFO si;
+    si.cbSize = sizeof(SCROLLINFO);
+    si.fMask = SIF_POS | SIF_RANGE | SIF_PAGE;
+    si.nMin = 0;
+    si.nPos = 50;
+    si.nMax = 100;
+    si.nPage = 10;
+    SetScrollInfo(m_hwnd, SB_HORZ, &si, FALSE);
+    SetScrollInfo(m_hwnd, SB_VERT, &si, FALSE);
+  }
 }
 
-WinWindow::~WinWindow()
+WindowWin::~WindowWin()
 {
-  auto& winApi = system()->winApi();
-  if (m_ictx && winApi.DestroyInteractionContext)
-    winApi.DestroyInteractionContext(m_ictx);
+  auto sys = system();
+
+  // If this assert fails it's highly probable that an os::WindowRef
+  // was kept alive in some kind of memory leak (or just inside an
+  // os::Event in the os::EventQueue).
+  ASSERT(sys);
+
+  if (sys) {
+    auto& winApi = sys->winApi();
+    if (m_ictx && winApi.DestroyInteractionContext)
+      winApi.DestroyInteractionContext(m_ictx);
+  }
 
   if (m_hwnd)
     DestroyWindow(m_hwnd);
 }
 
-void WinWindow::queueEvent(Event& ev)
+os::ScreenRef WindowWin::screen() const
 {
-  onQueueEvent(ev);
+  if (m_hwnd) {
+    HMONITOR monitor = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
+    return os::make_ref<ScreenWin>(monitor);
+  }
+  else
+    return os::instance()->mainScreen();
 }
 
-os::ColorSpacePtr WinWindow::colorSpace() const
+os::ColorSpaceRef WindowWin::colorSpace() const
 {
-  if (auto defaultCS = os::instance()->displaysColorSpace())
+  if (auto defaultCS = os::instance()->windowsColorSpace())
     return defaultCS;
 
   if (m_hwnd) {
@@ -275,58 +341,228 @@ os::ColorSpacePtr WinWindow::colorSpace() const
   }
   // sRGB by default
   if (!m_lastColorProfile)
-    m_lastColorProfile = os::instance()->createColorSpace(gfx::ColorSpace::MakeSRGB());
+    m_lastColorProfile = os::instance()->makeColorSpace(gfx::ColorSpace::MakeSRGB());
   return m_lastColorProfile;
 }
 
-void WinWindow::setScale(int scale)
+void WindowWin::setScale(int scale)
 {
   m_scale = scale;
+
+  // Align window size to new scale
+  {
+    RECT rc;
+    GetWindowRect(m_hwnd, &rc);
+    SendMessage(m_hwnd, WM_SIZING, 0, (LPARAM)&rc);
+    SetWindowPos(m_hwnd, nullptr,
+                 rc.left, rc.top,
+                 rc.right - rc.left,
+                 rc.bottom - rc.top,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  }
+
   onResize(m_clientSize);
 }
 
-void WinWindow::setVisible(bool visible)
+bool WindowWin::isVisible() const
+{
+  return (IsWindowVisible(m_hwnd) ? true: false);
+}
+
+void WindowWin::setVisible(bool visible)
 {
   if (visible) {
-    ShowWindow(m_hwnd, SW_SHOWNORMAL);
+    if (m_activate)
+      ShowWindow(m_hwnd, SW_SHOWNORMAL);
+    else
+      ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
+
     UpdateWindow(m_hwnd);
-    DrawMenuBar(m_hwnd);
   }
   else
     ShowWindow(m_hwnd, SW_HIDE);
 }
 
-void WinWindow::maximize()
+void WindowWin::activate()
 {
-  ShowWindow(m_hwnd, SW_MAXIMIZE);
+  SetActiveWindow(m_hwnd);
 }
 
-bool WinWindow::isMaximized() const
+void WindowWin::maximize()
+{
+  if (!isMaximized())
+    ShowWindow(m_hwnd, SW_MAXIMIZE);
+  else
+    ShowWindow(m_hwnd, SW_RESTORE);
+}
+
+void WindowWin::minimize()
+{
+  ShowWindow(m_hwnd, SW_MINIMIZE);
+}
+
+bool WindowWin::isMaximized() const
 {
   return (IsZoomed(m_hwnd) ? true: false);
 }
 
-bool WinWindow::isMinimized() const
+bool WindowWin::isMinimized() const
 {
   return (GetWindowLong(m_hwnd, GWL_STYLE) & WS_MINIMIZE ? true: false);
 }
 
-gfx::Size WinWindow::clientSize() const
+bool WindowWin::isTransparent() const
+{
+  return (GetWindowLong(m_hwnd, GWL_EXSTYLE) & WS_EX_LAYERED ? true: false);
+}
+
+bool WindowWin::isFullscreen() const
+{
+  return m_fullscreen;
+}
+
+void WindowWin::setFullscreen(bool state)
+{
+  const bool oldFullscreen = isFullscreen();
+  m_fullscreen = state;
+
+  // Enter into full screen mode
+  if (!oldFullscreen && state) {
+    HMONITOR monitor = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
+    if (!monitor)
+      return;                   // No monitor?
+
+    MONITORINFOEXA mi;
+    memset((void*)&mi, 0, sizeof(mi));
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoA(monitor, &mi))
+      return;                   // Invalid monitor info?
+
+    // Save the current window frame position to restore it when we
+    // exit the full screen mode.
+#if 0
+    m_restoredPlacement.length = sizeof(WINDOWPLACEMENT);
+    GetWindowPlacement(m_hwnd, &m_restoredPlacement);
+#else
+    {
+      RECT rc;
+      GetWindowRect(m_hwnd, &rc);
+      m_restoredFrame = gfx::Rect(rc.left, rc.top,
+                                  rc.right - rc.left, rc.bottom - rc.top);
+    }
+#endif
+
+    LONG style = GetWindowLong(m_hwnd, GWL_STYLE);
+    style &= ~(WS_CAPTION | WS_THICKFRAME);
+    SetWindowLong(m_hwnd, GWL_STYLE, style);
+    SetWindowPos(m_hwnd, nullptr,
+                 mi.rcMonitor.left,
+                 mi.rcMonitor.top,
+                 (mi.rcMonitor.right - mi.rcMonitor.left),
+                 (mi.rcMonitor.bottom - mi.rcMonitor.top),
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  }
+  // Exit from full screen mode
+  else if (oldFullscreen && !state) {
+    LONG style = GetWindowLong(m_hwnd, GWL_STYLE);
+    if (m_titled) style |= WS_CAPTION;
+    style |= WS_THICKFRAME;
+    SetWindowLong(m_hwnd, GWL_STYLE, style);
+
+    // On restore, resize to the previous saved rect size.
+#if 0
+    SetWindowPlacement(m_hwnd, &m_restoredPlacement);
+#else
+    SetWindowPos(m_hwnd, nullptr,
+                 m_restoredFrame.x, m_restoredFrame.y,
+                 m_restoredFrame.w, m_restoredFrame.h,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+#endif
+  }
+
+  notifyFullScreenStateToShell();
+  onResize(m_clientSize);
+}
+
+gfx::Size WindowWin::clientSize() const
 {
   return m_clientSize;
 }
 
-gfx::Size WinWindow::restoredSize() const
+gfx::Rect WindowWin::frame() const
 {
-  return m_restoredSize;
+  RECT rc;
+  BOOL withShadow = false;
+  if ((DwmIsCompositionEnabled(&withShadow) != S_OK) ||
+      !withShadow ||
+      // DwmGetWindowAttribute() returns the true bounds from the
+      // frame edges (not from the shadow) when the DWM composition is
+      // enabled.
+      (DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rc, sizeof(RECT)) != S_OK)) {
+    // In other case we can just use the GetWindowRect() function.
+    GetWindowRect(m_hwnd, &rc);
+  }
+  return gfx::Rect(rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top);
 }
 
-void WinWindow::setTitle(const std::string& title)
+void WindowWin::setFrame(const gfx::Rect& _bounds)
+{
+  gfx::Rect bounds = _bounds;
+
+  // If the Desktop Window Manager (DWM) composition is enabled, the
+  // window has an extra shadown, so we have to adjust the given
+  // "_bounds" (which represent the frame edges) with the extra shadow
+  // size. This is because SetWindowPos() receives the bounds of the
+  // frame from the shadow (not from the window edges).
+  RECT inner, outer;
+  BOOL withShadow = false;
+  if ((DwmIsCompositionEnabled(&withShadow) == S_OK) &&
+      withShadow &&
+      (DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &inner, sizeof(RECT)) == S_OK)) {
+    GetWindowRect(m_hwnd, &outer);
+    bounds.enlarge(gfx::Border(inner.left - outer.left,
+                               inner.top - outer.top,
+                               outer.right - inner.right,
+                               outer.bottom - inner.bottom));
+  }
+  SetWindowPos(m_hwnd, nullptr,
+               bounds.x, bounds.y,
+               bounds.w, bounds.h,
+               SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+}
+
+gfx::Rect WindowWin::contentRect() const
+{
+  RECT rc;
+  GetClientRect(m_hwnd, &rc);
+  ClientToScreen(m_hwnd, (LPPOINT)&rc);
+  return gfx::Rect(rc.left, rc.top, rc.right, rc.bottom);
+}
+
+gfx::Rect WindowWin::restoredFrame() const
+{
+  return m_restoredFrame;
+}
+
+std::string WindowWin::title() const
+{
+  int n = GetWindowTextLength(m_hwnd);
+  if (!n)
+    return std::string();
+
+  // One extra char for the trailing zero '\0'
+  ++n;
+  std::vector<wchar_t> buf(n, 0);
+  GetWindowText(m_hwnd, &buf[0], n);
+  return base::to_utf8(&buf[0], n);
+}
+
+void WindowWin::setTitle(const std::string& title)
 {
   SetWindowText(m_hwnd, base::from_utf8(title).c_str());
 }
 
-void WinWindow::captureMouse()
+void WindowWin::captureMouse()
 {
   m_captureMouse = true;
 
@@ -336,7 +572,7 @@ void WinWindow::captureMouse()
   }
 }
 
-void WinWindow::releaseMouse()
+void WindowWin::releaseMouse()
 {
   m_captureMouse = false;
 
@@ -346,166 +582,118 @@ void WinWindow::releaseMouse()
   }
 }
 
-void WinWindow::setMousePosition(const gfx::Point& position)
+void WindowWin::setMousePosition(const gfx::Point& position)
 {
   POINT pos = { position.x * m_scale,
                 position.y * m_scale };
   ClientToScreen(m_hwnd, &pos);
   SetCursorPos(pos.x, pos.y);
+
+  system()->_setInternalMousePosition(gfx::Point(pos.x, pos.y));
 }
 
-bool WinWindow::setNativeMouseCursor(NativeCursor cursor)
+bool WindowWin::setCursor(NativeCursor cursor)
 {
   HCURSOR hcursor = NULL;
 
   switch (cursor) {
-    case kNoCursor:
+    case NativeCursor::Hidden:
       // Do nothing, just set to null
       break;
-    case kArrowCursor:
+    case NativeCursor::Arrow:
       hcursor = LoadCursor(NULL, IDC_ARROW);
       break;
-    case kCrosshairCursor:
+    case NativeCursor::Crosshair:
       hcursor = LoadCursor(NULL, IDC_CROSS);
       break;
-    case kIBeamCursor:
+    case NativeCursor::IBeam:
       hcursor = LoadCursor(NULL, IDC_IBEAM);
       break;
-    case kWaitCursor:
+    case NativeCursor::Wait:
       hcursor = LoadCursor(NULL, IDC_WAIT);
       break;
-    case kLinkCursor:
+    case NativeCursor::Link:
       hcursor = LoadCursor(NULL, IDC_HAND);
       break;
-    case kHelpCursor:
+    case NativeCursor::Help:
       hcursor = LoadCursor(NULL, IDC_HELP);
       break;
-    case kForbiddenCursor:
+    case NativeCursor::Forbidden:
       hcursor = LoadCursor(NULL, IDC_NO);
       break;
-    case kMoveCursor:
+    case NativeCursor::Move:
       hcursor = LoadCursor(NULL, IDC_SIZEALL);
       break;
-    case kSizeNCursor:
-    case kSizeNSCursor:
-    case kSizeSCursor:
+    case NativeCursor::SizeN:
+    case NativeCursor::SizeNS:
+    case NativeCursor::SizeS:
       hcursor = LoadCursor(NULL, IDC_SIZENS);
       break;
-    case kSizeECursor:
-    case kSizeWCursor:
-    case kSizeWECursor:
+    case NativeCursor::SizeE:
+    case NativeCursor::SizeW:
+    case NativeCursor::SizeWE:
       hcursor = LoadCursor(NULL, IDC_SIZEWE);
       break;
-    case kSizeNWCursor:
-    case kSizeSECursor:
+    case NativeCursor::SizeNW:
+    case NativeCursor::SizeSE:
       hcursor = LoadCursor(NULL, IDC_SIZENWSE);
       break;
-    case kSizeNECursor:
-    case kSizeSWCursor:
+    case NativeCursor::SizeNE:
+    case NativeCursor::SizeSW:
       hcursor = LoadCursor(NULL, IDC_SIZENESW);
       break;
   }
 
-  return setCursor(hcursor, false);
+  return setCursor(hcursor, nullptr);
 }
 
-bool WinWindow::setNativeMouseCursor(const os::Surface* surface,
-                                     const gfx::Point& focus,
-                                     const int scale)
+bool WindowWin::setCursor(const CursorRef& cursor)
 {
-  ASSERT(surface);
-
-  SurfaceFormatData format;
-  surface->getFormat(&format);
-
-  // Only for 32bpp surfaces
-  if (format.bitsPerPixel != 32)
+  ASSERT(cursor);
+  if (!cursor)
     return false;
 
-  // Based on the following article "How To Create an Alpha
-  // Blended Cursor or Icon in Windows XP":
-  // https://support.microsoft.com/en-us/kb/318876
-
-  int w = scale*surface->width();
-  int h = scale*surface->height();
-
-  BITMAPV5HEADER bi;
-  ZeroMemory(&bi, sizeof(BITMAPV5HEADER));
-  bi.bV5Size = sizeof(BITMAPV5HEADER);
-  bi.bV5Width = w;
-  bi.bV5Height = h;
-  bi.bV5Planes = 1;
-  bi.bV5BitCount = 32;
-  bi.bV5Compression = BI_BITFIELDS;
-  bi.bV5RedMask = 0x00ff0000;
-  bi.bV5GreenMask = 0x0000ff00;
-  bi.bV5BlueMask = 0x000000ff;
-  bi.bV5AlphaMask = 0xff000000;
-
-  uint32_t* bits;
-  HDC hdc = GetDC(nullptr);
-  HBITMAP hbmp = CreateDIBSection(
-    hdc, (BITMAPINFO*)&bi, DIB_RGB_COLORS,
-    (void**)&bits, NULL, (DWORD)0);
-  ReleaseDC(nullptr, hdc);
-  if (!hbmp)
-    return false;
-
-  bool completelyTransparent = true;
-  for (int y=0; y<h; ++y) {
-    const uint32_t* ptr = (const uint32_t*)surface->getData(0, (h-1-y)/scale);
-    for (int x=0, u=0; x<w; ++x, ++bits) {
-      uint32_t c = *ptr;
-      uint32_t a = ((c & format.alphaMask) >> format.alphaShift);
-
-      if (a)
-        completelyTransparent = false;
-
-      *bits = (a << 24) |
-        (((c & format.redMask  ) >> format.redShift  ) << 16) |
-        (((c & format.greenMask) >> format.greenShift) << 8) |
-        (((c & format.blueMask ) >> format.blueShift ));
-      if (++u == scale) {
-        u = 0;
-        ++ptr;
-      }
-    }
-  }
-
-  // It looks like if we set a cursor that is completely transparent
-  // (all pixels with alpha=0), Windows will create a black opaque
-  // rectangle cursor. Which is not what we are looking for. So in
-  // this specific case we put a "no cursor" which has the expected
-  // result.
-  if (completelyTransparent) {
-    DeleteObject(hbmp);
-    setNativeMouseCursor(kNoCursor);
-    return true;
-  }
-
-  // Create an empty mask bitmap.
-  HBITMAP hmonobmp = CreateBitmap(w, h, 1, 1, nullptr);
-  if (!hmonobmp) {
-    DeleteObject(hbmp);
-    return false;
-  }
-
-  ICONINFO ii;
-  ii.fIcon = FALSE;
-  ii.xHotspot = scale*focus.x + scale/2;
-  ii.yHotspot = scale*focus.y + scale/2;
-  ii.hbmMask = hmonobmp;
-  ii.hbmColor = hbmp;
-
-  HCURSOR hcursor = CreateIconIndirect(&ii);
-
-  DeleteObject(hbmp);
-  DeleteObject(hmonobmp);
-
-  return setCursor(hcursor, true);
+  if (cursor->nativeHandle())
+    return setCursor((HCURSOR)cursor->nativeHandle(), cursor);
+  else
+    return setCursor(nullptr, nullptr); // Like NativeCursor::Hidden
 }
 
-void WinWindow::invalidateRegion(const gfx::Region& rgn)
+void WindowWin::performWindowAction(const WindowAction action,
+                                    const Event* event)
+{
+  int ht = HTNOWHERE;
+
+  switch (action) {
+    case WindowAction::Move:                  ht = HTCAPTION;     break;
+    case WindowAction::ResizeFromTopLeft:     ht = HTTOPLEFT;     break;
+    case WindowAction::ResizeFromTop:         ht = HTTOP;         break;
+    case WindowAction::ResizeFromTopRight:    ht = HTTOPRIGHT;    break;
+    case WindowAction::ResizeFromLeft:        ht = HTLEFT;        break;
+    case WindowAction::ResizeFromRight:       ht = HTRIGHT;       break;
+    case WindowAction::ResizeFromBottomLeft:  ht = HTBOTTOMLEFT;  break;
+    case WindowAction::ResizeFromBottom:      ht = HTBOTTOM;      break;
+    case WindowAction::ResizeFromBottomRight: ht = HTBOTTOMRIGHT; break;
+  }
+
+  if (ht != HTNOWHERE) {
+    POINT pos;
+    if (event) {
+      pos.x = event->position().x;
+      pos.y = event->position().y;
+      ClientToScreen(m_hwnd, &pos);
+    }
+    else {
+      GetCursorPos(&pos);
+    }
+    // Cannot use SendMessage() because if m_borderless is true,
+    // WM_NCLBUTTONDOWN will generate a MouseDown but not call the
+    // original DefWindowProc().
+    DefWindowProc(m_hwnd, WM_NCLBUTTONDOWN, ht, MAKELPARAM(pos.x, pos.y));
+  }
+}
+
+void WindowWin::invalidateRegion(const gfx::Region& rgn)
 {
 #if 1 // Invalidating the region generates a flicker in Aseprite's
       // BrushPreview, because it looks like regions are then painted
@@ -550,7 +738,7 @@ void WinWindow::invalidateRegion(const gfx::Region& rgn)
 #endif
 }
 
-std::string WinWindow::getLayout()
+std::string WindowWin::getLayout()
 {
   WINDOWPLACEMENT wp;
   wp.length = sizeof(WINDOWPLACEMENT);
@@ -572,7 +760,7 @@ std::string WinWindow::getLayout()
   return "";
 }
 
-void WinWindow::setLayout(const std::string& layout)
+void WindowWin::setLayout(const std::string& layout)
 {
   WINDOWPLACEMENT wp;
   wp.length = sizeof(WINDOWPLACEMENT);
@@ -600,7 +788,7 @@ void WinWindow::setLayout(const std::string& layout)
   }
 }
 
-void WinWindow::setTranslateDeadKeys(bool state)
+void WindowWin::setTranslateDeadKeys(bool state)
 {
   m_translateDeadKeys = state;
 
@@ -618,7 +806,7 @@ void WinWindow::setTranslateDeadKeys(bool state)
   }
 }
 
-void WinWindow::setInterpretOneFingerGestureAsMouseMovement(bool state)
+void WindowWin::setInterpretOneFingerGestureAsMouseMovement(bool state)
 {
   if (state) {
     if (!m_touch)
@@ -631,27 +819,25 @@ void WinWindow::setInterpretOneFingerGestureAsMouseMovement(bool state)
   }
 }
 
-void WinWindow::onTabletAPIChange()
+void WindowWin::onTabletAPIChange()
 {
   LOG("WIN: On window %p tablet API change %d\n",
       m_hwnd, int(system()->tabletAPI()));
 
-  auto& api = system()->wintabApi();
   closeWintabCtx();
   openWintabCtx();
 }
 
-bool WinWindow::setCursor(HCURSOR hcursor, bool custom)
+bool WindowWin::setCursor(HCURSOR hcursor,
+                          const CursorRef& cursor)
 {
   SetCursor(hcursor);
-  if (m_hcursor && m_customHcursor)
-    DestroyIcon(m_hcursor);
   m_hcursor = hcursor;
-  m_customHcursor = custom;
+  m_cursor = cursor;
   return (hcursor ? true: false);
 }
 
-LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
+LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 {
   switch (msg) {
 
@@ -659,6 +845,19 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       LOG("WIN: Creating window %p (tablet API %d)\n",
           m_hwnd, int(system()->tabletAPI()));
       openWintabCtx();
+
+      if (m_borderless &&
+          // Don't use drop shadow effect for borderless + transparent
+          !isTransparent()) {
+        BOOL dwmEnabled = false;
+        if ((DwmIsCompositionEnabled(&dwmEnabled) == S_OK) && dwmEnabled) {
+          // Without this, we lost the shadow effect when WM_NCCALCSIZE returns 0
+          MARGINS margins = { 0, 0, 0, 1 };
+          DwmExtendFrameIntoClientArea(m_hwnd, &margins);
+        }
+      }
+
+      notifyFullScreenStateToShell();
       break;
     }
 
@@ -672,8 +871,74 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
         checkColorSpaceChange();
       break;
 
+    case WM_WINDOWPOSCHANGING: {
+      if (m_adjustShadow) {
+        // Check the drop shadow size
+        BOOL dwmEnabled = false;
+        if ((DwmIsCompositionEnabled(&dwmEnabled) == S_OK) && dwmEnabled) {
+          RECT rc, exrc;
+          GetWindowRect(m_hwnd, &rc);
+          if (DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &exrc, sizeof(RECT)) != S_OK)
+            exrc = rc;
+
+          const int leftEdge = exrc.left - rc.left;
+          const int topEdge = exrc.top - rc.top;
+          const int rightEdge = rc.right - exrc.right;
+          const int bottomEdge = rc.bottom - exrc.bottom;
+
+          if (leftEdge || topEdge || rightEdge || bottomEdge) {
+            WINDOWPOS* winPos = (WINDOWPOS*)lparam;
+
+            // Add the shadow edge to the position
+            winPos->x = rc.left - leftEdge;
+            winPos->y = rc.top - topEdge;
+            winPos->cx = rc.right - rc.left + leftEdge + rightEdge;
+            winPos->cy = rc.bottom - rc.top + topEdge + bottomEdge;
+            winPos->flags &= ~(SWP_NOMOVE | SWP_NOSIZE);
+            m_adjustShadow = false;
+            return 0;
+          }
+        }
+        else {
+          m_adjustShadow = false;
+        }
+      }
+      break;
+    }
+
+    case WM_WINDOWPOSCHANGED:
+      // When a custom frame window (borderless) is maximized, Windows
+      // put the window in the monitor bounds (not the workarea), so
+      // the task bar is not visible. To fix this we put the window in
+      // the workarea explicitly.
+      //
+      // This is combined with the handling of WM_NCCALCSIZE message.
+      if (m_borderless &&
+          isMaximized() &&
+          !isFullscreen() &&
+          !m_fixingPos) {
+        gfx::Rect wa = screen()->workarea();
+
+        // TODO when we maximize a window from the restored/regular
+        //      state, autohide taskbars are hidden, but when come
+        //      back from the fullscreen mode to the maximize mode,
+        //      the autohide taskbar is visible (which is the correct
+        //      behavior).
+
+        m_fixingPos = true;
+        SetWindowPos(m_hwnd, nullptr,
+                     wa.x, wa.y,
+                     wa.w, wa.h,
+                     SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOSENDCHANGING);
+        m_fixingPos = false;
+      }
+      break;
+
     case WM_SETCURSOR:
-      if (LOWORD(lparam) == HTCLIENT) {
+      // We set our custom cursor if we are in the client area, or in
+      // the case of windows with custom frames (borderless), we
+      // always set our own cursor.
+      if (LOWORD(lparam) == HTCLIENT || m_borderless) {
         SetCursor(m_hcursor);
         return TRUE;
       }
@@ -681,13 +946,55 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 
     case WM_CLOSE: {
       Event ev;
-      ev.setType(Event::CloseDisplay);
+      ev.setType(Event::CloseWindow);
       queueEvent(ev);
 
       // Don't close the window, it must be closed manually after
-      // the CloseDisplay event is processed.
+      // the CloseWindow event is processed.
       return 0;
     }
+
+    case WM_NCPAINT:
+      if (m_borderless) {
+        // Don't paint frame border/grid grip in the scrollbars.
+        return 0;
+      }
+      break;
+
+    case WM_ERASEBKGND:
+      // Don't erase background to avoid any kind of flickering
+      return TRUE;
+
+    case WM_NCACTIVATE:
+      // The default WM_NCACTIVATE behavior paints the default NC
+      // frame borders (and resize grip if scrollbars are enabled)
+      // when we activate/deactivate the window.
+      if (m_borderless || useScrollBarsHack()) {
+        // From: https://docs.microsoft.com/en-us/windows/win32/winmsg/wm-ncactivate
+        // "If lparam is set to -1, DefWindowProc() does not repaint
+        // the nonclient area to reflect the state change."
+        //
+        // Anyway that's not enough, if scrollbars are enabled,
+        // DefWindowProc() will try to draw the whole frame + the
+        // resize grip, a "simple" hack is setting the window as
+        // temporarily hidden, and then restoring the style again.
+        LONG oldStyle, style;
+        oldStyle = style = GetWindowLong(m_hwnd, GWL_STYLE);
+
+        // Remove these styles to avoid drawing the resize grip at the
+        // bottom-right border of the window.
+        style &= ~(WS_HSCROLL | WS_VSCROLL);
+        if (m_borderless) {
+          // Avoid drawing the old-looking frame of the window.
+          style &= ~WS_THICKFRAME;
+        }
+
+        SetWindowLong(m_hwnd, GWL_STYLE, style);
+        auto res = DefWindowProc(m_hwnd, msg, wparam, lparam);
+        SetWindowLong(m_hwnd, GWL_STYLE, oldStyle);
+        return res;
+      }
+      break;
 
     case WM_ACTIVATE:
       if (wparam == WA_ACTIVE ||
@@ -719,6 +1026,59 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       }
       break;
 
+    case WM_SIZING: {
+      RECT* rect = reinterpret_cast<RECT*>(lparam);
+
+      // Get the border needed on each side between the window rect
+      // and the client area.
+      int dx, dy;
+      {
+        RECT frame, client;
+        GetWindowRect(m_hwnd, &frame);
+        GetClientRect(m_hwnd, &client);
+        dx = (frame.right - frame.left) - (client.right - client.left);
+        dy = (frame.bottom - frame.top) - (client.bottom - client.top);
+      }
+
+      // We align the client area size to the m_scale.
+      int w = std::max<int>(rect->right - rect->left, 0) - dx;
+      int h = std::max<int>(rect->bottom - rect->top, 0) - dy;
+      w = std::max<int>(w - (w % m_scale), 8*m_scale) + dx;
+      h = std::max<int>(h - (h % m_scale), 8*m_scale) + dy;
+
+      switch (wparam) {
+        case WMSZ_LEFT:
+          rect->left = rect->right - w;
+          break;
+        case WMSZ_RIGHT:
+          rect->right = rect->left + w;
+          break;
+        case WMSZ_TOP:
+          rect->top = rect->bottom - h;
+          break;
+        case WMSZ_TOPLEFT:
+          rect->left = rect->right - w;
+          rect->top = rect->bottom - h;
+          break;
+        case WMSZ_TOPRIGHT:
+          rect->top = rect->bottom - h;
+          rect->right = rect->left + w;
+          break;
+        case WMSZ_BOTTOM:
+          rect->bottom = rect->top + h;
+          break;
+        case WMSZ_BOTTOMLEFT:
+          rect->left = rect->right - w;
+          rect->bottom = rect->top + h;
+          break;
+        case WMSZ_BOTTOMRIGHT:
+          rect->right = rect->left + w;
+          rect->bottom = rect->top + h;
+          break;
+      }
+      break;
+    }
+
     case WM_SIZE:
       if (m_isCreated) {
         gfx::Size newSize(GET_X_LPARAM(lparam),
@@ -734,8 +1094,11 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 
         WINDOWPLACEMENT pl;
         pl.length = sizeof(pl);
-        if (GetWindowPlacement(m_hwnd, &pl)) {
-          m_restoredSize = gfx::Size(
+        if (GetWindowPlacement(m_hwnd, &pl) &&
+            !m_fullscreen) {
+          m_restoredFrame = gfx::Rect(
+            pl.rcNormalPosition.left,
+            pl.rcNormalPosition.top,
             pl.rcNormalPosition.right - pl.rcNormalPosition.left,
             pl.rcNormalPosition.bottom - pl.rcNormalPosition.top);
         }
@@ -766,50 +1129,46 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
         break;
       }
 
-      if (!m_hasMouse) {
-        m_hasMouse = true;
-
-        ev.setType(Event::MouseEnter);
-        queueEvent(ev);
-
-        MOUSE_TRACE("-> Event::MouseEnter\n");
-
-        // Track mouse to receive WM_MOUSELEAVE message.
-        TRACKMOUSEEVENT tme;
-        tme.cbSize = sizeof(TRACKMOUSEEVENT);
-        tme.dwFlags = TME_LEAVE;
-        tme.hwndTrack = m_hwnd;
-        _TrackMouseEvent(&tme);
-      }
-
-      if (m_pointerType != PointerType::Unknown) {
-        ev.setPointerType(m_pointerType);
-        ev.setPressure(m_pressure);
-      }
-
-      ev.setType(Event::MouseMove);
-
-      if (system()->tabletAPI() == TabletAPI::WintabPackets &&
-          same_mouse_event(ev, m_lastWintabEvent))
-        MOUSE_TRACE(" - IGNORED (WinTab)\n");
-      else {
-        queueEvent(ev);
-        m_lastWintabEvent.setType(Event::None);
-      }
+      handleMouseMove(ev);
       break;
     }
 
+    case WM_NCLBUTTONDOWN:
+      if (m_borderless) {
+        // With custom frames, simulate that we always clicked the
+        // client area. So in this way Windows doesn't paint the
+        // default Minimize/Maximize/Close buttons.
+        POINT pos = {
+          GET_X_LPARAM(lparam),
+          GET_Y_LPARAM(lparam) };
+        ScreenToClient(m_hwnd, &pos);
+
+        LPARAM rellparam = MAKELPARAM(pos.x, pos.y);
+        return SendMessage(m_hwnd, WM_LBUTTONDOWN, MK_LBUTTON, rellparam);
+      }
+      break;
+
     case WM_NCMOUSEMOVE:
     case WM_MOUSELEAVE:
-      if (m_hasMouse) {
-        m_hasMouse = false;
+      // For regular windows (with the default system frame), we
+      // generate the MouseLeave message when the mouse leaves the
+      // client area.
+      if (m_hasMouse && !m_borderless) {
+        handleMouseLeave();
+      }
+      break;
 
-        Event ev;
-        ev.setType(Event::MouseLeave);
-        ev.setModifiers(get_modifiers_from_last_win32_message());
-        queueEvent(ev);
-
-        MOUSE_TRACE("-> Event::MouseLeave\n");
+    case WM_NCMOUSELEAVE:
+      // When the window doesn't have borders (m_borderless), we send
+      // the MouseLeave event when the mouse leaves the non-client
+      // area. This is required when handleHitTest() function is
+      // specified, because when the hit test is != HTCLIENT the
+      // WM_MOUSELEAVE is sent by Windows (and we don't want to
+      // generate the MouseLeave in that case, only when the mouse
+      // leaves the custom frame of the window, that is in this
+      // WM_NCMOUSELEAVE message).
+      if (m_hasMouse && m_borderless) {
+        handleMouseLeave();
       }
       break;
 
@@ -1039,6 +1398,7 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
         ev.setType(Event::MouseEnter);
         queueEvent(ev);
 
+        system()->_setInternalMousePosition(ev);
         MOUSE_TRACE("-> Event::MouseEnter\n");
       }
       return 0;
@@ -1079,6 +1439,8 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
           }
         }
       }
+
+      system()->_clearInternalMousePosition();
 
 #if 0 // Don't generate MouseLeave from pen/touch messages
       // TODO we should generate this message, but after this touch
@@ -1349,28 +1711,78 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 
     case WM_NCCALCSIZE: {
       if (wparam) {
-        // Scrollbars must be enabled and visible to get trackpad
-        // events of old drivers. So we cannot use ShowScrollBar() to
-        // hide them. This is a simple (maybe not so elegant)
-        // solution: Expand the client area to we overlap the
-        // scrollbars. In this way they are not visible, but we still
-        // get their messages.
-        NCCALCSIZE_PARAMS* cs = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
-        cs->rgrc[0].right += GetSystemMetrics(SM_CYVSCROLL);
-        cs->rgrc[0].bottom += GetSystemMetrics(SM_CYHSCROLL);
+        if (m_borderless) {
+#if 0     // TODO this is not working yet because the taskbar is not
+          //      visible (in some way Windows is still hidden the
+          //      taskbar), we've fixed this in WM_WINDOWPOSCHANGED
+          if (isMaximized() && !m_fullscreen) {
+            // As a maximized window without WS_CAPTION | WS_THICKFRAME
+            // styles is seen as a full screen window, Windows gives us the
+            // full screen area (instead of the workarea). This is a hack
+            // to avoid that and just give us the workarea for our custom
+            // frame/client area.
+            gfx::Rect wa = screen()->workarea();
+
+            NCCALCSIZE_PARAMS* cs = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+            cs->rgrc[0].left = wa.x;
+            cs->rgrc[0].top = wa.y;
+            cs->rgrc[0].right = wa.x2();
+            cs->rgrc[0].bottom = wa.y2();
+          }
+#endif
+
+          // Not using DefProcWindow() here will avoid showing a
+          // native frame around the our custom frame.
+          //
+          // The "WVR_REDRAW" is used to redraw the whole client area
+          // (not reusing old regions after the resize operation).
+          return WVR_REDRAW;
+        }
+
+        if (useScrollBarsHack()) {
+          // Scrollbars must be enabled and visible to get trackpad
+          // events of old drivers. So we cannot use ShowScrollBar() to
+          // hide them. This is a simple (maybe not so elegant)
+          // solution: Expand the client area to we overlap the
+          // scrollbars. In this way they are not visible, but we still
+          // get their messages.
+          NCCALCSIZE_PARAMS* cs = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+          cs->rgrc[0].right += GetSystemMetrics(SM_CYVSCROLL);
+          cs->rgrc[0].bottom += GetSystemMetrics(SM_CYHSCROLL);
+        }
       }
       break;
     }
 
     case WM_NCHITTEST: {
-      LRESULT result = CallWindowProc(DefWindowProc, m_hwnd, msg, wparam, lparam);
       gfx::Point pt(GET_X_LPARAM(lparam),
                     GET_Y_LPARAM(lparam));
 
+      // Custom handler for WM_NCHITTEST when the mouse is inside the
+      // windows area.
+      if (this->handleHitTest) {
+        POINT pos = { pt.x, pt.y };
+        ScreenToClient(m_hwnd, &pos);
+        gfx::Point relPt(pos.x, pos.y);
+        relPt /= m_scale;
+
+        Event ev;
+        ev.setModifiers(get_modifiers_from_last_win32_message());
+        ev.setPosition(relPt);
+        handleMouseMove(ev);
+
+        // Convert os::Hit values to Win32 HT* values
+        const int i = static_cast<int>(this->handleHitTest(this, relPt));
+        return (i >= 0 &&
+                i < hit2hittest_entries ?
+                    static_cast<LRESULT>(hit2hittest[i]):
+                    HTNOWHERE);
+      }
+
+      LRESULT result = DefWindowProc(m_hwnd, msg, wparam, lparam);
+
       ABS_CLIENT_RC(rc);
       gfx::Rect area(rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top);
-
-      //LOG("NCHITTEST: %d %d - %d %d %d %d - %s\n", pt.x, pt.y, area.x, area.y, area.w, area.h, area.contains(pt) ? "true": "false");
 
       // We ignore scrollbars so if the mouse is above them, we return
       // as it's in the window client or resize area. (Remember that
@@ -1382,6 +1794,13 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       else if (result == HTVSCROLL) {
         result = (area.contains(pt) ? HTCLIENT: HTRIGHT);
       }
+      // Filter the resize grip area of the bottom-right corner, which
+      // has the size of the scrollbars and we don't want to use that
+      // area to resize the window.
+      else if (result == HTBOTTOMRIGHT) {
+        if (area.contains(pt))
+          result = HTCLIENT;
+      }
 
       return result;
     }
@@ -1390,37 +1809,31 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 
     case WT_PROXIMITY: {
       HCTX ctx = (HCTX)wparam;
-      ASSERT(m_hpenctx == ctx);
+
+      // This can happen when we switch from TabletAPI::Wintab to
+      // TabletAPI::WintabPackets mode.
+      if (m_hpenctx != ctx)
+        break;
 
       bool entering_ctx = (LOWORD(lparam) ? true: false);
-      if (!entering_ctx)
-        m_pointerType = PointerType::Unknown;
-
-      MOUSE_TRACE("WT_PROXIMITY entering=%d\n", entering_ctx);
-
-      // Flush/empty queue
-      if (ctx) {
+      if (entering_ctx && ctx) {
         auto& api = system()->wintabApi();
-        api.packet(ctx, 0xffff, nullptr);
+
+        // Get the cursor from the proximity packet
+        PACKET packet;
+        if (api.packets(ctx, 1, &packet) == 1) {
+          m_pointerType = wt_packet_pkcursor_to_pointer_type(packet.pkCursor);
+        }
       }
+      else {
+        m_pointerType = PointerType::Unknown;
+      }
+
+      MOUSE_TRACE("WT_PROXIMITY entering=%d pointerType=%d\n",
+                  entering_ctx, (int)m_pointerType);
 
       // Reset last event
       m_lastWintabEvent.setType(Event::None);
-      break;
-    }
-
-    case WT_CSRCHANGE: {    // From Wintab 1.1
-      auto& api = system()->wintabApi();
-      UINT serial = wparam;
-      HCTX ctx = (HCTX)lparam;
-      PACKET packet;
-
-      if (api.packet(ctx, serial, &packet))
-        m_pointerType = wt_packet_pkcursor_to_pointer_type(packet.pkCursor);
-      else
-        m_pointerType = PointerType::Unknown;
-
-      MOUSE_TRACE("WT_CSRCHANGE pointer=%d\n", m_pointerType);
       break;
     }
 
@@ -1493,6 +1906,10 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 
             // To avoid processing two times the last generated event in WM_MOUSEMOVE/WM_LBUTTONDOWN/UP
             m_lastWintabEvent = ev;
+
+            // Don't store a reference to the window (without this
+            // windows cannot be closed after storing a reference).
+            m_lastWintabEvent.setWindow(nullptr);
           }
         }
       }
@@ -1524,7 +1941,7 @@ LRESULT WinWindow::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
   return DefWindowProc(m_hwnd, msg, wparam, lparam);
 }
 
-void WinWindow::mouseEvent(LPARAM lparam, Event& ev)
+void WindowWin::mouseEvent(LPARAM lparam, Event& ev)
 {
   ev.setModifiers(get_modifiers_from_last_win32_message());
   ev.setPosition(gfx::Point(
@@ -1532,7 +1949,7 @@ void WinWindow::mouseEvent(LPARAM lparam, Event& ev)
                    GET_Y_LPARAM(lparam) / m_scale));
 }
 
-bool WinWindow::pointerEvent(WPARAM wparam, Event& ev, POINTER_INFO& pi)
+bool WindowWin::pointerEvent(WPARAM wparam, Event& ev, POINTER_INFO& pi)
 {
   if (!m_usePointerApi)
     return false;
@@ -1586,12 +2003,62 @@ bool WinWindow::pointerEvent(WPARAM wparam, Event& ev, POINTER_INFO& pi)
       break;
     }
   }
-
-  m_lastPointerId = pi.pointerId;
   return true;
 }
 
-void WinWindow::handlePointerButtonChange(Event& ev, POINTER_INFO& pi)
+void WindowWin::handleMouseMove(Event& ev)
+{
+  if (!m_hasMouse) {
+    m_hasMouse = true;
+
+    ev.setType(Event::MouseEnter);
+    queueEvent(ev);
+
+    MOUSE_TRACE("-> Event::MouseEnter\n");
+
+    // Track mouse to receive WM_MOUSELEAVE and WM_NCMOUSELEAVE message.
+    TRACKMOUSEEVENT tme;
+    tme.cbSize = sizeof(TRACKMOUSEEVENT);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = m_hwnd;
+    _TrackMouseEvent(&tme);
+  }
+
+  if (m_pointerType != PointerType::Unknown) {
+    ev.setPointerType(m_pointerType);
+    ev.setPressure(m_pressure);
+  }
+
+  ev.setType(Event::MouseMove);
+
+  auto sys = system();
+  if (sys->tabletAPI() == TabletAPI::WintabPackets &&
+      same_mouse_event(ev, m_lastWintabEvent)) {
+    MOUSE_TRACE(" - IGNORED (WinTab)\n");
+  }
+  else {
+    queueEvent(ev);
+    m_lastWintabEvent.setType(Event::None);
+
+    sys->_setInternalMousePosition(ev);
+  }
+}
+
+void WindowWin::handleMouseLeave()
+{
+  ASSERT(m_hasMouse);
+  m_hasMouse = false;
+
+  Event ev;
+  ev.setType(Event::MouseLeave);
+  ev.setModifiers(get_modifiers_from_last_win32_message());
+  queueEvent(ev);
+
+  system()->_clearInternalMousePosition();
+  MOUSE_TRACE("-> Event::MouseLeave\n");
+}
+
+void WindowWin::handlePointerButtonChange(Event& ev, POINTER_INFO& pi)
 {
   if (pi.ButtonChangeType == POINTER_CHANGE_NONE) {
 #if OS_USE_POINTER_API_FOR_MOUSE
@@ -1673,9 +2140,10 @@ void WinWindow::handlePointerButtonChange(Event& ev, POINTER_INFO& pi)
   }
 
   queueEvent(ev);
+  system()->_setInternalMousePosition(ev);
 }
 
-void WinWindow::handleInteractionContextOutput(
+void WindowWin::handleInteractionContextOutput(
   const INTERACTION_CONTEXT_OUTPUT* output)
 {
   MOUSE_TRACE("%s (%d) xy=%.16g %.16g flags=%d type=%d\n",
@@ -1703,6 +2171,10 @@ void WinWindow::handleInteractionContextOutput(
                    int((output->y - rc.top) / m_scale));
 
     Event ev;
+    // This is PT_PEN or PT_TOUCH
+    ev.setPointerType(output->inputType == PT_PEN ?
+                      PointerType::Pen:
+                      PointerType::Touch);
     ev.setModifiers(get_modifiers_from_last_win32_message());
     ev.setPosition(pos);
 
@@ -1767,7 +2239,7 @@ void WinWindow::handleInteractionContextOutput(
   }
 }
 
-void WinWindow::waitTimerToConvertFingerAsMouseMovement()
+void WindowWin::waitTimerToConvertFingerAsMouseMovement()
 {
   ASSERT(m_touch);
   m_touch->canBeMouse = true;
@@ -1777,14 +2249,14 @@ void WinWindow::waitTimerToConvertFingerAsMouseMovement()
   TOUCH_TRACE(" - Set timer\n");
 }
 
-void WinWindow::convertFingerAsMouseMovement()
+void WindowWin::convertFingerAsMouseMovement()
 {
   ASSERT(m_touch);
   m_touch->asMouse = true;
   sendDelayedTouchEvents();
 }
 
-void WinWindow::delegateFingerToInteractionContext()
+void WindowWin::delegateFingerToInteractionContext()
 {
   ASSERT(m_touch);
   m_touch->canBeMouse = false;
@@ -1794,7 +2266,7 @@ void WinWindow::delegateFingerToInteractionContext()
     killTouchTimer();
 }
 
-void WinWindow::sendDelayedTouchEvents()
+void WindowWin::sendDelayedTouchEvents()
 {
   ASSERT(m_touch);
   for (auto& ev : m_touch->delayedEvents)
@@ -1802,13 +2274,13 @@ void WinWindow::sendDelayedTouchEvents()
   clearDelayedTouchEvents();
 }
 
-void WinWindow::clearDelayedTouchEvents()
+void WindowWin::clearDelayedTouchEvents()
 {
   ASSERT(m_touch);
   m_touch->delayedEvents.clear();
 }
 
-void WinWindow::killTouchTimer()
+void WindowWin::killTouchTimer()
 {
   ASSERT(m_touch);
   if (m_touch->timerID > 0) {
@@ -1818,15 +2290,15 @@ void WinWindow::killTouchTimer()
   }
 }
 
-void WinWindow::checkColorSpaceChange()
+void WindowWin::checkColorSpaceChange()
 {
-  os::ColorSpacePtr oldColorSpace = m_lastColorProfile;
-  os::ColorSpacePtr newColorSpace = colorSpace();
+  os::ColorSpaceRef oldColorSpace = m_lastColorProfile;
+  os::ColorSpaceRef newColorSpace = colorSpace();
   if (oldColorSpace != newColorSpace)
     onChangeColorSpace();
 }
 
-void WinWindow::openWintabCtx()
+void WindowWin::openWintabCtx()
 {
   const TabletAPI tabletAPI = system()->tabletAPI();
   if (tabletAPI == TabletAPI::Wintab ||
@@ -1836,10 +2308,13 @@ void WinWindow::openWintabCtx()
     m_hpenctx = api.open(
       m_hwnd,
       true); // We want to move the cursor with the pen in any case
+
+    if (api.crashedBefore())
+      system()->setTabletAPI(TabletAPI::Default);
   }
 }
 
-void WinWindow::closeWintabCtx()
+void WindowWin::closeWintabCtx()
 {
   if (m_hpenctx) {
     auto& api = system()->wintabApi();
@@ -1848,8 +2323,22 @@ void WinWindow::closeWintabCtx()
   }
 }
 
+void WindowWin::notifyFullScreenStateToShell()
+{
+  base::ComPtr<ITaskbarList2> taskbar;
+  HRESULT hr = CoCreateInstance(CLSID_TaskbarList,
+                                nullptr, CLSCTX_INPROC_SERVER,
+                                IID_PPV_ARGS(&taskbar));
+  if (FAILED(hr))
+    return;
+
+  // Useful to send the taskbar at the bottom when the window is set
+  // as fullscreen.
+  taskbar->MarkFullscreenWindow(m_hwnd, m_fullscreen ? TRUE: FALSE);
+}
+
 //static
-void WinWindow::registerClass()
+void WindowWin::registerClass()
 {
   HMODULE instance = GetModuleHandle(nullptr);
 
@@ -1859,13 +2348,13 @@ void WinWindow::registerClass()
 
   wcex.cbSize        = sizeof(WNDCLASSEX);
   wcex.style         = CS_DBLCLKS;
-  wcex.lpfnWndProc   = &WinWindow::staticWndProc;
+  wcex.lpfnWndProc   = &WindowWin::staticWndProc;
   wcex.cbClsExtra    = 0;
   wcex.cbWndExtra    = 0;
   wcex.hInstance     = instance;
   wcex.hIcon         = LoadIcon(instance, L"0");
   wcex.hCursor       = NULL;
-  wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+  wcex.hbrBackground = (HBRUSH)(COLOR_WINDOWFRAME+1);
   wcex.lpszMenuName  = nullptr;
   wcex.lpszClassName = OS_WND_CLASS_NAME;
   wcex.hIconSm       = nullptr;
@@ -1875,65 +2364,106 @@ void WinWindow::registerClass()
 }
 
 //static
-HWND WinWindow::createHwnd(WinWindow* self, int width, int height)
+HWND WindowWin::createHwnd(WindowWin* self, const WindowSpec& spec)
 {
+  int exStyle = WS_EX_ACCEPTFILES;
+  int style = 0;
+  if (spec.titled()) {
+    if (!spec.parent())
+      exStyle |= WS_EX_APPWINDOW;
+    style |= WS_OVERLAPPED | WS_SYSMENU | WS_CAPTION;
+  }
+  else {
+    style |= WS_POPUP;
+  }
+  if (spec.minimizable()) {
+    style |= WS_SYSMENU | WS_MINIMIZEBOX;
+  }
+  if (spec.resizable() ||
+      // Without WS_THICKFRAME we get a white canvas for borderless
+      // windows because we don't receive a WM_SIZE as we intercept
+      // WM_NCCALCSIZE in this case.
+      spec.borderless()) {
+    style |= WS_THICKFRAME;
+  }
+  if (spec.maximizable()) {
+    style |= WS_MAXIMIZEBOX;
+  }
+  if (spec.floating()) {
+    exStyle |= WS_EX_TOOLWINDOW;
+  }
+  if (spec.transparent()) {
+    exStyle |= WS_EX_LAYERED;
+  }
+
+  gfx::Rect rc;
+
+  switch (spec.position()) {
+    case WindowSpec::Position::Default:
+      rc.x = CW_USEDEFAULT;
+      rc.y = CW_USEDEFAULT;
+      break;
+    case WindowSpec::Position::Frame:
+      rc = spec.frame();
+      break;
+    case WindowSpec::Position::ContentRect:
+      rc = spec.contentRect();
+      break;
+  }
+
+  if (!spec.contentRect().isEmpty()) {
+    rc.w = spec.contentRect().w;
+    rc.h = spec.contentRect().h;
+    RECT ncrc = { 0, 0, rc.w, rc.h };
+    AdjustWindowRectEx(&ncrc, style,
+                       false,     // Add a field to WindowSpec to add native menu bars
+                       exStyle);
+
+    if (rc.x != CW_USEDEFAULT) rc.x += ncrc.left;
+    if (rc.y != CW_USEDEFAULT) rc.y += ncrc.top;
+    rc.w = ncrc.right - ncrc.left;
+    rc.h = ncrc.bottom - ncrc.top;
+  }
+  else if (!spec.frame().isEmpty()) {
+    rc.w = spec.frame().w;
+    rc.h = spec.frame().h;
+  }
+  else {
+    rc.w = CW_USEDEFAULT;
+    rc.h = CW_USEDEFAULT;
+  }
+
   HWND hwnd = CreateWindowEx(
-    WS_EX_APPWINDOW | WS_EX_ACCEPTFILES,
+    exStyle,
     OS_WND_CLASS_NAME,
     L"",
-    WS_OVERLAPPEDWINDOW | WS_HSCROLL | WS_VSCROLL,
-    CW_USEDEFAULT, CW_USEDEFAULT,
-    width, height,
-    nullptr,
+    style,
+    rc.x, rc.y, rc.w, rc.h,
+    (HWND)(spec.parent() ? static_cast<WindowWin*>(spec.parent())->nativeHandle(): nullptr),
     nullptr,
     GetModuleHandle(nullptr),
     reinterpret_cast<LPVOID>(self));
   if (!hwnd)
     return nullptr;
 
-  // Center the window
-  RECT workarea;
-  if (SystemParametersInfo(SPI_GETWORKAREA, 0, (PVOID)&workarea, 0)) {
-    SetWindowPos(hwnd, nullptr,
-                 (workarea.right-workarea.left)/2-width/2,
-                 (workarea.bottom-workarea.top)/2-height/2, 0, 0,
-                 SWP_NOSIZE |
-                 SWP_NOSENDCHANGING |
-                 SWP_NOOWNERZORDER |
-                 SWP_NOZORDER |
-                 SWP_NOREDRAW);
-  }
-
-  // Set scroll info to receive WM_HSCROLL/VSCROLL events (events
-  // generated by some trackpad drivers).
-  SCROLLINFO si;
-  si.cbSize = sizeof(SCROLLINFO);
-  si.fMask = SIF_POS | SIF_RANGE | SIF_PAGE;
-  si.nMin = 0;
-  si.nPos = 50;
-  si.nMax = 100;
-  si.nPage = 10;
-  SetScrollInfo(hwnd, SB_HORZ, &si, FALSE);
-  SetScrollInfo(hwnd, SB_VERT, &si, FALSE);
-
   return hwnd;
 }
 
 //static
-LRESULT CALLBACK WinWindow::staticWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+LRESULT CALLBACK WindowWin::staticWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-  WinWindow* wnd = nullptr;
+  WindowWin* wnd = nullptr;
 
   if (msg == WM_CREATE) {
     wnd =
-      reinterpret_cast<WinWindow*>(
+      reinterpret_cast<WindowWin*>(
         reinterpret_cast<LPCREATESTRUCT>(lparam)->lpCreateParams);
 
     if (wnd && wnd->m_hwnd == nullptr)
       wnd->m_hwnd = hwnd;
   }
   else {
-    wnd = reinterpret_cast<WinWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    wnd = reinterpret_cast<WindowWin*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
     // Check that the user data makes sense
     if (wnd && wnd->m_hwnd != hwnd)
@@ -1950,18 +2480,18 @@ LRESULT CALLBACK WinWindow::staticWndProc(HWND hwnd, UINT msg, WPARAM wparam, LP
 }
 
 //static
-void CALLBACK WinWindow::staticInteractionContextCallback(
+void CALLBACK WindowWin::staticInteractionContextCallback(
   void* clientData,
   const INTERACTION_CONTEXT_OUTPUT* output)
 {
-  WinWindow* self = reinterpret_cast<WinWindow*>(clientData);
+  WindowWin* self = reinterpret_cast<WindowWin*>(clientData);
   self->handleInteractionContextOutput(output);
 }
 
 // static
-WindowSystem* WinWindow::system()
+SystemWin* WindowWin::system()
 {
-  return static_cast<WindowSystem*>(os::instance());
+  return static_cast<SystemWin*>(os::instance());
 }
 
 } // namespace os

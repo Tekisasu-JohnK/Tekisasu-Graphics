@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,13 +9,13 @@
 #define OS_COMMON_SYSTEM_H
 #pragma once
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include "os/win/native_dialogs.h"
-#elif defined(__APPLE__)
+#elif LAF_MACOS
   #include "os/osx/app.h"
   #include "os/osx/menus.h"
   #include "os/osx/native_dialogs.h"
-#elif defined(LAF_OS_WITH_GTK)
+#elif LAF_OS_WITH_GTK
   #include "os/gtk/native_dialogs.h"
 #else
   #include "os/native_dialogs.h"
@@ -37,11 +37,21 @@ namespace os {
 class CommonSystem : public System {
 public:
   CommonSystem() { }
-  ~CommonSystem() { }
+  ~CommonSystem() {
+    // We have to clear the list of all events to clear all possible
+    // living WindowRef (so all window destructors are called at this
+    // point, when the os::System instance is still alive).
+    //
+    // TODO Maybe the event queue should be inside the System instance
+    //      (so when the system is deleted, the queue is
+    //      deleted). Anyway we should still clear all the events
+    //      before set_instance(nullptr), and we're not sure if this
+    //      is possible on macOS, as some events are queued before the
+    //      System instance is even created (see
+    //      EventQueue::instance() comment on laf/os/event_queue.h).
+    eventQueue()->clearEvents();
 
-  void dispose() override {
     set_instance(nullptr);
-    delete this;
   }
 
   void setAppName(const std::string& appName) override { }
@@ -68,16 +78,15 @@ public:
   }
 
   NativeDialogs* nativeDialogs() override {
-#ifdef _WIN32
-    if (!m_nativeDialogs)
-      m_nativeDialogs.reset(new NativeDialogsWin32);
-#elif defined(__APPLE__)
-    if (!m_nativeDialogs)
+    if (!m_nativeDialogs) {
+#if LAF_WINDOWS
+      m_nativeDialogs.reset(new NativeDialogsWin);
+#elif LAF_MACOS
       m_nativeDialogs.reset(new NativeDialogsOSX);
-#elif defined(LAF_OS_WITH_GTK)
-    if (!m_nativeDialogs)
+#elif LAF_OS_WITH_GTK
       m_nativeDialogs.reset(new NativeDialogsGTK);
 #endif
+    }
     return m_nativeDialogs.get();
   }
 
@@ -85,21 +94,22 @@ public:
     return EventQueue::instance();
   }
 
-  Font* loadSpriteSheetFont(const char* filename, int scale) override {
-    Surface* sheet = loadRgbaSurface(filename);
-    Font* font = nullptr;
+  FontRef loadSpriteSheetFont(const char* filename, int scale) override {
+    SurfaceRef sheet = loadRgbaSurface(filename);
+    FontRef font = nullptr;
     if (sheet) {
       sheet->applyScale(scale);
+      sheet->setImmutable();
       font = SpriteSheetFont::fromSurface(sheet);
     }
     return font;
   }
 
-  Font* loadTrueTypeFont(const char* filename, int height) override {
+  FontRef loadTrueTypeFont(const char* filename, int height) override {
 #ifdef LAF_FREETYPE
     if (!m_ft)
       m_ft.reset(new ft::Lib());
-    return load_free_type_font(*m_ft.get(), filename, height);
+    return FontRef(load_free_type_font(*m_ft.get(), filename, height));
 #else
     return nullptr;
 #endif
@@ -121,7 +131,7 @@ public:
   }
 
 private:
-  std::unique_ptr<NativeDialogs> m_nativeDialogs;
+  Ref<NativeDialogs> m_nativeDialogs;
 #ifdef LAF_FREETYPE
   std::unique_ptr<ft::Lib> m_ft;
 #endif

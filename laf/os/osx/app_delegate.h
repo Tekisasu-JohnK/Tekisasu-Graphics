@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2021  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -14,11 +14,11 @@
 #include <set>
 #include <string>
 
-@interface OSXNSApplication : NSApplication
+@interface NSApplicationOSX : NSApplication
 - (void)sendEvent:(NSEvent *)event;
 @end
 
-@interface OSXAppDelegate : NSObject<NSApplicationDelegate> {
+@interface AppDelegateOSX : NSObject<NSApplicationDelegate> {
   // Files that were already processed in the CLI, so we don't need to
   // generate a DropFiles event.
   std::set<std::string> m_cliFiles;

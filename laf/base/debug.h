@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -49,7 +49,7 @@ void base_trace(const char* msg, ...);
 #undef TRACEARGS
 
 #ifdef _DEBUG
-  #ifdef _WIN32
+  #if LAF_WINDOWS
     #include <crtdbg.h>
     #define base_break() _CrtDbgBreak()
   #else

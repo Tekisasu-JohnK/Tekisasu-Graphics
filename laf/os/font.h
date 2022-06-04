@@ -1,6 +1,6 @@
 // LAF OS Library
-// Copyright (C) 2019  Igara Studio S.A.
-// Copyright (C) 2012-2017  David Capello
+// Copyright (c) 2019-2020  Igara Studio S.A.
+// Copyright (c) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -10,13 +10,16 @@
 #pragma once
 
 #include "base/ints.h"
+#include "os/ref.h"
 
 #include <string>
 
 namespace os {
 
+  class Font;
   class FontStyle;
   class Typeface;
+  using FontRef = Ref<Font>;
 
   enum class FontType {
     Unknown,
@@ -25,11 +28,10 @@ namespace os {
     Native,                     // Skia
   };
 
-  class Font {
+  class Font : public RefCount {
   public:
     Font() : m_fallback(nullptr) { }
     virtual ~Font() { }
-    virtual void dispose() = 0;
     virtual FontType type() = 0;
     virtual int height() const = 0;
     virtual int textLength(const std::string& str) const = 0;

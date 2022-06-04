@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2019  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2012-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -12,53 +12,49 @@
 #include "base/disable_copying.h"
 #include "os/color_space.h"
 #include "os/native_cursor.h"
+#include "os/osx/window.h"
+#include "os/screen.h"
+#include "os/skia/skia_gl.h"
+#include "os/skia/skia_window_base.h"
 
 #include <string>
 
 namespace os {
 
-class EventQueue;
-class SkiaDisplay;
-class Surface;
-
-class SkiaWindow {
+class SkiaWindowOSX : public SkiaWindowBase<WindowOSX> {
 public:
-  enum class Backend { NONE, GL };
+  SkiaWindowOSX(const WindowSpec& spec);
+  ~SkiaWindowOSX();
 
-  SkiaWindow(EventQueue* queue, SkiaDisplay* display,
-             int width, int height, int scale);
-  ~SkiaWindow();
+  void setFullscreen(bool state) override;
 
-  os::ColorSpacePtr colorSpace() const;
-  int scale() const;
-  void setScale(int scale);
-  void setVisible(bool visible);
-  void maximize();
-  bool isMaximized() const;
-  bool isMinimized() const;
-  gfx::Size clientSize() const;
-  gfx::Size restoredSize() const;
-  void setTitle(const std::string& title);
-  void captureMouse();
-  void releaseMouse();
-  void setMousePosition(const gfx::Point& position);
-  bool setNativeMouseCursor(NativeCursor cursor);
-  bool setNativeMouseCursor(const Surface* surface,
-                            const gfx::Point& focus,
-                            const int scale);
-  void invalidateRegion(const gfx::Region& rgn);
-  std::string getLayout() { return ""; }
-  void setLayout(const std::string& layout) { }
+  void invalidateRegion(const gfx::Region& rgn) override;
+
+  std::string getLayout() override { return ""; }
+  void setLayout(const std::string& layout) override { }
   void setTranslateDeadKeys(bool state);
-  void* handle();
+
+  // WindowOSX overrides
+  void onClose() override;
+  void onResize(const gfx::Size& size) override;
+  void onDrawRect(const gfx::Rect& rect) override;
+  void onWindowChanged() override;
+  void onStartResizing() override;
+  void onResizing(gfx::Size& size) override;
+  void onEndResizing() override;
+  void onChangeBackingProperties() override;
 
 private:
-  void destroyImpl();
+  void paintGC(const gfx::Rect& rect);
 
-  class Impl;
-  Impl* m_impl;
+  bool m_closing = false;
 
-  DISABLE_COPYING(SkiaWindow);
+  // Counter used to match each onStart/EndResizing() call because we
+  // can receive multiple calls in case of windowWill/DidEnter/ExitFullScreen
+  // and windowWill/DidStart/EndLiveResize notifications.
+  int m_resizingCount = 0;
+
+  DISABLE_COPYING(SkiaWindowOSX);
 };
 
 } // namespace os

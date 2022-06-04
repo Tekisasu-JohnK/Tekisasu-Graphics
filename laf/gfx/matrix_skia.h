@@ -11,7 +11,7 @@
 #include "gfx/point.h"
 #include "gfx/rect.h"
 
-#include "SkMatrix.h"
+#include "include/core/SkMatrix.h"
 
 namespace gfx {
 
@@ -22,15 +22,15 @@ namespace gfx {
     constexpr Matrix(const SkMatrix& skMatrix) : m_skMatrix(skMatrix) { }
 
     static Matrix MakeScale(float sx, float sy) {
-      return Matrix(SkMatrix::MakeScale(sx, sy));
+      return Matrix(SkMatrix::Scale(sx, sy));
     }
 
     static Matrix MakeScale(float scale) {
-      return Matrix(SkMatrix::MakeScale(scale));
+      return Matrix(SkMatrix::Scale(scale, scale));
     }
 
     static Matrix MakeTrans(float x, float y) {
-      return Matrix(SkMatrix::MakeTrans(x, y));
+      return Matrix(SkMatrix::Translate(x, y));
     }
 
     static Matrix MakeAll(float scaleX, float skewX,  float transX,
@@ -38,7 +38,7 @@ namespace gfx {
                           float pers0, float pers1, float pers2) {
       return Matrix(SkMatrix::MakeAll(scaleX, skewX,  transX,
                                       skewY,  scaleY, transY,
-                                      pers0, pers1, pers2));
+                                      pers0,  pers1,  pers2));
     }
 
     Matrix& reset() {
@@ -101,7 +101,8 @@ namespace gfx {
 
     RectF mapRect(const RectF& src) const {
       SkRect dst;
-      m_skMatrix.mapRect(&dst, SkRect::MakeXYWH(src.x, src.y, src.w, src.h));
+      m_skMatrix.mapRect(&dst, SkRect::MakeXYWH(SkScalar(src.x), SkScalar(src.y),
+                                                SkScalar(src.w), SkScalar(src.h)));
       return RectF(dst.x(), dst.y(), dst.width(), dst.height());
     }
 

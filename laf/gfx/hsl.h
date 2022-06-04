@@ -10,6 +10,7 @@
 #pragma once
 
 #include "base/clamp.h"
+#include <cmath>
 
 namespace gfx {
 
@@ -49,7 +50,8 @@ public:
   int lightnessInt() const;
 
   void hue(double hue) {
-    m_hue = base::clamp(hue, 0.0, 360.0);
+    while (hue < 0.0) hue += 360.0;
+    m_hue = std::fmod(hue, 360.0);
   }
 
   void saturation(double saturation) {
