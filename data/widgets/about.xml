@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2018-2022  Igara Studio S.A. -->
 <!-- Copyright (C) 2018  David Capello -->
 <gui i18nwarnings="false">
-<window id="about" text="About Aseprite">
+<window id="about" text="About">
   <vbox>
     <label text="" id="title" />
     <label text="Animated sprite editor &amp;&amp; pixel art tool" />
