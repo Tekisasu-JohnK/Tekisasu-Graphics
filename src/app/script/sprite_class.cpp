@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -27,16 +27,20 @@
 #include "app/color_spaces.h"
 #include "app/commands/commands.h"
 #include "app/commands/params.h"
+#include "app/console.h"
 #include "app/context.h"
 #include "app/doc.h"
 #include "app/doc_access.h"
 #include "app/doc_api.h"
 #include "app/doc_range.h"
+#include "app/doc_undo.h"
+#include "app/doc_undo_observer.h"
 #include "app/file/palette_file.h"
 #include "app/script/docobj.h"
 #include "app/script/engine.h"
 #include "app/script/luacpp.h"
 #include "app/script/security.h"
+#include "app/script/userdata.h"
 #include "app/site.h"
 #include "app/transaction.h"
 #include "app/tx.h"
@@ -136,9 +140,9 @@ int Sprite_new(lua_State* L)
 
 int Sprite_eq(lua_State* L)
 {
-  const auto a = get_docobj<Sprite>(L, 1);
-  const auto b = get_docobj<Sprite>(L, 2);
-  lua_pushboolean(L, a->id() == b->id());
+  const auto a = may_get_docobj<Sprite>(L, 1);
+  const auto b = may_get_docobj<Sprite>(L, 2);
+  lua_pushboolean(L, (!a && !b) || (a && b && a->id() == b->id()));
   return 1;
 }
 
@@ -205,7 +209,7 @@ int Sprite_saveAs_base(lua_State* L, std::string& absFn)
     appCtx->setActiveDocument(doc);
 
     absFn = base::get_absolute_path(fn);
-    if (!ask_access(L, absFn.c_str(), FileAccessMode::Write, true))
+    if (!ask_access(L, absFn.c_str(), FileAccessMode::Write, ResourceType::File))
       return luaL_error(L, "script doesn't have access to write file %s",
                         absFn.c_str());
 
@@ -264,7 +268,7 @@ int Sprite_loadPalette(lua_State* L)
   const char* fn = luaL_checkstring(L, 2);
   if (fn && sprite) {
     std::string absFn = base::get_absolute_path(fn);
-    if (!ask_access(L, absFn.c_str(), FileAccessMode::Read, true))
+    if (!ask_access(L, absFn.c_str(), FileAccessMode::Read, ResourceType::File))
       return luaL_error(L, "script doesn't have access to open file %s",
                         absFn.c_str());
 
@@ -300,7 +304,7 @@ int Sprite_assignColorSpace(lua_State* L)
   auto cs = get_obj<gfx::ColorSpace>(L, 2);
   Tx tx;
   tx(new cmd::AssignColorProfile(
-       sprite, std::make_shared<gfx::ColorSpace>(*cs)));
+       sprite, base::make_ref<gfx::ColorSpace>(*cs)));
   tx.commit();
   return 1;
 }
@@ -311,7 +315,7 @@ int Sprite_convertColorSpace(lua_State* L)
   auto cs = get_obj<gfx::ColorSpace>(L, 2);
   Tx tx;
   tx(new cmd::ConvertColorProfile(
-       sprite, std::make_shared<gfx::ColorSpace>(*cs)));
+       sprite, base::make_ref<gfx::ColorSpace>(*cs)));
   tx.commit();
   return 1;
 }
@@ -372,6 +376,8 @@ int Sprite_deleteLayer(lua_State* L)
     }
   }
   if (layer) {
+    if (sprite != layer->sprite())
+      return luaL_error(L, "the layer doesn't belong to the sprite");
     Tx tx;
     tx(new cmd::RemoveLayer(layer));
     tx.commit();
@@ -498,11 +504,11 @@ int Sprite_newCel(lua_State* L)
 int Sprite_deleteCel(lua_State* L)
 {
   auto sprite = get_docobj<Sprite>(L, 1);
-  (void)sprite;                 // unused
-
   auto cel = may_get_docobj<doc::Cel>(L, 2);
   if (!cel) {
     if (auto layer = may_get_docobj<doc::Layer>(L, 2)) {
+      if (sprite != layer->sprite())
+        return luaL_error(L, "the layer doesn't belong to the sprite");
       doc::frame_t frame = get_frame_number_from_arg(L, 3);
       if (layer->isImage())
         cel = static_cast<doc::LayerImage*>(layer)->cel(frame);
@@ -545,6 +551,8 @@ int Sprite_deleteTag(lua_State* L)
       tag = sprite->tags().getByName(tagName);
   }
   if (tag) {
+    if (sprite != tag->owner()->sprite())
+      return luaL_error(L, "the tag doesn't belong to the sprite");
     Tx tx;
     tx(new cmd::RemoveTag(sprite, tag));
     tx.commit();
@@ -579,6 +587,8 @@ int Sprite_deleteSlice(lua_State* L)
       slice = sprite->slices().getByName(sliceName);
   }
   if (slice) {
+    if (sprite != slice->owner()->sprite())
+      return luaL_error(L, "the slice doesn't belong to the sprite");
     Tx tx;
     tx(new cmd::RemoveSlice(sprite, slice));
     tx.commit();
@@ -587,6 +597,13 @@ int Sprite_deleteSlice(lua_State* L)
   else {
     return luaL_error(L, "slice not found");
   }
+}
+
+int Sprite_get_events(lua_State* L)
+{
+  auto sprite = get_docobj<Sprite>(L, 1);
+  push_sprite_events(L, sprite);
+  return 1;
 }
 
 int Sprite_get_filename(lua_State* L)
@@ -681,6 +698,13 @@ int Sprite_get_slices(lua_State* L)
 {
   auto sprite = get_docobj<Sprite>(L, 1);
   push_sprite_slices(L, sprite);
+  return 1;
+}
+
+int Sprite_get_tilesets(lua_State* L)
+{
+  auto sprite = get_docobj<Sprite>(L, 1);
+  push_tilesets(L, sprite->tilesets());
   return 1;
 }
 
@@ -838,11 +862,15 @@ const Property Sprite_properties[] = {
   { "cels", Sprite_get_cels, nullptr },
   { "tags", Sprite_get_tags, nullptr },
   { "slices", Sprite_get_slices, nullptr },
+  { "tilesets", Sprite_get_tilesets, nullptr },
   { "backgroundLayer", Sprite_get_backgroundLayer, nullptr },
   { "transparentColor", Sprite_get_transparentColor, Sprite_set_transparentColor },
   { "bounds", Sprite_get_bounds, nullptr },
   { "gridBounds", Sprite_get_gridBounds, Sprite_set_gridBounds },
+  { "color", UserData_get_color<Sprite>, UserData_set_color<Sprite> },
+  { "data", UserData_get_text<Sprite>, UserData_set_text<Sprite> },
   { "pixelRatio", Sprite_get_pixelRatio, Sprite_set_pixelRatio },
+  { "events", Sprite_get_events, nullptr },
   { nullptr, nullptr, nullptr }
 };
 

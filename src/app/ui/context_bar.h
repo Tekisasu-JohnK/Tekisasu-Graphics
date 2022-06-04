@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -53,6 +53,8 @@ namespace app {
   class ColorBar;
   class DitheringSelector;
   class GradientTypeSelector;
+  class SamplingSelector;
+  class Transformation;
 
   class ContextBar : public DocObserverWidget<ui::HBox>
                    , public obs::observable<ContextBarObserver>
@@ -64,9 +66,10 @@ namespace app {
 
     void updateForActiveTool();
     void updateForTool(tools::Tool* tool);
-    void updateForMovingPixels();
+    void updateForMovingPixels(const Transformation& t);
     void updateForSelectingBox(const std::string& text);
     void updateToolLoopModifiersIndicators(tools::ToolLoopModifiers modifiers);
+    bool updateSamplingVisibility(tools::Tool* tool = nullptr);
     void updateAutoSelectLayer(bool state);
     bool isAutoSelectLayer() const;
 
@@ -121,6 +124,7 @@ namespace app {
     void onSymmetryModeChange();
     void onFgOrBgColorChange(doc::Brush::ImageColor imageColor);
     void onDropPixels(ContextBarObserver::DropAction action);
+    void updateSliceFields(const Site& site);
 
     // ActiveToolObserver impl
     void onActiveToolChange(tools::Tool* tool) override;
@@ -129,6 +133,7 @@ namespace app {
     void registerCommands();
     void showBrushes();
     void showDynamics();
+    bool needZoomButtons(tools::Tool* tool) const;
 
     class ZoomButtons;
     class BrushBackField;
@@ -148,6 +153,7 @@ namespace app {
     class TransparentColorField;
     class PivotField;
     class RotAlgorithmField;
+    class TransformationFields;
     class DynamicsField;
     class FreehandAlgorithmField;
     class BrushPatternField;
@@ -158,6 +164,7 @@ namespace app {
     class SliceFields;
 
     ZoomButtons* m_zoomButtons;
+    SamplingSelector* m_samplingSelector;
     BrushBackField* m_brushBack;
     BrushTypeField* m_brushType;
     BrushAngleField* m_brushAngle;
@@ -187,6 +194,7 @@ namespace app {
     TransparentColorField* m_transparentColor;
     PivotField* m_pivot;
     RotAlgorithmField* m_rotAlgo;
+    TransformationFields* m_transformation = nullptr;
     DropPixelsField* m_dropPixels;
     doc::BrushRef m_activeBrush;
     ui::Label* m_selectBoxHelp;

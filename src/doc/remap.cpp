@@ -1,6 +1,6 @@
 // Aseprite Document Library
-// Copyright (c)      2020 Igara Studio S.A.
-// Copyright (c) 2001-2016 David Capello
+// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -137,8 +137,21 @@ void Remap::merge(const Remap& other)
 Remap Remap::invert() const
 {
   Remap inv(size());
+
   for (int i=0; i<size(); ++i)
-    inv.map(operator[](i), i);
+    inv.unused(i);
+
+  for (int i=0; i<size(); ++i) {
+    int j = m_map[i];
+    if (j == kUnused ||
+        j == kNoTile ||
+        inv.m_map[j] != kUnused) { // Already mapped (strange case, we
+                                   // cannot invert this Remap)
+      continue;
+    }
+    inv.map(j, i);
+  }
+
   return inv;
 }
 
@@ -157,15 +170,33 @@ bool Remap::isFor8bit() const
 bool Remap::isInvertible(const PalettePicks& usedEntries) const
 {
   PalettePicks picks(size());
-  for (int i=0; i<size(); ++i) {
+  const int n = std::min(size(), usedEntries.size());
+  for (int i=0; i<n; ++i) {
     if (!usedEntries[i])
       continue;
 
     int j = m_map[i];
+    if (j == kUnused ||
+        j == kNoTile) {
+      continue;
+    }
+
     if (picks[j])
       return false;
 
     picks[j] = true;
+  }
+  return true;
+}
+
+bool Remap::isIdentity() const
+{
+  for (int i=0; i<size(); ++i) {
+    int j = m_map[i];
+    if (j != i &&
+        j != kUnused) {
+      return false;
+    }
   }
   return true;
 }

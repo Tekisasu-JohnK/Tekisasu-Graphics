@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -55,7 +55,7 @@ namespace {
 
 class Item : public ListItem {
 public:
-  Item(crash::Session* session, crash::Session::Backup* backup)
+  Item(crash::Session* session, const crash::Session::BackupPtr& backup)
     : m_session(session)
     , m_backup(backup)
     , m_task(nullptr) {
@@ -63,7 +63,7 @@ public:
   }
 
   crash::Session* session() const { return m_session; }
-  crash::Session::Backup* backup() const { return m_backup; }
+  const crash::Session::BackupPtr& backup() const { return m_backup; }
 
   bool isTaskRunning() const { return m_task != nullptr; }
 
@@ -111,6 +111,7 @@ public:
         try {
           // Warning: This is executed from a worker thread
           m_session->deleteBackup(m_backup);
+          m_backup.reset();     // Delete the Backup instance
 
           ui::execute_from_ui_thread(
             [this]{
@@ -138,10 +139,15 @@ public:
   }
 
   void updateText() {
-    if (!m_task)
+    if (!m_task) {
+      ASSERT(m_backup);
+      if (!m_backup)
+        return;
+
       setText(
         m_backup->description(
           Preferences::instance().general.showFullPath()));
+    }
   }
 
 private:
@@ -220,7 +226,7 @@ private:
   }
 
   crash::Session* m_session;
-  crash::Session::Backup* m_backup;
+  crash::Session::BackupPtr m_backup;
   TaskWidget* m_task;
 };
 
@@ -247,7 +253,7 @@ DataRecoveryView::DataRecoveryView(crash::DataRecovery* dataRecovery)
 
   InitTheme.connect(
     [this, hbox]{
-      SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+      auto theme = SkinTheme::get(this);
 
       m_openButton.mainButton()->resetSizeHint();
       gfx::Size hint = m_openButton.mainButton()->sizeHint();
@@ -330,7 +336,8 @@ void DataRecoveryView::fillListWith(const bool crashes)
                    Strings::recover_files_old_sessions()), HORIZONTAL);
       sep->InitTheme.connect(
         [sep]{
-          sep->setStyle(skin::SkinTheme::instance()->styles.separatorInViewReverse());
+          auto theme = skin::SkinTheme::get(sep);
+          sep->setStyle(theme->styles.separatorInViewReverse());
           sep->setBorder(sep->border() + gfx::Border(0, 8, 0, 8)*guiscale());
         });
       sep->initTheme();
@@ -391,6 +398,11 @@ TabIcon DataRecoveryView::getTabIcon()
   return TabIcon::NONE;
 }
 
+gfx::Color DataRecoveryView::getTabColor()
+{
+  return gfx::ColorNone;
+}
+
 void DataRecoveryView::onWorkspaceViewSelected()
 {
   // Do nothing
@@ -408,7 +420,7 @@ void DataRecoveryView::onTabPopup(Workspace* workspace)
   if (!menu)
     return;
 
-  menu->showPopup(ui::get_mouse_position());
+  menu->showPopup(mousePosInDisplay(), display());
 }
 
 void DataRecoveryView::onOpen()
@@ -456,7 +468,7 @@ void DataRecoveryView::onOpenMenu()
   rawFrames.Click.connect([this]{ onOpenRaw(crash::RawImagesAs::kFrames); });
   rawLayers.Click.connect([this]{ onOpenRaw(crash::RawImagesAs::kLayers); });
 
-  menu.showPopup(gfx::Point(bounds.x, bounds.y+bounds.h));
+  menu.showPopup(gfx::Point(bounds.x, bounds.y+bounds.h), display());
 }
 
 void DataRecoveryView::onDelete()

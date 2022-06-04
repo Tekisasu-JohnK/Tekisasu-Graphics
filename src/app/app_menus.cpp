@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -16,6 +16,7 @@
 #include "app/commands/commands.h"
 #include "app/commands/params.h"
 #include "app/console.h"
+#include "app/extensions.h"
 #include "app/gui_xml.h"
 #include "app/i18n/strings.h"
 #include "app/recent_files.h"
@@ -288,6 +289,14 @@ os::Shortcut get_os_shortcut_from_key(const Key* key)
 {
   if (key && !key->accels().empty()) {
     const ui::Accelerator& accel = key->accels().front();
+
+#ifdef __APPLE__
+    // Shortcuts with spacebar as modifier do not work well in macOS
+    // (they will be called when the space bar is unpressed too).
+    if ((accel.modifiers() & ui::kKeySpaceModifier) == ui::kKeySpaceModifier)
+      return os::Shortcut();
+#endif
+
     return os::Shortcut(
       (accel.unicodeChar() ? accel.unicodeChar():
                              from_scancode_to_unicode(accel.scancode())),
@@ -315,12 +324,6 @@ AppMenus::AppMenus()
   m_recentFilesConn =
     App::instance()->recentFiles()->Changed.connect(
       [this]{ rebuildRecentList(); });
-}
-
-AppMenus::~AppMenus()
-{
-  if (m_osMenu)
-    m_osMenu->dispose();
 }
 
 void AppMenus::reload()
@@ -423,10 +426,22 @@ void AppMenus::reload()
     .FirstChild("gui")
     .FirstChild("keyboard").ToElement();
 
+  // From a fresh start, load the default keys
   KeyboardShortcuts::instance()->clear();
   KeyboardShortcuts::instance()->importFile(xmlKey, KeySource::Original);
 
-  // Load user settings
+  // Load extension-defined keys
+  for (const Extension* ext : App::instance()->extensions()) {
+    if (ext->isEnabled() &&
+        ext->hasKeys()) {
+      for (const auto& kv : ext->keys()) {
+        KeyboardShortcuts::instance()->importFile(
+          kv.second, KeySource::ExtensionDefined);
+      }
+    }
+  }
+
+  // Load user-defined keys
   {
     ResourceFinder rf;
     rf.includeUserDir("user.aseprite-keys");
@@ -554,10 +569,10 @@ bool AppMenus::rebuildRecentList()
   // Sync native menus
   if (owner->native() &&
       owner->native()->menuItem) {
-    os::Menus* menus = os::instance()->menus();
-    os::Menu* osMenu = (menus ? menus->createMenu(): nullptr);
+    auto menus = os::instance()->menus();
+    os::MenuRef osMenu = (menus ? menus->makeMenu(): nullptr);
     if (osMenu) {
-      createNativeSubmenus(osMenu, menu);
+      createNativeSubmenus(osMenu.get(), menu);
       owner->native()->menuItem->setSubmenu(osMenu);
     }
   }
@@ -650,6 +665,7 @@ Menu* AppMenus::loadMenuById(TiXmlHandle& handle, const char* id)
 Menu* AppMenus::convertXmlelemToMenu(TiXmlElement* elem)
 {
   Menu* menu = new Menu();
+  menu->setText(m_xmlTranslator(elem, "text"));
 
   TiXmlElement* child = elem->FirstChildElement();
   while (child) {
@@ -817,8 +833,9 @@ void AppMenus::createNativeMenus()
   if (!menus)       // This platform doesn't support native menu items
     return;
 
-  os::Menu* oldOSMenu = m_osMenu;
-  m_osMenu = menus->createMenu();
+  // Save a reference to the old menu to avoid destroying it.
+  os::MenuRef oldOSMenu = m_osMenu;
+  m_osMenu = menus->makeMenu();
 
 #ifdef __APPLE__ // Create default macOS app menus (App ... Window)
   {
@@ -854,24 +871,24 @@ void AppMenus::createNativeMenus()
     os::MenuItemInfo quit(fmt::format("Quit {}", get_app_name()), os::MenuItemInfo::Quit);
     quit.shortcut = os::Shortcut('q', os::kKeyCmdModifier);
 
-    os::Menu* appMenu = menus->createMenu();
-    appMenu->addItem(menus->createMenuItem(about));
-    appMenu->addItem(menus->createMenuItem(os::MenuItemInfo(os::MenuItemInfo::Separator)));
-    appMenu->addItem(menus->createMenuItem(preferences));
-    appMenu->addItem(menus->createMenuItem(os::MenuItemInfo(os::MenuItemInfo::Separator)));
-    appMenu->addItem(menus->createMenuItem(hide));
-    appMenu->addItem(menus->createMenuItem(os::MenuItemInfo("Hide Others", os::MenuItemInfo::HideOthers)));
-    appMenu->addItem(menus->createMenuItem(os::MenuItemInfo("Show All", os::MenuItemInfo::ShowAll)));
-    appMenu->addItem(menus->createMenuItem(os::MenuItemInfo(os::MenuItemInfo::Separator)));
-    appMenu->addItem(menus->createMenuItem(quit));
+    os::MenuRef appMenu = menus->makeMenu();
+    appMenu->addItem(menus->makeMenuItem(about));
+    appMenu->addItem(menus->makeMenuItem(os::MenuItemInfo(os::MenuItemInfo::Separator)));
+    appMenu->addItem(menus->makeMenuItem(preferences));
+    appMenu->addItem(menus->makeMenuItem(os::MenuItemInfo(os::MenuItemInfo::Separator)));
+    appMenu->addItem(menus->makeMenuItem(hide));
+    appMenu->addItem(menus->makeMenuItem(os::MenuItemInfo("Hide Others", os::MenuItemInfo::HideOthers)));
+    appMenu->addItem(menus->makeMenuItem(os::MenuItemInfo("Show All", os::MenuItemInfo::ShowAll)));
+    appMenu->addItem(menus->makeMenuItem(os::MenuItemInfo(os::MenuItemInfo::Separator)));
+    appMenu->addItem(menus->makeMenuItem(quit));
 
-    os::MenuItem* appItem = menus->createMenuItem(os::MenuItemInfo("App"));
+    os::MenuItemRef appItem = menus->makeMenuItem(os::MenuItemInfo("App"));
     appItem->setSubmenu(appMenu);
     m_osMenu->addItem(appItem);
   }
 #endif
 
-  createNativeSubmenus(m_osMenu, m_rootMenu.get());
+  createNativeSubmenus(m_osMenu.get(), m_rootMenu.get());
 
 #ifdef __APPLE__
   {
@@ -889,11 +906,11 @@ void AppMenus::createNativeMenus()
     os::MenuItemInfo minimize("Minimize", os::MenuItemInfo::Minimize);
     minimize.shortcut = os::Shortcut('m', os::kKeyCmdModifier);
 
-    os::Menu* windowMenu = menus->createMenu();
-    windowMenu->addItem(menus->createMenuItem(minimize));
-    windowMenu->addItem(menus->createMenuItem(os::MenuItemInfo("Zoom", os::MenuItemInfo::Zoom)));
+    os::MenuRef windowMenu = menus->makeMenu();
+    windowMenu->addItem(menus->makeMenuItem(minimize));
+    windowMenu->addItem(menus->makeMenuItem(os::MenuItemInfo("Zoom", os::MenuItemInfo::Zoom)));
 
-    os::MenuItem* windowItem = menus->createMenuItem(os::MenuItemInfo("Window"));
+    os::MenuItemRef windowItem = menus->makeMenuItem(os::MenuItemInfo("Window"));
     windowItem->setSubmenu(windowMenu);
 
     // We use helpIndex+1 because the first index in m_osMenu is the
@@ -904,10 +921,11 @@ void AppMenus::createNativeMenus()
 
   menus->setAppMenu(m_osMenu);
   if (oldOSMenu)
-    oldOSMenu->dispose();
+    oldOSMenu.reset();
 }
 
-void AppMenus::createNativeSubmenus(os::Menu* osMenu, const ui::Menu* uiMenu)
+void AppMenus::createNativeSubmenus(os::Menu* osMenu,
+                                    const ui::Menu* uiMenu)
 {
   os::Menus* menus = os::instance()->menus();
 
@@ -951,7 +969,7 @@ void AppMenus::createNativeSubmenus(os::Menu* osMenu, const ui::Menu* uiMenu)
       continue;
     }
 
-    os::MenuItem* osItem = menus->createMenuItem(info);
+    os::MenuItemRef osItem = menus->makeMenuItem(info);
     if (osItem) {
       osMenu->addItem(osItem);
       if (appMenuItem) {
@@ -961,8 +979,8 @@ void AppMenus::createNativeSubmenus(os::Menu* osMenu, const ui::Menu* uiMenu)
 
       if (child->type() == ui::kMenuItemWidget &&
           ((ui::MenuItem*)child)->hasSubmenu()) {
-        os::Menu* osSubmenu = menus->createMenu();
-        createNativeSubmenus(osSubmenu, ((ui::MenuItem*)child)->getSubmenu());
+        os::MenuRef osSubmenu = menus->makeMenu();
+        createNativeSubmenus(osSubmenu.get(), ((ui::MenuItem*)child)->getSubmenu());
         osItem->setSubmenu(osSubmenu);
       }
     }

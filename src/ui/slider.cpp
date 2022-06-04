@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -13,7 +13,6 @@
 
 #include "base/clamp.h"
 #include "os/font.h"
-#include "ui/manager.h"
 #include "ui/message.h"
 #include "ui/size_hint_event.h"
 #include "ui/system.h"
@@ -122,7 +121,7 @@ bool Slider::onProcessMessage(Message* msg)
       if (hasCapture()) {
         int value, accuracy, range;
         gfx::Rect rc = childrenBounds();
-        gfx::Point mousePos = static_cast<MouseMessage*>(msg)->position();
+        gfx::Point mousePos = static_cast<MouseMessage*>(msg)->positionForDisplay(display());
 
         range = m_max - m_min + 1;
 

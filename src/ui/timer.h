@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -38,12 +38,12 @@ namespace ui {
 
     static void pollTimers();
     static bool haveTimers();
-    static bool haveRunningTimers();
+    static bool getNextTimeout(double& timeout);
 
   protected:
     virtual void onTick();
 
-  public:
+  private:
     Widget* m_owner;
     int m_interval;
     bool m_running;

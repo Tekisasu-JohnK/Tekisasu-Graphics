@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -19,6 +19,7 @@
 
 namespace ui {
 
+  class MenuBoxWindow;
   class MenuItem;
   class Timer;
   struct MenuBaseData;
@@ -28,18 +29,22 @@ namespace ui {
     Menu();
     ~Menu();
 
-    void showPopup(const gfx::Point& pos);
-    Widget* findItemById(const char* id);
+    void showPopup(const gfx::Point& pos,
+                   Display* parentDisplay);
+    Widget* findItemById(const char* id) const;
 
     // Returns the MenuItem that has as submenu this menu.
     MenuItem* getOwnerMenuItem() {
       return m_menuitem;
     }
 
+    obs::signal<void()> OpenPopup;
+
   protected:
     virtual void onPaint(PaintEvent& ev) override;
     virtual void onResize(ResizeEvent& ev) override;
     virtual void onSizeHint(SizeHintEvent& ev) override;
+    virtual void onOpenPopup();
 
   private:
     void setOwnerMenuItem(MenuItem* ownerMenuItem) {
@@ -67,7 +72,7 @@ namespace ui {
     void setMenu(Menu* menu);
 
     MenuBaseData* getBase() {
-      return m_base;
+      return m_base.get();
     }
 
     // Closes all menu-boxes and goes back to the normal state of the
@@ -85,7 +90,7 @@ namespace ui {
     void startFilteringMouseDown();
     void stopFilteringMouseDown();
 
-    MenuBaseData* m_base;
+    std::unique_ptr<MenuBaseData> m_base;
 
     friend class Menu;
     friend class MenuItem;
@@ -93,12 +98,22 @@ namespace ui {
 
   class MenuBar : public MenuBox {
   public:
-    MenuBar();
+    enum class ProcessTopLevelShortcuts { kNo, kYes };
+
+    MenuBar(ProcessTopLevelShortcuts processShortcuts);
+
+    bool processTopLevelShortcuts() const {
+      return m_processTopLevelShortcuts;
+    }
 
     static bool expandOnMouseover();
     static void setExpandOnMouseover(bool state);
 
   private:
+    // True if we should open top-level menus with Alt+mnemonic (this
+    // flag is not used by Aseprite), top-level menus are opened with
+    // the ShowMenu command now.
+    bool m_processTopLevelShortcuts;
     static bool m_expandOnMouseover;
   };
 
@@ -109,6 +124,10 @@ namespace ui {
 
     Menu* getSubmenu();
     void setSubmenu(Menu* submenu);
+
+    // Open the submenu of this menu item (the menu item should be
+    // positioned in a correct position on the screen).
+    void openSubmenu();
 
     bool isHighlighted() const;
     void setHighlighted(bool state);
@@ -141,7 +160,7 @@ namespace ui {
     virtual void onClick();
     virtual void onValidate();
 
-    bool inBar();
+    bool inBar() const;
 
   private:
     void openSubmenu(bool select_first);
@@ -156,6 +175,7 @@ namespace ui {
 
     friend class Menu;
     friend class MenuBox;
+    friend class MenuBoxWindow;
   };
 
   class MenuSeparator : public Separator {
@@ -166,9 +186,14 @@ namespace ui {
 
   class MenuBoxWindow : public Window {
   public:
-    MenuBoxWindow(MenuBox* menubox);
+    MenuBoxWindow(MenuItem* menuitem = nullptr);
+    ~MenuBoxWindow();
+    MenuBox* menubox() { return &m_menubox; }
   protected:
     bool onProcessMessage(Message* msg) override;
+  private:
+    MenuBox m_menubox;
+    MenuItem* m_menuitem;
   };
 
   extern RegisterMessage kOpenMenuItemMessage;

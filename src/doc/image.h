@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (c) 2018 Igara Studio S.A.
+// Copyright (c) 2018-2020 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -46,13 +46,14 @@ namespace doc {
     const ImageSpec& spec() const { return m_spec; }
     ColorMode colorMode() const { return m_spec.colorMode(); }
     PixelFormat pixelFormat() const { return (PixelFormat)colorMode(); }
+    bool isTilemap() const { return m_spec.colorMode() == ColorMode::TILEMAP; }
     int width() const { return m_spec.width(); }
     int height() const { return m_spec.height(); }
     gfx::Size size() const { return m_spec.size(); }
     gfx::Rect bounds() const { return m_spec.bounds(); }
     color_t maskColor() const { return m_spec.maskColor(); }
     void setMaskColor(color_t c) { m_spec.setMaskColor(c); }
-    void setColorSpace(const gfx::ColorSpacePtr& cs) { m_spec.setColorSpace(cs); }
+    void setColorSpace(const gfx::ColorSpaceRef& cs) { m_spec.setColorSpace(cs); }
 
     virtual int getMemSize() const override;
     int getRowStrideSize() const;
@@ -107,6 +108,7 @@ namespace doc {
       case IMAGE_GRAYSCALE: return GrayscaleTraits::getRowStrideBytes(pixels_per_row);
       case IMAGE_INDEXED:   return IndexedTraits::getRowStrideBytes(pixels_per_row);
       case IMAGE_BITMAP:    return BitmapTraits::getRowStrideBytes(pixels_per_row);
+      case IMAGE_TILEMAP:   return TilemapTraits::getRowStrideBytes(pixels_per_row);
     }
     return 0;
   }

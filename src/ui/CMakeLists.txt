@@ -1,4 +1,5 @@
 # Aseprite UI Library
+# Copyright (C) 2019-2022  Igara Studio S.A.
 # Copyright (C) 2001-2018  David Capello
 
 if(WIN32)
@@ -8,11 +9,13 @@ endif()
 add_library(ui-lib
   accelerator.cpp
   alert.cpp
+  app_state.cpp
   box.cpp
   button.cpp
   combobox.cpp
   component.cpp
   cursor.cpp
+  display.cpp
   entry.cpp
   event.cpp
   fit_bounds.cpp

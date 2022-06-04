@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -20,7 +20,6 @@ namespace app {
   namespace tools {
     class Ink;
     class Pointer;
-    class Command;
   }
 
   class DrawingState;
@@ -47,6 +46,9 @@ namespace app {
     // the brush-preview.
     virtual bool requireBrushPreview() override { return true; }
 
+    // Layer edges and cel guides are allowed to be drawn.
+    virtual bool allowLayerEdges() override { return true; }
+
     virtual Transformation getTransformation(Editor* editor);
 
     void startSelectionTransformation(Editor* editor, const gfx::Point& move, double angle);
@@ -55,7 +57,9 @@ namespace app {
 
   protected:
     void callEyedropper(Editor* editor, const ui::MouseMessage* msg);
-    bool checkStartDrawingStraightLine(Editor* editor, const ui::MouseMessage* msg);
+    bool checkStartDrawingStraightLine(Editor* editor,
+                                       const ui::MouseMessage* msg,
+                                       const tools::Pointer* pointer);
     virtual bool canCheckStartDrawingStraightLine() { return true; }
 
     class Decorator : public EditorDecorator {
@@ -87,6 +91,7 @@ namespace app {
 
   private:
     DrawingState* startDrawingState(Editor* editor,
+                                    const ui::MouseMessage* msg,
                                     const DrawingType drawingType,
                                     const tools::Pointer& pointer);
     void transformSelection(Editor* editor, ui::MouseMessage* msg, HandleType handle);

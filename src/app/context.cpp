@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -19,9 +19,16 @@
 #include "app/doc.h"
 #include "app/pref/preferences.h"
 #include "app/site.h"
+#include "app/util/clipboard.h"
 #include "base/scoped_value.h"
 #include "doc/layer.h"
 #include "ui/system.h"
+
+#ifdef _DEBUG
+#include "doc/layer_tilemap.h"
+#include "doc/tileset.h"
+#include "doc/tilesets.h"
+#endif
 
 #include <algorithm>
 #include <stdexcept>
@@ -53,6 +60,16 @@ Preferences& Context::preferences() const
   return *m_preferences;
 }
 
+Clipboard* Context::clipboard() const
+{
+#ifdef ENABLE_UI
+  return Clipboard::instance();
+#else
+  // TODO support clipboard when !ENABLE_UI
+  throw std::runtime_error("Clipboard not supported");
+#endif
+}
+
 void Context::sendDocumentToTop(Doc* document)
 {
   ASSERT(document != NULL);
@@ -81,7 +98,7 @@ Doc* Context::activeDocument() const
 
 void Context::setActiveDocument(Doc* document)
 {
-  onSetActiveDocument(document);
+  onSetActiveDocument(document, true);
 }
 
 void Context::setActiveLayer(doc::Layer* layer)
@@ -102,6 +119,11 @@ void Context::setRange(const DocRange& range)
 void Context::setSelectedColors(const doc::PalettePicks& picks)
 {
   onSetSelectedColors(picks);
+}
+
+void Context::setSelectedTiles(const doc::PalettePicks& picks)
+{
+  onSetSelectedTiles(picks);
 }
 
 bool Context::hasModifiedDocuments() const
@@ -143,6 +165,8 @@ void Context::executeCommand(Command* command, const Params& params)
   if (!command)
     return;
 
+  m_result.reset();
+
   Console console;
   LOG(VERBOSE, "CTXT: Executing command %s\n", command->id().c_str());
   try {
@@ -175,19 +199,39 @@ void Context::executeCommand(Command* command, const Params& params)
     // TODO move this code to another place (e.g. a Workplace/Tabs widget)
     if (isUIAvailable())
       app_rebuild_documents_tabs();
+
+#ifdef _DEBUG // Special checks for debugging purposes
+    {
+      Site site = activeSite();
+      // Check that all tileset hash tables are valid
+      if (site.sprite() &&
+          site.sprite()->hasTilesets()) {
+        for (Tileset* tileset : *site.sprite()->tilesets()) {
+          if (tileset)
+            tileset->assertValidHashTable();
+        }
+      }
+    }
+#endif
   }
   catch (base::Exception& e) {
+    m_result = CommandResult(CommandResult::kError);
+
     LOG(ERROR, "CTXT: Exception caught executing %s command\n%s\n",
         command->id().c_str(), e.what());
     Console::showException(e);
   }
   catch (std::exception& e) {
+    m_result = CommandResult(CommandResult::kError);
+
     LOG(ERROR, "CTXT: std::exception caught executing %s command\n%s\n",
         command->id().c_str(), e.what());
     console.printf("An error ocurred executing the command.\n\nDetails:\n%s", e.what());
   }
 #ifdef NDEBUG
   catch (...) {
+    m_result = CommandResult(CommandResult::kError);
+
     LOG(ERROR, "CTXT: Unknown exception executing %s command\n",
         command->id().c_str());
 
@@ -200,21 +244,30 @@ void Context::executeCommand(Command* command, const Params& params)
 #endif
 }
 
+void Context::setCommandResult(const CommandResult& result)
+{
+  m_result = result;
+}
+
 void Context::onAddDocument(Doc* doc)
 {
   m_lastSelectedDoc = doc;
 
   if (m_activeSiteHandler)
     m_activeSiteHandler->addDoc(doc);
+
+  notifyActiveSiteChanged();
 }
 
 void Context::onRemoveDocument(Doc* doc)
 {
-  if (doc == m_lastSelectedDoc)
-    m_lastSelectedDoc = nullptr;
-
   if (m_activeSiteHandler)
     m_activeSiteHandler->removeDoc(doc);
+
+  if (doc == m_lastSelectedDoc) {
+    m_lastSelectedDoc = nullptr;
+    notifyActiveSiteChanged();
+  }
 }
 
 void Context::onGetActiveSite(Site* site) const
@@ -224,24 +277,33 @@ void Context::onGetActiveSite(Site* site) const
     activeSiteHandler()->getActiveSiteForDoc(doc, site);
 }
 
-void Context::onSetActiveDocument(Doc* doc)
+void Context::onSetActiveDocument(Doc* doc, bool notify)
 {
   m_lastSelectedDoc = doc;
+  if (notify)
+    notifyActiveSiteChanged();
 }
 
 void Context::onSetActiveLayer(doc::Layer* layer)
 {
   Doc* newDoc = (layer ? static_cast<Doc*>(layer->sprite()->document()): nullptr);
+  if (!newDoc)
+    return;
+
+  activeSiteHandler()->setActiveLayerInDoc(newDoc, layer);
+
   if (newDoc != m_lastSelectedDoc)
     setActiveDocument(newDoc);
-  if (newDoc)
-    activeSiteHandler()->setActiveLayerInDoc(newDoc, layer);
+  else
+    notifyActiveSiteChanged();
 }
 
 void Context::onSetActiveFrame(const doc::frame_t frame)
 {
   if (m_lastSelectedDoc)
     activeSiteHandler()->setActiveFrameInDoc(m_lastSelectedDoc, frame);
+
+  notifyActiveSiteChanged();
 }
 
 void Context::onSetRange(const DocRange& range)
@@ -254,6 +316,12 @@ void Context::onSetSelectedColors(const doc::PalettePicks& picks)
 {
   if (m_lastSelectedDoc)
     activeSiteHandler()->setSelectedColorsInDoc(m_lastSelectedDoc, picks);
+}
+
+void Context::onSetSelectedTiles(const doc::PalettePicks& picks)
+{
+  if (m_lastSelectedDoc)
+    activeSiteHandler()->setSelectedTilesInDoc(m_lastSelectedDoc, picks);
 }
 
 ActiveSiteHandler* Context::activeSiteHandler() const

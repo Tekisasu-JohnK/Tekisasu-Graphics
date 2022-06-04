@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -39,7 +39,6 @@
 #include "app/ui/workspace_tabs.h"
 #include "app/ui_context.h"
 #include "base/fs.h"
-#include "os/display.h"
 #include "os/system.h"
 #include "ui/message.h"
 #include "ui/splitter.h"
@@ -77,10 +76,8 @@ public:
 
     ui::set_theme(ui::get_theme(), newUIScale);
 
-    Manager* manager = Manager::getDefault();
-    os::Display* display = manager->getDisplay();
-    display->setScale(newScreenScale);
-    manager->setDisplay(display);
+    Manager::getDefault()
+      ->updateAllDisplaysWithNewScale(newScreenScale);
   }
 };
 
@@ -222,6 +219,13 @@ HomeView* MainWindow::getHomeView()
 CheckUpdateDelegate* MainWindow::getCheckUpdateDelegate()
 {
   return getHomeView();
+}
+#endif
+
+#if ENABLE_SENTRY
+void MainWindow::updateConsentCheckbox()
+{
+  getHomeView()->updateConsentCheckbox();
 }
 #endif
 
@@ -371,13 +375,22 @@ void MainWindow::onResize(ui::ResizeEvent& ev)
 {
   app::gen::MainWindow::onResize(ev);
 
-  os::Display* display = manager()->getDisplay();
-  if ((display) &&
-      (display->scale()*ui::guiscale() > 2) &&
-      (!m_scalePanic) &&
-      (ui::display_w()/ui::guiscale() < 320 ||
-       ui::display_h()/ui::guiscale() < 260)) {
-    showNotification(m_scalePanic = new ScreenScalePanic);
+  os::Window* nativeWindow = (display() ? display()->nativeWindow(): nullptr);
+  if (nativeWindow && nativeWindow->screen()) {
+    const int scale = nativeWindow->scale()*ui::guiscale();
+
+    // We can check for the available workarea to know that the user
+    // can resize the window to its full size and there will be enough
+    // room to display some common dialogs like (for example) the
+    // Preferences dialog.
+    if ((scale > 2) &&
+        (!m_scalePanic)) {
+      const gfx::Size wa = nativeWindow->screen()->workarea().size();
+      if ((wa.w / scale < 256 ||
+           wa.h / scale < 256)) {
+        showNotification(m_scalePanic = new ScreenScalePanic);
+      }
+    }
   }
 }
 
@@ -386,12 +399,20 @@ void MainWindow::onResize(ui::ResizeEvent& ev)
 // inform to the UIContext that the current view has changed.
 void MainWindow::onActiveViewChange()
 {
+  // First we have to configure the MainWindow layout (e.g. show
+  // Timeline if needed) as UIContext::setActiveView() will configure
+  // several widgets (calling updateUsingEditor() functions) using the
+  // active document, and we need to know the available space on
+  // screen for each widget (e.g. the Timeline will configure its
+  // scrollable area/position depending on the number of
+  // layers/frames, but it needs to know its position on screen
+  // first).
+  configureWorkspaceLayout();
+
   if (DocView* docView = getDocView())
     UIContext::instance()->setActiveView(docView);
   else
     UIContext::instance()->setActiveView(nullptr);
-
-  configureWorkspaceLayout();
 }
 
 bool MainWindow::isTabModified(Tabs* tabs, TabView* tabView)
@@ -532,12 +553,10 @@ void MainWindow::configureWorkspaceLayout()
 
   if (os::instance()->menus() == nullptr ||
       pref.general.showMenuBar()) {
-    if (!m_menuBar->parent())
-      menuBarPlaceholder()->insertChild(0, m_menuBar);
+    m_menuBar->resetMaxSize();
   }
   else {
-    if (m_menuBar->parent())
-      menuBarPlaceholder()->removeChild(m_menuBar);
+    m_menuBar->setMaxSize(gfx::Size(0, 0));
   }
 
   m_menuBar->setVisible(normal);

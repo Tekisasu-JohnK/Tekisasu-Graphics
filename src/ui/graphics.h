@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,7 +15,9 @@
 #include "gfx/point.h"
 #include "gfx/rect.h"
 #include "gfx/size.h"
+#include "os/font.h"
 #include "os/paint.h"
+#include "os/surface.h"
 
 #include <memory>
 #include <string>
@@ -28,12 +30,13 @@ namespace gfx {
 
 namespace os {
   class DrawTextDelegate;
-  class Font;
-  class Surface;
+  struct Sampling;
 }
 
 namespace ui {
-  using os::Paint;
+  using os::Paint;              // Define ui::Paint = os::Paint
+
+  class Display;
 
   // Class to render a widget in the screen.
   class Graphics {
@@ -44,13 +47,13 @@ namespace ui {
       Checked,
     };
 
-    Graphics(os::Surface* surface, int dx, int dy);
+    Graphics(Display* display, const os::SurfaceRef& surface, int dx, int dy);
     ~Graphics();
 
     int width() const;
     int height() const;
 
-    os::Surface* getInternalSurface() { return m_surface; }
+    os::Surface* getInternalSurface() { return m_surface.get(); }
     int getInternalDeltaX() { return m_dx; }
     int getInternalDeltaY() { return m_dy; }
 
@@ -79,6 +82,7 @@ namespace ui {
     void drawLine(gfx::Color color, const gfx::Point& a, const gfx::Point& b);
     void drawPath(gfx::Path& path, const Paint& paint);
 
+    void drawRect(const gfx::Rect& rc, const Paint& paint);
     void drawRect(gfx::Color color, const gfx::Rect& rc);
     void fillRect(gfx::Color color, const gfx::Rect& rc);
     void fillRegion(gfx::Color color, const gfx::Region& rgn);
@@ -88,12 +92,11 @@ namespace ui {
     void drawSurface(os::Surface* surface, int x, int y);
     void drawSurface(os::Surface* surface,
                      const gfx::Rect& srcRect,
-                     const gfx::Rect& dstRect);
+                     const gfx::Rect& dstRect,
+                     const os::Sampling& sampling,
+                     const ui::Paint* paint);
     void drawRgbaSurface(os::Surface* surface, int x, int y);
     void drawRgbaSurface(os::Surface* surface, int srcx, int srcy, int dstx, int dsty, int w, int h);
-    void drawRgbaSurface(os::Surface* surface,
-                         const gfx::Rect& srcRect,
-                         const gfx::Rect& dstRect);
     void drawColoredRgbaSurface(os::Surface* surface, gfx::Color color, int x, int y);
     void drawColoredRgbaSurface(os::Surface* surface, gfx::Color color, int srcx, int srcy, int dstx, int dsty, int w, int h);
     void drawSurfaceNine(os::Surface* surface,
@@ -108,14 +111,13 @@ namespace ui {
     // FONT & TEXT
     // ======================================================================
 
-    os::Font* font() { return m_font; }
-    void setFont(os::Font* font);
+    os::Font* font() { return m_font.get(); }
+    void setFont(const os::FontRef& font);
 
-    void drawText(base::utf8_const_iterator it,
-                  const base::utf8_const_iterator& end,
-                  gfx::Color fg, gfx::Color bg, const gfx::Point& pt,
-                  os::DrawTextDelegate* delegate);
-    void drawText(const std::string& str, gfx::Color fg, gfx::Color bg, const gfx::Point& pt);
+    void drawText(const std::string& str,
+                  gfx::Color fg, gfx::Color bg,
+                  const gfx::Point& pt,
+                  os::DrawTextDelegate* delegate = nullptr);
     void drawUIText(const std::string& str, gfx::Color fg, gfx::Color bg, const gfx::Point& pt, const int mnemonic);
     void drawAlignedUIText(const std::string& str, gfx::Color fg, gfx::Color bg, const gfx::Rect& rc, const int align);
 
@@ -127,18 +129,19 @@ namespace ui {
     gfx::Size doUIStringAlgorithm(const std::string& str, gfx::Color fg, gfx::Color bg, const gfx::Rect& rc, int align, bool draw);
     void dirty(const gfx::Rect& bounds);
 
-    os::Surface* m_surface;
+    Display* m_display;
+    os::SurfaceRef m_surface;
     int m_dx;
     int m_dy;
     gfx::Rect m_clipBounds;
-    os::Font* m_font;
+    os::FontRef m_font;
     gfx::Rect m_dirtyBounds;
   };
 
   // Class to draw directly in the screen.
   class ScreenGraphics : public Graphics {
   public:
-    ScreenGraphics();
+    ScreenGraphics(Display* display);
     virtual ~ScreenGraphics();
   };
 

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -89,7 +89,7 @@ DevConsoleView::DevConsoleView()
 
   InitTheme.connect(
     [this]{
-      SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+      auto theme = SkinTheme::get(this);
       m_view.setStyle(theme->styles.workspaceView());
     });
   initTheme();
@@ -111,6 +111,11 @@ std::string DevConsoleView::getTabText()
 TabIcon DevConsoleView::getTabIcon()
 {
   return TabIcon::NONE;
+}
+
+gfx::Color DevConsoleView::getTabColor()
+{
+  return gfx::ColorNone;
 }
 
 WorkspaceView* DevConsoleView::cloneWorkspaceView()
@@ -135,7 +140,7 @@ void DevConsoleView::onTabPopup(Workspace* workspace)
   if (!menu)
     return;
 
-  menu->showPopup(ui::get_mouse_position());
+  menu->showPopup(mousePosInDisplay(), display());
 }
 
 bool DevConsoleView::onProcessMessage(Message* msg)
@@ -147,6 +152,11 @@ void DevConsoleView::onExecuteCommand(const std::string& cmd)
 {
   m_engine->printLastResult();
   m_engine->evalCode(cmd);
+}
+
+void DevConsoleView::onConsoleError(const char* text)
+{
+  onConsolePrint(text);
 }
 
 void DevConsoleView::onConsolePrint(const char* text)

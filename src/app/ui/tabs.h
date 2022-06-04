@@ -9,6 +9,7 @@
 #define APP_UI_TABS_H_INCLUDED
 #pragma once
 
+#include "base/ref.h"
 #include "ui/animated_widget.h"
 #include "ui/timer.h"
 #include "ui/widget.h"
@@ -40,6 +41,9 @@ namespace app {
 
     // Returns the icon to be shown in the tab
     virtual TabIcon getTabIcon() = 0;
+
+    // Returns the tab background color
+    virtual gfx::Color getTabColor() = 0;
   };
 
   enum class DropTabResult {
@@ -115,6 +119,7 @@ namespace app {
       TabView* view;
       std::string text;
       TabIcon icon;
+      gfx::Color color;
       int x, width;
       int oldX, oldWidth;
       bool modified;
@@ -123,6 +128,7 @@ namespace app {
         ASSERT(view);
         text = view->getTabText();
         icon = view->getTabIcon();
+        color = view->getTabColor();
 
         x = width = oldX = oldWidth =
 #if _DEBUG
@@ -286,7 +292,7 @@ namespace app {
     // (this overlay floats next to the mouse cursor).  It's destroyed
     // and recreated every time the tab is put inside or outside the
     // Tabs widget.
-    std::unique_ptr<ui::Overlay> m_floatingOverlay;
+    base::Ref<ui::Overlay> m_floatingOverlay;
 
     // Relative mouse position inside the m_dragTab (used to adjust
     // the m_floatingOverlay precisely).

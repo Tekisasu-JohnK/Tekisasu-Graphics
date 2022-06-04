@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -17,8 +17,10 @@
 #include "app/color_spaces.h"
 #include "app/color_utils.h"
 #include "app/modules/gfx.h"
+#include "app/pref/preferences.h"
 #include "app/ui/skin/skin_theme.h"
 #include "app/ui/status_bar.h"
+#include "app/util/shader_helpers.h"
 #include "base/clamp.h"
 #include "base/concurrent_queue.h"
 #include "base/scoped_value.h"
@@ -36,7 +38,15 @@
 #include <algorithm>
 #include <cmath>
 #include <condition_variable>
+#include <cstdio>
 #include <thread>
+
+#if SK_ENABLE_SKSL
+  #include "os/skia/skia_surface.h"
+
+  #include "include/core/SkCanvas.h"
+  #include "include/effects/SkRuntimeEffect.h"
+#endif
 
 namespace app {
 
@@ -94,10 +104,8 @@ public:
       }
 
       m_paintingThread.join();
-      if (m_canvas) {
-        m_canvas->dispose();
-        m_canvas = nullptr;
-      }
+      if (m_canvas)
+        m_canvas.reset();
     }
   }
 
@@ -113,18 +121,22 @@ public:
       std::unique_lock<std::mutex> lock(m_mutex);
       stopCurrentPainting(lock);
 
-      auto oldCanvas = m_canvas;
-      m_canvas = os::instance()->createSurface(w, h, activeCS);
+      os::SurfaceRef oldCanvas = m_canvas;
+      m_canvas = os::instance()->makeSurface(w, h, activeCS);
       os::Paint paint;
       paint.color(bgColor);
       paint.style(os::Paint::Fill);
       m_canvas->drawRect(gfx::Rect(0, 0, w, h), paint);
       if (oldCanvas) {
-        m_canvas->drawSurface(oldCanvas, 0, 0);
-        oldCanvas->dispose();
+        m_canvas->drawSurface(
+          oldCanvas.get(),
+          gfx::Rect(0, 0, oldCanvas->width(), oldCanvas->height()),
+          gfx::Rect(0, 0, w, h),
+          os::Sampling(),
+          nullptr);
       }
     }
-    return m_canvas;
+    return m_canvas.get();
   }
 
   void startBgPainting(ColorSelector* colorSelector,
@@ -182,7 +194,7 @@ private:
       {
         lock.unlock();
         colorSel->onPaintSurfaceInBgThread(
-          m_canvas,
+          m_canvas.get(),
           m_mainBounds,
           m_bottomBarBounds,
           m_alphaBarBounds,
@@ -211,7 +223,7 @@ private:
   std::mutex m_mutex;
   std::condition_variable m_paintingCV;
   std::condition_variable m_waitStopCV;
-  os::Surface* m_canvas;
+  os::SurfaceRef m_canvas;
   ColorSelector* m_colorSelector;
   ui::Manager* m_manager;
   gfx::Rect m_mainBounds;
@@ -222,12 +234,15 @@ private:
 
 static ColorSelector::Painter painter;
 
+#if SK_ENABLE_SKSL
+// static
+sk_sp<SkRuntimeEffect> ColorSelector::m_alphaEffect;
+#endif
+
 ColorSelector::ColorSelector()
   : Widget(kGenericWidget)
   , m_paintFlags(AllAreasFlag)
   , m_lockColor(false)
-  , m_capturedInBottom(false)
-  , m_capturedInAlpha(false)
   , m_timer(100, this)
 {
   initTheme();
@@ -312,6 +327,9 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
       if (msg->type() == kMouseDownMessage) {
         m_capturedInBottom = bottomBarBounds().contains(pos);
         m_capturedInAlpha = alphaBarBounds().contains(pos);
+        m_capturedInMain = (hasCapture() &&
+                            !m_capturedInMain &&
+                            !m_capturedInBottom);
       }
 
       app::Color color = getColorByPosition(pos);
@@ -329,6 +347,7 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
       if (hasCapture()) {
         m_capturedInBottom = false;
         m_capturedInAlpha = false;
+        m_capturedInMain = false;
         releaseMouse();
       }
       return true;
@@ -337,7 +356,8 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
       MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
       app::Color color = getColorByPosition(mouseMsg->position());
       if (color.getType() != app::Color::MaskType) {
-        ui::set_mouse_cursor(kCustomCursor, SkinTheme::instance()->cursors.eyedropper());
+        auto theme = skin::SkinTheme::get(this);
+        ui::set_mouse_cursor(kCustomCursor, theme->cursors.eyedropper());
         return true;
       }
       break;
@@ -388,7 +408,7 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
 
 void ColorSelector::onInitTheme(ui::InitThemeEvent& ev)
 {
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+  auto theme = SkinTheme::get(this);
 
   Widget::onInitTheme(ev);
   setBorder(theme->calcBorder(this, theme->styles.editorView()));
@@ -406,7 +426,7 @@ void ColorSelector::onResize(ui::ResizeEvent& ev)
 void ColorSelector::onPaint(ui::PaintEvent& ev)
 {
   ui::Graphics* g = ev.graphics();
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+  auto theme = SkinTheme::get(this);
 
   theme->drawRect(g, clientBounds(),
                   theme->parts.editorNormal().get(),
@@ -416,12 +436,88 @@ void ColorSelector::onPaint(ui::PaintEvent& ev)
   if (rc.isEmpty())
     return;
 
-  g->drawSurface(
-    painter.getCanvas(rc.w, rc.h, theme->colors.workspace()),
-    rc.x, rc.y);
-
   gfx::Rect bottomBarBounds = this->bottomBarBounds();
   gfx::Rect alphaBarBounds = this->alphaBarBounds();
+
+  os::Surface* painterSurface = nullptr;
+
+#if SK_ENABLE_SKSL              // Paint with shaders
+  if (buildEffects()) {
+    SkCanvas* canvas;
+    bool isSRGB;
+    // TODO compare both color spaces
+    if (get_current_color_space()->isSRGB() &&
+        g->getInternalSurface()->colorSpace()->isSRGB()) {
+      // We can render directly in the ui::Graphics surface
+      canvas = &static_cast<os::SkiaSurface*>(g->getInternalSurface())->canvas();
+      isSRGB = true;
+    }
+    else {
+      // We'll paint in the ColorSelector::Painter canvas, and so we
+      // can convert color spaces.
+      painterSurface = painter.getCanvas(rc.w, rc.h, theme->colors.workspace());
+      canvas = &static_cast<os::SkiaSurface*>(painterSurface)->canvas();
+      isSRGB = false;
+    }
+
+    canvas->save();
+    {
+      SkPaint p;
+      p.setStyle(SkPaint::kFill_Style);
+
+      // Main area
+      gfx::Rect rc2(0, 0, rc.w, std::max(1, rc.h-bottomBarBounds.h-alphaBarBounds.h));
+
+      SkRuntimeShaderBuilder builder1(m_mainEffect);
+      builder1.uniform("iRes") = SkV3{float(rc2.w), float(rc2.h), 0.0f};
+      builder1.uniform("iColor") = appColor_to_SkV4(m_color);
+      setShaderMainAreaParams(builder1);
+      p.setShader(builder1.makeShader());
+
+      if (isSRGB)
+        canvas->translate(rc.x+g->getInternalDeltaX(),
+                          rc.y+g->getInternalDeltaY());
+
+      canvas->drawRect(SkRect::MakeXYWH(0, 0, rc2.w, rc2.h), p);
+
+      // Bottom bar
+      canvas->translate(0.0, rc2.h);
+      rc2.h = bottomBarBounds.h;
+
+      SkRuntimeShaderBuilder builder2(m_bottomEffect);
+      builder2.uniform("iRes") = SkV3{float(rc2.w), float(rc2.h), 0.0f};
+      builder2.uniform("iColor") = appColor_to_SkV4(m_color);
+      p.setShader(builder2.makeShader());
+
+      canvas->drawRect(SkRect::MakeXYWH(0, 0, rc2.w, rc2.h), p);
+
+      // Alpha bar
+      canvas->translate(0.0, rc2.h);
+      rc2.h = alphaBarBounds.h;
+
+      SkRuntimeShaderBuilder builder3(m_alphaEffect);
+      builder3.uniform("iRes") = SkV3{float(rc2.w), float(rc2.h), 0.0f};
+      builder3.uniform("iColor") = appColor_to_SkV4(m_color);
+      builder3.uniform("iBg1") = gfxColor_to_SkV4(grid_color1());
+      builder3.uniform("iBg2") = gfxColor_to_SkV4(grid_color2());
+      p.setShader(builder3.makeShader());
+
+      canvas->drawRect(SkRect::MakeXYWH(0, 0, rc2.w, rc2.h), p);
+    }
+    canvas->restore();
+
+    // We already painted all areas
+    m_paintFlags = 0;
+  }
+  else
+#endif // SK_ENABLE_SKSL
+  {
+    painterSurface = painter.getCanvas(rc.w, rc.h, theme->colors.workspace());
+  }
+
+  if (painterSurface)
+    g->drawSurface(painterSurface, rc.x, rc.y);
+
   rc.h -= bottomBarBounds.h + alphaBarBounds.h;
   onPaintMainArea(g, rc);
 
@@ -482,7 +578,7 @@ void ColorSelector::paintColorIndicator(ui::Graphics* g,
                                         const gfx::Point& pos,
                                         const bool white)
 {
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+  auto theme = SkinTheme::get(this);
   os::Surface* icon = theme->parts.colorWheelIndicator()->bitmap(0);
 
   g->drawColoredRgbaSurface(
@@ -502,7 +598,7 @@ int ColorSelector::getCurrentAlphaForNewColor() const
 
 gfx::Rect ColorSelector::bottomBarBounds() const
 {
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+  auto theme = SkinTheme::get(this);
   const gfx::Rect rc = childrenBounds();
   const int size = theme->dimensions.colorSelectorBarSize();
   if (rc.h > 2*size) {
@@ -517,7 +613,7 @@ gfx::Rect ColorSelector::bottomBarBounds() const
 
 gfx::Rect ColorSelector::alphaBarBounds() const
 {
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+  auto theme = SkinTheme::get(this);
   const gfx::Rect rc = childrenBounds();
   const int size = theme->dimensions.colorSelectorBarSize();
   if (rc.h > 3*size)
@@ -531,5 +627,62 @@ void ColorSelector::updateColorSpace()
   m_paintFlags |= AllAreasFlag;
   invalidate();
 }
+
+#if SK_ENABLE_SKSL
+// static
+const char* ColorSelector::getAlphaBarShader()
+{
+  return R"(
+uniform half3 iRes;
+uniform half4 iColor;
+uniform half4 iBg1;
+uniform half4 iBg2;
+
+half4 main(vec2 fragcoord) {
+ vec2 d = (fragcoord.xy / iRes.xy);
+ half4 p = (mod((fragcoord.x / iRes.y) + floor(d.y+0.5), 2.0) > 1.0) ? iBg2: iBg1;
+ half4 q = iColor.rgb1;
+ float a = d.x;
+ return (1.0-a)*p + a*q;
+}
+)";
+}
+
+bool ColorSelector::buildEffects()
+{
+  if (!Preferences::instance().experimental.useShadersForColorSelectors())
+    return false;
+
+  if (!m_mainEffect) {
+    if (const char* code = getMainAreaShader())
+      m_mainEffect = buildEffect(code);
+  }
+
+  if (!m_bottomEffect) {
+    if (const char* code = getBottomBarShader())
+      m_bottomEffect = buildEffect(code);
+  }
+
+  if (!m_alphaEffect) {
+    if (const char* code = getAlphaBarShader())
+      m_alphaEffect = buildEffect(code);
+  }
+
+  return (m_mainEffect && m_bottomEffect && m_alphaEffect);
+}
+
+sk_sp<SkRuntimeEffect> ColorSelector::buildEffect(const char* code)
+{
+  auto result = SkRuntimeEffect::MakeForShader(SkString(code));
+  if (!result.errorText.isEmpty()) {
+    LOG(ERROR, "Shader error: %s\n", result.errorText.c_str());
+    std::printf("Shader error: %s\n", result.errorText.c_str());
+    return nullptr;
+  }
+  else {
+    return result.effect;
+  }
+}
+#endif  // SK_ENABLE_SKSL
 
 } // namespace app

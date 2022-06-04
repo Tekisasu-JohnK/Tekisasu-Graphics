@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,6 +16,7 @@
 #include "gfx/region.h"
 #include "gfx/size.h"
 #include "obs/signal.h"
+#include "os/font.h"
 #include "ui/base.h"
 #include "ui/component.h"
 #include "ui/graphics.h"
@@ -26,12 +27,9 @@
 
 #define ASSERT_VALID_WIDGET(widget) ASSERT((widget) != nullptr)
 
-namespace os {
-  class Font;
-}
-
 namespace ui {
 
+  class Display;
   class InitThemeEvent;
   class KeyMessage;
   class LoadLayoutEvent;
@@ -163,7 +161,9 @@ namespace ui {
 
     Window* window() const;
     Widget* parent() const { return m_parent; }
+    int parentIndex() const { return m_parentIndex; }
     Manager* manager() const;
+    Display* display() const;
 
     // Returns a list of children.
     const WidgetsList& children() const { return m_children; }
@@ -186,22 +186,24 @@ namespace ui {
 
     Widget* pick(const gfx::Point& pt,
                  const bool checkParentsVisibility = true) const;
+    virtual Widget* pickFromScreenPos(const gfx::Point& screenPos) const;
+
     bool hasChild(Widget* child);
     bool hasAncestor(Widget* ancestor);
-    Widget* findChild(const char* id);
+    Widget* findChild(const char* id) const;
 
     // Returns a widget in the same window that is located "sibling".
-    Widget* findSibling(const char* id);
+    Widget* findSibling(const char* id) const;
 
     // Finds a child with the specified ID and dynamic-casts it to type
     // T.
     template<class T>
-    T* findChildT(const char* id) {
+    T* findChildT(const char* id) const {
       return dynamic_cast<T*>(findChild(id));
     }
 
     template<class T>
-    T* findFirstChildByType() {
+    T* findFirstChildByType() const {
       for (auto child : m_children) {
         if (T* specificChild = dynamic_cast<T*>(child))
           return specificChild;
@@ -241,6 +243,9 @@ namespace ui {
     gfx::Rect childrenBounds() const;
     gfx::Rect clientChildrenBounds() const;
 
+    // Bounds of this widget or window on native screen/desktop coordinates.
+    gfx::Rect boundsOnScreen() const;
+
     // Sets the bounds of the widget generating a onResize() event.
     void setBounds(const gfx::Rect& rc);
 
@@ -255,6 +260,8 @@ namespace ui {
     const gfx::Size& maxSize() const { return m_maxSize; }
     void setMinSize(const gfx::Size& sz);
     void setMaxSize(const gfx::Size& sz);
+    void resetMinSize();
+    void resetMaxSize();
 
     const gfx::Border& border() const { return m_border; }
     void setBorder(const gfx::Border& border);
@@ -319,7 +326,8 @@ namespace ui {
     bool sendMessage(Message* msg);
     void closeWindow();
 
-    void broadcastMouseMessage(WidgetsList& targets);
+    void broadcastMouseMessage(const gfx::Point& screenPos,
+                               WidgetsList& targets);
 
     // ===============================================================
     // SIZE & POSITION
@@ -343,7 +351,19 @@ namespace ui {
     bool hasFocus() const { return hasFlags(HAS_FOCUS); }
     bool hasMouse() const { return hasFlags(HAS_MOUSE); }
     bool hasCapture() const { return hasFlags(HAS_CAPTURE); }
+
+    // Checking if the mouse is currently above the widget.
     bool hasMouseOver() const;
+
+    // Returns the mouse position relative to the top-left corner of
+    // the ui::Display's client area/content rect.
+    gfx::Point mousePosInDisplay() const;
+
+    // Returns the mouse position relative to the top-left cornder of
+    // the widget bounds.
+    gfx::Point mousePosInClientBounds() const {
+      return toClient(mousePosInDisplay());
+    }
 
     // Offer the capture to widgets of the given type. Returns true if
     // the capture was passed to other widget.
@@ -381,7 +401,8 @@ namespace ui {
     virtual void onSaveLayout(SaveLayoutEvent& ev);
     virtual void onResize(ResizeEvent& ev);
     virtual void onPaint(PaintEvent& ev);
-    virtual void onBroadcastMouseMessage(WidgetsList& targets);
+    virtual void onBroadcastMouseMessage(const gfx::Point& screenPos,
+                                         WidgetsList& targets);
     virtual void onInitTheme(InitThemeEvent& ev);
     virtual void onSetDecorativeWidgetBounds();
     virtual void onVisible(bool visible);
@@ -393,7 +414,7 @@ namespace ui {
     virtual double onGetTextDouble() const;
 
   private:
-    void removeChild(WidgetsList::iterator& it);
+    void removeChild(const WidgetsList::iterator& it);
     void paint(Graphics* graphics,
                const gfx::Region& drawRegion,
                const bool isBg);
@@ -407,12 +428,13 @@ namespace ui {
     Theme* m_theme;              // Widget's theme
     Style* m_style;
     std::string m_text;          // Widget text
-    mutable os::Font* m_font;    // Cached font returned by the theme
+    mutable os::FontRef m_font;  // Cached font returned by the theme
     gfx::Color m_bgColor;        // Background color
     gfx::Rect m_bounds;
     gfx::Region m_updateRegion;   // Region to be redrawed.
     WidgetsList m_children;       // Sub-widgets
     Widget* m_parent;             // Who is the parent?
+    int m_parentIndex;            // Location/index of this widget in the parent's Widget::m_children vector
     gfx::Size* m_sizeHint;
     int m_mnemonic;               // Keyboard shortcut to access this widget like Alt+mnemonic
 

@@ -37,6 +37,7 @@ namespace app {
     void goForward();
     void goUp();
     void goInsideFolder();
+    void refreshCurrentFolder();
 
     // Shows the dialog to select a file in the program.
     bool show(const std::string& title,
@@ -45,6 +46,8 @@ namespace app {
               base::paths& output);
 
   private:
+    bool onProcessMessage(ui::Message* msg) override;
+
     void updateLocation();
     void updateNavigationButtons();
     void addInNavigationHistory(IFileItem* folder);
@@ -58,6 +61,7 @@ namespace app {
     void onFileListFileSelected();
     void onFileListFileAccepted();
     void onFileListCurrentFolderChanged();
+    void onRefreshFolder();
     std::string getSelectedExtension() const;
 
     class ArrowNavigator;

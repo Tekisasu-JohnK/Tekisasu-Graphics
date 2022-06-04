@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -30,11 +30,30 @@ namespace doc {
 
 namespace app {
   class ActiveSiteHandler;
+  class Clipboard;
   class Command;
   class Doc;
   class DocRange;
   class DocView;
   class Preferences;
+
+  class CommandResult {
+  public:
+    enum Type {
+      kOk,
+      // Exception throw (e.g. cannot lock sprite)
+      kError,
+      // Canceled by user.
+      kCanceled,
+    };
+
+    CommandResult(Type type = Type::kOk) : m_type(type) { }
+    Type type() const { return m_type; }
+    void reset() { m_type = Type::kOk; }
+
+  private:
+    Type m_type;
+  };
 
   class CommandPreconditionException : public base::Exception {
   public:
@@ -72,6 +91,7 @@ namespace app {
     Docs& documents() { return m_docs; }
 
     Preferences& preferences() const;
+    Clipboard* clipboard() const;
 
     virtual bool isUIAvailable() const     { return false; }
     virtual bool isRecordingMacro() const  { return false; }
@@ -91,11 +111,15 @@ namespace app {
     void setActiveFrame(doc::frame_t frame);
     void setRange(const DocRange& range);
     void setSelectedColors(const doc::PalettePicks& picks);
+    void setSelectedTiles(const doc::PalettePicks& picks);
     bool hasModifiedDocuments() const;
     void notifyActiveSiteChanged();
 
     void executeCommandFromMenuOrShortcut(Command* command, const Params& params = Params());
     virtual void executeCommand(Command* command, const Params& params = Params());
+
+    void setCommandResult(const CommandResult& result);
+    const CommandResult& commandResult() { return m_result; }
 
     virtual DocView* getFirstDocView(Doc* document) const {
       return nullptr;
@@ -110,11 +134,12 @@ namespace app {
     void onRemoveDocument(Doc* doc) override;
 
     virtual void onGetActiveSite(Site* site) const;
-    virtual void onSetActiveDocument(Doc* doc);
+    virtual void onSetActiveDocument(Doc* doc, bool notify);
     virtual void onSetActiveLayer(doc::Layer* layer);
     virtual void onSetActiveFrame(const doc::frame_t frame);
     virtual void onSetRange(const DocRange& range);
     virtual void onSetSelectedColors(const doc::PalettePicks& picks);
+    virtual void onSetSelectedTiles(const doc::PalettePicks& picks);
     virtual void onCloseDocument(Doc* doc);
 
     Doc* lastSelectedDoc() { return m_lastSelectedDoc; }
@@ -122,11 +147,16 @@ namespace app {
   private:
     ActiveSiteHandler* activeSiteHandler() const;
 
+    // This must be defined before m_docs because ActiveSiteHandler
+    // will be an observer of all documents.
+    mutable std::unique_ptr<ActiveSiteHandler> m_activeSiteHandler;
     mutable Docs m_docs;
     ContextFlags m_flags;       // Last updated flags.
     Doc* m_lastSelectedDoc;
-    mutable std::unique_ptr<ActiveSiteHandler> m_activeSiteHandler;
     mutable std::unique_ptr<Preferences> m_preferences;
+
+    // Result of the execution of a command.
+    CommandResult m_result;
 
     DISABLE_COPYING(Context);
   };

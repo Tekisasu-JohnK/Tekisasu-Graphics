@@ -112,8 +112,8 @@ void UIContext::setActiveView(DocView* docView)
   else
     current_editor = nullptr;
 
-  mainWin->getPreviewEditor()->updateUsingEditor(current_editor);
   mainWin->getTimeline()->updateUsingEditor(current_editor);
+  mainWin->getPreviewEditor()->updateUsingEditor(current_editor);
 
   // Change the image-type of color bar.
   ColorBar::instance()->setPixelFormat(app_get_current_pixel_format());
@@ -134,10 +134,10 @@ void UIContext::setActiveView(DocView* docView)
   notifyActiveSiteChanged();
 }
 
-void UIContext::onSetActiveDocument(Doc* document)
+void UIContext::onSetActiveDocument(Doc* document, bool notify)
 {
-  bool notify = (lastSelectedDoc() != document);
-  app::Context::onSetActiveDocument(document);
+  notify = (notify && lastSelectedDoc() != document);
+  app::Context::onSetActiveDocument(document, false);
 
   DocView* docView = getFirstDocView(document);
   if (docView) {     // The view can be null if we are in --batch mode
@@ -190,6 +190,16 @@ void UIContext::onSetSelectedColors(const doc::PalettePicks& picks)
   }
   else if (!isUIAvailable())
     Context::onSetSelectedColors(picks);
+}
+
+void UIContext::onSetSelectedTiles(const doc::PalettePicks& picks)
+{
+  if (activeView()) {
+    if (ColorBar* colorBar = ColorBar::instance())
+      colorBar->getTilesView()->setSelectedEntries(picks);
+  }
+  else if (!isUIAvailable())
+    Context::onSetSelectedTiles(picks);
 }
 
 DocView* UIContext::getFirstDocView(Doc* document) const

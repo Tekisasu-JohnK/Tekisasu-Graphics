@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -69,7 +69,7 @@ class JpegFormat : public FileFormat {
   }
 
   bool onLoad(FileOp* fop) override;
-  gfx::ColorSpacePtr loadColorSpace(FileOp* fop, jpeg_decompress_struct* dinfo);
+  gfx::ColorSpaceRef loadColorSpace(FileOp* fop, jpeg_decompress_struct* dinfo);
 #ifdef ENABLE_SAVE
   bool onSave(FileOp* fop) override;
   void saveColorSpace(FileOp* fop, jpeg_compress_struct* cinfo,
@@ -256,7 +256,7 @@ bool JpegFormat::onLoad(FileOp* fop)
   }
 
   // Read color space
-  gfx::ColorSpacePtr colorSpace = loadColorSpace(fop, &dinfo);
+  gfx::ColorSpaceRef colorSpace = loadColorSpace(fop, &dinfo);
   if (colorSpace)
     fop->setEmbeddedColorProfile();
   else { // sRGB is the default JPG color space.
@@ -282,7 +282,7 @@ bool JpegFormat::onLoad(FileOp* fop)
 // in two steps:
 //   (1) Discover all ICC profile markers and verify that they are numbered properly.
 //   (2) Copy the data from each marker into a contiguous ICC profile.
-gfx::ColorSpacePtr JpegFormat::loadColorSpace(FileOp* fop, jpeg_decompress_struct* dinfo)
+gfx::ColorSpaceRef JpegFormat::loadColorSpace(FileOp* fop, jpeg_decompress_struct* dinfo)
 {
   // Note that 256 will be enough storage space since each markerIndex is stored in 8-bits.
   jpeg_marker_struct* markerSequence[256];
@@ -357,7 +357,9 @@ bool JpegFormat::onSave(FileOp* fop)
   JSAMPARRAY buffer;
   JDIMENSION buffer_height;
   const auto jpeg_options = std::static_pointer_cast<JpegOptions>(fop->formatOptions());
-  const int qualityValue = (int)base::clamp(100.0f * jpeg_options->quality, 0.f, 100.f);
+  const int qualityValue =
+    (jpeg_options ? (int)base::clamp(100.0f * jpeg_options->quality, 0.f, 100.f):
+                    100);
 
   int c;
 

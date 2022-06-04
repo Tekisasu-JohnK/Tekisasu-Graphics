@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2015  David Capello
 //
 // This program is distributed under the terms of
@@ -53,6 +53,19 @@ SetPalette::SetPalette(Sprite* sprite, frame_t frame, const Palette* newPalette)
         m_newColors[i] = newPalette->getEntry(m_from+i);
     }
   }
+
+  if (sprite->pixelFormat() == IMAGE_INDEXED) {
+    m_oldTransparentIndex = sprite->transparentColor();
+    if (m_oldTransparentIndex >= newPalette->size())
+      m_newTransparentIndex = newPalette->size() - 1;
+    else
+      m_newTransparentIndex = m_oldTransparentIndex;
+  }
+  else {
+    ASSERT(sprite->transparentColor() == 0);
+    m_oldTransparentIndex = 0;
+    m_newTransparentIndex = 0;
+  }
 }
 
 void SetPalette::onExecute()
@@ -63,6 +76,9 @@ void SetPalette::onExecute()
 
   for (size_t i=0; i<m_newColors.size(); ++i)
     palette->setEntry(m_from+i, m_newColors[i]);
+
+  if (m_newTransparentIndex != m_oldTransparentIndex)
+    sprite->setTransparentColor(m_newTransparentIndex);
 
   palette->incrementVersion();
 }
@@ -75,6 +91,9 @@ void SetPalette::onUndo()
 
   for (size_t i=0; i<m_oldColors.size(); ++i)
     palette->setEntry(m_from+i, m_oldColors[i]);
+
+  if (m_newTransparentIndex != m_oldTransparentIndex)
+    sprite->setTransparentColor(m_oldTransparentIndex);
 
   palette->incrementVersion();
 }

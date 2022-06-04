@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -16,6 +16,7 @@
 #include "app/doc.h"
 #include "app/doc_access.h"
 #include "app/i18n/strings.h"
+#include "app/inline_command_execution.h"
 #include "app/loop_tag.h"
 #include "app/modules/palettes.h"
 #include "app/pref/preferences.h"
@@ -26,6 +27,7 @@
 #include "app/script/security.h"
 #include "app/site.h"
 #include "app/tools/active_tool.h"
+#include "app/tools/ink.h"
 #include "app/tools/tool_box.h"
 #include "app/tools/tool_loop.h"
 #include "app/tools/tool_loop_manager.h"
@@ -57,7 +59,7 @@ int load_sprite_from_file(lua_State* L, const char* filename,
                           const LoadSpriteFromFileParam param)
 {
   std::string absFn = base::get_absolute_path(filename);
-  if (!ask_access(L, absFn.c_str(), FileAccessMode::Read, true))
+  if (!ask_access(L, absFn.c_str(), FileAccessMode::Read, ResourceType::File))
     return luaL_error(L, "script doesn't have access to open file %s",
                       absFn.c_str());
 
@@ -134,10 +136,12 @@ int App_transaction(lua_State* L)
   int nresults = 0;
   if (lua_isfunction(L, 1)) {
     Tx tx; // Create a new transaction so it exists in the whole
-           // duration of the argument function call.
+            // duration of the argument function call.
     lua_pushvalue(L, -1);
     if (lua_pcall(L, 0, LUA_MULTRET, 0) == LUA_OK)
       tx.commit();
+    else
+      return lua_error(L); // pcall already put an error object on the stack
     nresults = lua_gettop(L) - top;
   }
   return nresults;
@@ -388,9 +392,49 @@ int App_useTool(lua_State* L)
     params.freehandAlgorithm = get_value_from_lua<tools::FreehandAlgorithm>(L, -1);
   lua_pop(L, 1);
 
+  if (params.ink->isSelection()) {
+    gen::SelectionMode selectionMode = Preferences::instance().selection.mode();
+
+    type = lua_getfield(L, 1, "selection");
+    if (type != LUA_TNIL)
+      selectionMode = get_value_from_lua<gen::SelectionMode>(L, -1);
+    lua_pop(L, 1);
+
+    switch (selectionMode) {
+      case gen::SelectionMode::REPLACE:
+        params.modifiers = tools::ToolLoopModifiers::kReplaceSelection;
+        break;
+      case gen::SelectionMode::ADD:
+        params.modifiers = tools::ToolLoopModifiers::kAddSelection;
+        break;
+      case gen::SelectionMode::SUBTRACT:
+        params.modifiers = tools::ToolLoopModifiers::kSubtractSelection;
+        break;
+      case gen::SelectionMode::INTERSECT:
+        params.modifiers = tools::ToolLoopModifiers::kIntersectSelection;
+        break;
+    }
+  }
+
+  // Are we going to modify pixels or tiles?
+  type = lua_getfield(L, 1, "tilemapMode");
+  if (type != LUA_TNIL) {
+    site.tilemapMode(TilemapMode(lua_tointeger(L, -1)));
+  }
+  lua_pop(L, 1);
+
+  // How the tileset must be modified depending on this tool usage
+  type = lua_getfield(L, 1, "tilesetMode");
+  if (type != LUA_TNIL) {
+    site.tilesetMode(TilesetMode(lua_tointeger(L, -1)));
+  }
+  lua_pop(L, 1);
+
   // Do the tool loop
   type = lua_getfield(L, 1, "points");
   if (type == LUA_TTABLE) {
+    InlineCommandExecution inlineCmd(ctx);
+
     std::unique_ptr<tools::ToolLoop> loop(
       create_tool_loop_for_script(ctx, site, params));
     if (!loop)
@@ -425,10 +469,16 @@ int App_useTool(lua_State* L)
     if (!first)
       manager.releaseButton(lastPointer);
 
-    loop->commitOrRollback();
+    manager.end();
   }
   lua_pop(L, 1);
   return 0;
+}
+
+int App_get_events(lua_State* L)
+{
+  push_app_events(L);
+  return 1;
 }
 
 int App_get_activeSprite(lua_State* L)
@@ -711,6 +761,7 @@ const Property App_properties[] = {
   { "range", App_get_range, nullptr },
   { "isUIAvailable", App_get_isUIAvailable, nullptr },
   { "defaultPalette", App_get_defaultPalette, App_set_defaultPalette },
+  { "events", App_get_events, nullptr },
   { nullptr, nullptr, nullptr }
 };
 
