@@ -5,6 +5,7 @@
 <window id="about" text="About">
   <vbox>
     <label text="" id="title" />
+    <label text="Tekisasu Toolchain 2.0" />
     <label text="Animated sprite editor &amp;&amp; pixel art tool" />
     <hbox homogeneous="true">
       <hbox>
@@ -23,6 +24,12 @@
         <link text="Open Source Projects" url="" id="licenses" />
       </vbox>
     </hbox>
+    <separator horizontal="true" />
+    <hbox>
+      <label text="Copyright (C) 2021-2022" />
+      <link text="Tekisasu" url="https://tekisasu.com/" />
+    </hbox>
+    <link text="https://dev.tekisasu.com/" url="https://dev.tekisasu.com/" />
     <separator horizontal="true" />
     <hbox>
       <label text="Copyright (C) 2001-2022" />
