@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2019  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 //
 // This program is distributed under the terms of
 // the End-User License Agreement for Aseprite.
@@ -24,7 +24,7 @@ namespace app {
 namespace cmd {
 
 static doc::ImageRef convert_image_color_space(const doc::Image* srcImage,
-                                               const gfx::ColorSpacePtr& newCS,
+                                               const gfx::ColorSpaceRef& newCS,
                                                os::ColorSpaceConversion* conversion)
 {
   ImageSpec spec = srcImage->spec();
@@ -71,14 +71,14 @@ static doc::ImageRef convert_image_color_space(const doc::Image* srcImage,
 }
 
 void convert_color_profile(doc::Sprite* sprite,
-                           const gfx::ColorSpacePtr& newCS)
+                           const gfx::ColorSpaceRef& newCS)
 {
   ASSERT(sprite->colorSpace());
   ASSERT(newCS);
 
   os::System* system = os::instance();
-  auto srcOCS = system->createColorSpace(sprite->colorSpace());
-  auto dstOCS = system->createColorSpace(newCS);
+  auto srcOCS = system->makeColorSpace(sprite->colorSpace());
+  auto dstOCS = system->makeColorSpace(newCS);
   ASSERT(srcOCS);
   ASSERT(dstOCS);
 
@@ -88,10 +88,12 @@ void convert_color_profile(doc::Sprite* sprite,
   if (sprite->pixelFormat() != doc::IMAGE_INDEXED) {
     for (Cel* cel : sprite->uniqueCels()) {
       ImageRef old_image = cel->imageRef();
-      ImageRef new_image = convert_image_color_space(
-        old_image.get(), newCS, conversion.get());
+      if (old_image.get()->pixelFormat() != IMAGE_TILEMAP) {
+        ImageRef new_image = convert_image_color_space(
+          old_image.get(), newCS, conversion.get());
 
-      sprite->replaceImage(old_image->id(), new_image);
+        sprite->replaceImage(old_image->id(), new_image);
+      }
     }
   }
 
@@ -123,15 +125,15 @@ void convert_color_profile(doc::Sprite* sprite,
 
 void convert_color_profile(doc::Image* image,
                            doc::Palette* palette,
-                           const gfx::ColorSpacePtr& oldCS,
-                           const gfx::ColorSpacePtr& newCS)
+                           const gfx::ColorSpaceRef& oldCS,
+                           const gfx::ColorSpaceRef& newCS)
 {
   ASSERT(oldCS);
   ASSERT(newCS);
 
   os::System* system = os::instance();
-  auto srcOCS = system->createColorSpace(oldCS);
-  auto dstOCS = system->createColorSpace(newCS);
+  auto srcOCS = system->makeColorSpace(oldCS);
+  auto dstOCS = system->makeColorSpace(newCS);
   ASSERT(srcOCS);
   ASSERT(dstOCS);
 
@@ -161,7 +163,7 @@ void convert_color_profile(doc::Image* image,
   }
 }
 
-ConvertColorProfile::ConvertColorProfile(doc::Sprite* sprite, const gfx::ColorSpacePtr& newCS)
+ConvertColorProfile::ConvertColorProfile(doc::Sprite* sprite, const gfx::ColorSpaceRef& newCS)
   : WithSprite(sprite)
 {
   os::System* system = os::instance();
@@ -169,8 +171,8 @@ ConvertColorProfile::ConvertColorProfile(doc::Sprite* sprite, const gfx::ColorSp
   ASSERT(sprite->colorSpace());
   ASSERT(newCS);
 
-  auto srcOCS = system->createColorSpace(sprite->colorSpace());
-  auto dstOCS = system->createColorSpace(newCS);
+  auto srcOCS = system->makeColorSpace(sprite->colorSpace());
+  auto dstOCS = system->makeColorSpace(newCS);
 
   ASSERT(srcOCS);
   ASSERT(dstOCS);
@@ -181,10 +183,12 @@ ConvertColorProfile::ConvertColorProfile(doc::Sprite* sprite, const gfx::ColorSp
   if (sprite->pixelFormat() != doc::IMAGE_INDEXED) {
     for (Cel* cel : sprite->uniqueCels()) {
       ImageRef old_image = cel->imageRef();
-      ImageRef new_image = convert_image_color_space(
-        old_image.get(), newCS, conversion.get());
+      if (old_image.get()->pixelFormat() != IMAGE_TILEMAP) {
+        ImageRef new_image = convert_image_color_space(
+          old_image.get(), newCS, conversion.get());
 
-      m_seq.add(new cmd::ReplaceImage(sprite, old_image, new_image));
+        m_seq.add(new cmd::ReplaceImage(sprite, old_image, new_image));
+      }
     }
   }
 

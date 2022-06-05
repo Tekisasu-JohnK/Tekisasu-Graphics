@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -21,6 +21,8 @@
 #include "app/ui/editor/editor_observers.h"
 #include "app/ui/editor/editor_state.h"
 #include "app/ui/editor/editor_states_history.h"
+#include "app/ui/tile_source.h"
+#include "app/util/tiled_mode.h"
 #include "doc/algorithm/flip_type.h"
 #include "doc/frame.h"
 #include "doc/image_buffer.h"
@@ -59,9 +61,11 @@ namespace app {
   class EditorRender;
   class PixelsMovement;
   class Site;
+  class Transformation;
 
   namespace tools {
     class Ink;
+    class Pointer;
     class Tool;
   }
 
@@ -73,6 +77,7 @@ namespace app {
   class Editor : public ui::Widget,
                  public app::DocObserver,
                  public IColorSource,
+                 public ITileSource,
                  public tools::ActiveToolObserver {
   public:
     enum EditorFlags {
@@ -108,6 +113,7 @@ namespace app {
     static void destroyEditorSharedInternals();
 
     bool isActive() const;
+    bool isUsingNewRenderEngine() const;
 
     DocView* getDocView() { return m_docView; }
     void setDocView(DocView* docView) { m_docView = docView; }
@@ -168,7 +174,13 @@ namespace app {
 
     void flashCurrentLayer();
 
+    // Convert ui::Display coordinates (pixel relative to the top-left
+    // corner of the in the display content bounds) from/to
+    // editor/sprite coordinates (pixel in the canvas).
+    //
+    // TODO we should rename these functions to displayToEditor() and editorToDisplay()
     gfx::Point screenToEditor(const gfx::Point& pt);
+    gfx::Point screenToEditorCeiling(const gfx::Point& pt);
     gfx::PointF screenToEditorF(const gfx::Point& pt);
     gfx::Point editorToScreen(const gfx::Point& pt);
     gfx::PointF editorToScreenF(const gfx::PointF& pt);
@@ -203,7 +215,8 @@ namespace app {
     void updateStatusBar();
 
     // Control scroll when cursor goes out of the editor viewport.
-    gfx::Point autoScroll(ui::MouseMessage* msg, AutoScroll dir);
+    gfx::Point autoScroll(const ui::MouseMessage* msg,
+                          const AutoScroll dir);
 
     tools::Tool* getCurrentEditorTool() const;
     tools::Ink* getCurrentEditorInk() const;
@@ -239,8 +252,8 @@ namespace app {
     void pasteImage(const Image* image, const Mask* mask = nullptr);
 
     void startSelectionTransformation(const gfx::Point& move, double angle);
-
     void startFlipTransformation(doc::algorithm::FlipType flipType);
+    void updateTransformation(const Transformation& transform);
 
     // Used by EditorView to notify changes in the view's scroll
     // position.
@@ -282,12 +295,15 @@ namespace app {
     // IColorSource
     app::Color getColorByPosition(const gfx::Point& pos) override;
 
+    // ITileSource
+    doc::tile_t getTileByPosition(const gfx::Point& pos) override;
+
     void setTagFocusBand(int value) { m_tagFocusBand = value; }
     int tagFocusBand() const { return m_tagFocusBand; }
 
     // Returns true if the Shift key to draw straight lines with a
     // freehand tool is pressed.
-    bool startStraightLineWithFreehandTool(const ui::MouseMessage* msg);
+    bool startStraightLineWithFreehandTool(const tools::Pointer* pointer);
 
     // Functions to handle the set of selected slices.
     bool isSliceSelected(const doc::Slice* slice) const;
@@ -309,6 +325,7 @@ namespace app {
     void onResize(ui::ResizeEvent& ev) override;
     void onPaint(ui::PaintEvent& ev) override;
     void onInvalidateRegion(const gfx::Region& region) override;
+    void onSamplingChange();
     void onFgColorChange();
     void onContextBarBrushChange();
     void onTiledModeBeforeChange();
@@ -346,6 +363,7 @@ namespace app {
     void drawGrid(ui::Graphics* g, const gfx::Rect& spriteBounds, const gfx::Rect& gridBounds,
                   const app::Color& color, int alpha);
     void drawSlices(ui::Graphics* g);
+    void drawTileNumbers(ui::Graphics* g, const Cel* cel);
     void drawCelBounds(ui::Graphics* g, const Cel* cel, const gfx::Color color);
     void drawCelGuides(ui::Graphics* g, const Cel* cel, const Cel* mouseCel);
     void drawCelHGuide(ui::Graphics* g,
@@ -360,7 +378,7 @@ namespace app {
                        const int dottedY);
     gfx::Rect getCelScreenBounds(const Cel* cel);
 
-    void setCursor(const gfx::Point& mouseScreenPos);
+    void setCursor(const gfx::Point& mouseDisplayPos);
 
     // Draws the specified portion of sprite in the editor.  Warning:
     // You should setup the clip of the screen before calling this
@@ -369,6 +387,7 @@ namespace app {
 
     gfx::Point calcExtraPadding(const render::Projection& proj);
 
+    void invalidateCanvas();
     void invalidateIfActive();
     bool showAutoCelGuides();
     void updateAutoCelGuides(ui::Message* msg);
@@ -390,6 +409,8 @@ namespace app {
     frame_t m_frame;              // Active frame in the editor
     render::Projection m_proj;    // Zoom/pixel ratio in the editor
     DocumentPreferences& m_docPref;
+    // Helper functions affected by the current Tiled Mode.
+    app::TiledModeHelper m_tiledModeHelper;
 
     // Brush preview
     BrushPreview m_brushPreview;
@@ -403,6 +424,7 @@ namespace app {
     ui::Timer m_antsTimer;
     int m_antsOffset;
 
+    obs::scoped_connection m_samplingChangeConn;
     obs::scoped_connection m_fgColorChangeConn;
     obs::scoped_connection m_contextBarBrushChangeConn;
     obs::scoped_connection m_showExtrasConn;

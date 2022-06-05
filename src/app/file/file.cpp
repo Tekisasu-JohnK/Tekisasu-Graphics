@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -63,11 +63,13 @@ base::paths get_readable_extensions()
   return paths;
 }
 
-base::paths get_writable_extensions()
+base::paths get_writable_extensions(const int requiredFormatFlag)
 {
   base::paths paths;
   for (const FileFormat* format : *FileFormatsManager::instance()) {
-    if (format->support(FILE_SUPPORT_SAVE))
+    if (format->support(FILE_SUPPORT_SAVE) &&
+        (requiredFormatFlag == 0 ||
+         format->support(requiredFormatFlag)))
       format->getExtensions(paths);
   }
   return paths;
@@ -473,14 +475,27 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
 #ifdef ENABLE_UI
     // Interative
     if (context && context->isUIAvailable()) {
-      int ret = OptionalAlert::show(
-        Preferences::instance().saveFile.showFileFormatDoesntSupportAlert,
-        1, // Yes is the default option when the alert dialog is disabled
-        fmt::format(
-          (fatal ? Strings::alerts_file_format_doesnt_support_error():
-                   Strings::alerts_file_format_doesnt_support_warning()),
-          fop->m_format->name(),
-          warnings));
+      int ret;
+
+      // If the error is fatal, we cannot ignore a no-op, we always
+      // show the alert dialog.
+      if (fatal) {
+        ui::Alert::show(
+          fmt::format(
+            Strings::alerts_file_format_doesnt_support_error(),
+            fop->m_format->name(),
+            warnings));
+        ret = 1;
+      }
+      else {
+        ret = OptionalAlert::show(
+          Preferences::instance().saveFile.showFileFormatDoesntSupportAlert,
+          1, // Yes is the default option when the alert dialog is disabled
+          fmt::format(
+            Strings::alerts_file_format_doesnt_support_warning(),
+            fop->m_format->name(),
+            warnings));
+      }
 
       // Operation can't be done (by fatal error) or the user cancel
       // the operation
@@ -605,7 +620,8 @@ void FileOp::operate(IFileOpProgress* progress)
       auto add_image = [&]() {
         canvasSize |= m_seq.image->size();
 
-        m_seq.last_cel->data()->setImage(m_seq.image);
+        m_seq.last_cel->data()->setImage(m_seq.image,
+                                         m_seq.layer);
         m_seq.layer->addCel(m_seq.last_cel);
 
         if (m_document->sprite()->palette(frame)
@@ -869,9 +885,6 @@ void FileOp::stop()
 
 FileOp::~FileOp()
 {
-  if (m_format)
-    m_format->destroyData(this);
-
   delete m_seq.palette;
 }
 
@@ -914,7 +927,8 @@ void FileOp::postLoad()
       std::shared_ptr<Palette> palette(
         render::create_palette_from_sprite(
           sprite, frame_t(0), sprite->lastFrame(), true,
-          nullptr, nullptr, m_config.newBlend));
+          nullptr, nullptr, m_config.newBlend,
+          m_config.rgbMapAlgorithm));
 
       sprite->resetPalettes();
       sprite->setPalette(palette.get(), false);
@@ -922,7 +936,7 @@ void FileOp::postLoad()
   }
 
   // What to do with the sprite color profile?
-  gfx::ColorSpacePtr spriteCS = sprite->colorSpace();
+  gfx::ColorSpaceRef spriteCS = sprite->colorSpace();
   app::gen::ColorProfileBehavior behavior =
     app::gen::ColorProfileBehavior::DISABLE;
 

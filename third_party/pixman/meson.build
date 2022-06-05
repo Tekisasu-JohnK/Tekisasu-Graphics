@@ -21,9 +21,9 @@
 project(
   'pixman',
   ['c'],
-  version : '0.35.1',
+  version : '0.40.1',
   license : 'MIT',
-  meson_version : '>= 0.47.2',
+  meson_version : '>= 0.52.0',
   default_options : ['buildtype=debugoptimized'],
 )
 
@@ -36,6 +36,13 @@ add_project_arguments(
     '-Wdeclaration-after-statement',
     '-fno-strict-aliasing',
     '-fvisibility=hidden',
+    '-Wundef',
+    # -ftrapping-math is the default for gcc, but -fno-trapping-math is the
+    # default for clang.  The FLOAT_IS_ZERO macro is used to guard against
+    # floating-point exceptions, however with -fno-trapping-math, the compiler
+    # can reorder floating-point operations so that they occur before the guard.
+    # Note, this function is ignored in clang < 10.0.0.
+    '-ftrapping-math'
   ]),
   language : ['c']
 )
@@ -50,7 +57,7 @@ endforeach
 
 use_loongson_mmi = get_option('loongson-mmi')
 have_loongson_mmi = false
-loongson_mmi_flags = ['-mach=loongson2f']
+loongson_mmi_flags = ['-mloongson-mmi']
 if not use_loongson_mmi.disabled()
   if host_machine.cpu_family() == 'mips64' and cc.compiles('''
       #ifndef __mips_loongson_vector_rev
@@ -70,6 +77,7 @@ if not use_loongson_mmi.disabled()
         return 0;
       }''',
       args : loongson_mmi_flags,
+      include_directories : include_directories('.'),
       name : 'Loongson MMI Intrinsic Support')
     have_loongson_mmi = true
   endif
@@ -83,9 +91,17 @@ endif
 
 use_mmx = get_option('mmx')
 have_mmx = false
-mmx_flags = ['-mmmx', '-Winline']
+mmx_flags = []
+
+if cc.get_id() == 'msvc'
+  mmx_flags = ['/w14710', '/w14714', '/wd4244']
+elif cc.get_id() == 'sun'
+  mmx_flags = ['-xarch=sse']
+else
+  mmx_flags = ['-mmmx', '-Winline']
+endif
 if not use_mmx.disabled()
-  if host_machine.cpu_family() == 'x86_64'
+  if host_machine.cpu_family() == 'x86_64' or cc.get_id() == 'msvc'
     have_mmx = true
   elif host_machine.cpu_family() == 'x86' and cc.compiles('''
       #include <mmintrin.h>
@@ -126,14 +142,23 @@ if not use_mmx.disabled()
 endif
 
 if have_mmx
-  config.set10('USE_X86_MMX', true)
+  # Inline assembly do not work on X64 MSVC, so we use
+  # compatibility intrinsics there
+  if cc.get_id() != 'msvc' or host_machine.cpu_family() != 'x86_64'
+    config.set10('USE_X86_MMX', true)
+  endif
 elif use_mmx.enabled()
   error('MMX Support unavailable, but required')
 endif
 
 use_sse2 = get_option('sse2')
 have_sse2 = false
-sse2_flags = ['-msse2', '-Winline']
+sse2_flags = []
+if cc.get_id() == 'sun'
+  sse2_flags = ['-xarch=sse2']
+elif cc.get_id() != 'msvc'
+  sse2_flags = ['-msse2', '-Winline']
+endif
 if not use_sse2.disabled()
   if host_machine.cpu_family() == 'x86'
     if cc.compiles('''
@@ -168,8 +193,13 @@ endif
 
 use_ssse3 = get_option('ssse3')
 have_ssse3 = false
-ssse3_flags =['-mssse3', '-Winline']
-if not use_ssse3.disabled()
+ssse3_flags = []
+if cc.get_id() != 'msvc'
+  ssse3_flags = ['-mssse3', '-Winline']
+endif
+
+# x64 pre-2010 MSVC compilers crashes when building the ssse3 code
+if not use_ssse3.disabled() and not (cc.get_id() == 'msvc' and cc.version().version_compare('<16') and host_machine.cpu_family() == 'x86_64')
   if host_machine.cpu_family().startswith('x86')
     if cc.compiles('''
         #include <mmintrin.h>
@@ -223,20 +253,7 @@ use_armv6_simd = get_option('arm-simd')
 have_armv6_simd = false
 if not use_armv6_simd.disabled()
   if host_machine.cpu_family() == 'arm'
-    if cc.compiles('''
-        .text
-        .arch armv6
-        .object_arch armv4
-        .arm
-        .altmacro
-        #ifndef __ARM_EABI__
-        #error EABI is required (to be sure that calling conventions are compatible)
-        #endif
-        pld [r0]
-        uqadd8 r0, r0, r0
-        ''',
-        args : ['-x assembler-with-cpp'],
-        name : 'ARMv6 SIMD Intrinsic Support')
+    if cc.compiles(files('arm-simd-test.S'), name : 'ARMv6 SIMD Intrinsic Support')
       have_armv6_simd = true
     endif
   endif
@@ -252,22 +269,7 @@ use_neon = get_option('neon')
 have_neon = false
 if not use_neon.disabled()
   if host_machine.cpu_family() == 'arm'
-    if cc.compiles('''
-        .text
-        .fpu neon
-        .arch armv7a
-        .object_arch armv4
-        .eabi_attribute 10, 0
-        .arm
-        .altmacro
-        #ifndef __ARM_EABI__
-        #error EABI is required (to be sure that calling conventions are compatible)
-        #endif
-        pld [r0]
-        vmovn.u16 d0, q0
-        ''',
-        args : ['-x assembler-with-cpp'],
-        name : 'NEON Intrinsic Support')
+    if cc.compiles(files('neon-test.S'), name : 'NEON Intrinsic Support')
       have_neon = true
     endif
   endif
@@ -277,6 +279,22 @@ if have_neon
   config.set10('USE_ARM_NEON', true)
 elif use_neon.enabled()
   error('NEON Support unavailable, but required')
+endif
+
+use_a64neon = get_option('a64-neon')
+have_a64neon = false
+if not use_a64neon.disabled()
+  if host_machine.cpu_family() == 'aarch64'
+    if cc.compiles(files('a64-neon-test.S'), name : 'NEON A64 Intrinsic Support')
+      have_a64neon = true
+    endif
+  endif
+endif
+
+if have_a64neon
+  config.set10('USE_ARM_A64_NEON', true)
+elif use_a64neon.enabled()
+  error('A64 NEON Support unavailable, but required')
 endif
 
 use_iwmmxt = get_option('iwmmxt')
@@ -317,7 +335,7 @@ endif
 if have_iwmmxt
   config.set10('USE_ARM_IWMMXT', true)
 elif use_iwmmxt.enabled()
-  error('NEON Support unavailable, but required')
+  error('IWMMXT Support unavailable, but required')
 endif
 
 use_mips_dspr2 = get_option('mips-dspr2')
@@ -376,30 +394,76 @@ if get_option('gnuplot')
   config.set('PIXMAN_GNUPLOT', 1)
 endif
 
-use_openmp = get_option('openmp')
-dep_openmp = null_dep
-if not use_openmp.disabled()
+if cc.get_id() != 'msvc'
   dep_openmp = dependency('openmp', required : get_option('openmp'))
   if dep_openmp.found()
     config.set10('USE_OPENMP', true)
+  elif meson.version().version_compare('<0.51.0')
+  # In versions of meson before 0.51 the openmp dependency can still
+  # inject arguments in the the auto case when it is not found, the
+  # detection does work correctly in that case however, so we just
+  # replace dep_openmp with null_dep to work around this.
+    dep_openmp = null_dep
+  endif
+else
+  # the MSVC implementation of openmp is not compliant enough for our
+  # uses here, so we disable it here.
+  # Please see: https://stackoverflow.com/questions/12560243/using-threadprivate-directive-in-visual-studio
+  dep_openmp = null_dep
+endif
+
+dep_gtk = dependency('gtk+-3.0', required : get_option('gtk'))
+dep_glib = dependency('glib-2.0', required : get_option('gtk'))
+
+dep_png = null_dep
+if not get_option('libpng').disabled()
+  dep_png = dependency('libpng', required : false)
+
+  # We need to look for the right library to link to for libpng,
+  # when looking for libpng manually
+  foreach png_ver : [ '16', '15', '14', '13', '12', '10' ]
+    if not dep_png.found()
+      dep_png = cc.find_library('libpng@0@'.format(png_ver), has_headers : ['png.h'], required : false)
+    endif
+  endforeach
+
+  if get_option('libpng').enabled() and not dep_png.found()
+    error('libpng support requested but libpng library not found')
   endif
 endif
 
-dep_gtk = dependency('gtk+-2.0', version : '>= 2.16', required : get_option('gtk'))
-dep_glib = dependency('glib-2.0', required : get_option('gtk'))
-dep_pixman = dependency('pixman-1', required : get_option('gtk'),
-                        version : '>= ' + meson.project_version())
-dep_png = dependency('libpng', required : get_option('libpng'))
 if dep_png.found()
   config.set('HAVE_LIBPNG', 1)
 endif
 dep_m = cc.find_library('m', required : false)
 dep_threads = dependency('threads')
-if dep_threads.found()
+
+# MSVC-style compilers do not come with pthreads, so we must link
+# to it explicitly, currently pthreads-win32 is supported
+pthreads_found = false
+
+if dep_threads.found() and cc.has_header('pthread.h')
+  if cc.get_argument_syntax() == 'msvc'
+    pthread_lib = null_dep
+    foreach pthread_type : ['VC3', 'VSE3', 'VCE3', 'VC2', 'VSE2', 'VCE2']
+      if not pthread_lib.found()
+        pthread_lib = cc.find_library('pthread@0@'.format(pthread_type), required : false)
+      endif
+    endforeach
+    if pthread_lib.found()
+      pthreads_found = true
+      dep_threads = pthread_lib
+    endif
+  else
+    pthreads_found = true
+  endif
+endif
+
+if pthreads_found
   config.set('HAVE_PTHREADS', 1)
 endif
 
-funcs = ['sigaction', 'alarm', 'mprotect', 'getpagesize', 'mmap']
+funcs = ['sigaction', 'alarm', 'mprotect', 'getpagesize', 'mmap', 'getisax', 'gettimeofday']
 # mingw claimes to have posix_memalign, but it doesn't
 if host_machine.system() != 'windows'
   funcs += 'posix_memalign'
@@ -410,10 +474,6 @@ foreach f : funcs
     config.set('HAVE_@0@'.format(f.to_upper()), 1)
   endif
 endforeach
-
-if cc.has_function('gettimeofday')
-  config.set('HAVE_GETTIMEOFDAY', 1)
-endif
 
 # This is only used in one test, that defines _GNU_SOURCE
 if cc.has_function('feenableexcept',
@@ -432,8 +492,12 @@ foreach h : ['sys/mman.h', 'fenv.h', 'unistd.h']
   endif
 endforeach
 
+# gcc on Windows only warns that __declspec(thread) isn't supported,
+# passing -Werror=attributes makes it fail.
 if (host_machine.system() == 'windows' and
-    cc.compiles('int __declspec(thread) foo;', name : 'TLS via __declspec(thread)'))
+    cc.compiles('int __declspec(thread) foo;',
+                args : cc.get_supported_arguments(['-Werror=attributes']),
+                name : 'TLS via __declspec(thread)'))
   config.set('TLS', '__declspec(thread)')
 elif cc.compiles('int __thread foo;', name : 'TLS via __thread')
   config.set('TLS', '__thread')
@@ -470,6 +534,8 @@ if host_machine.endian() == 'big'
   config.set('WORDS_BIGENDIAN', 1)
 endif
 
+config.set('SIZEOF_LONG', cc.sizeof('long'))
+
 # Required to make pixman-private.h
 config.set('PACKAGE', 'foo')
 
@@ -482,15 +548,17 @@ version_conf.set('PIXMAN_VERSION_MICRO', split[2])
 add_project_arguments('-DHAVE_CONFIG_H', language : ['c'])
 
 subdir('pixman')
-subdir('test')
-subdir('demos')
+
+if not get_option('tests').disabled()
+  subdir('test')
+  subdir('demos')
+endif
 
 pkg = import('pkgconfig')
-pkg.generate(
+pkg.generate(libpixman,
   name : 'Pixman',
   filebase : 'pixman-1',
   description : 'The pixman library (version 1)',
-  libraries : libpixman,
   subdirs: 'pixman-1',
   version : meson.project_version(),
 )

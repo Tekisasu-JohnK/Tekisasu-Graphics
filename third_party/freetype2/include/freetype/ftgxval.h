@@ -4,7 +4,7 @@
  *
  *   FreeType API for validating TrueTypeGX/AAT tables (specification).
  *
- * Copyright 2004-2018 by
+ * Copyright (C) 2004-2022 by
  * Masatake YAMATO, Redhat K.K,
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
@@ -28,8 +28,7 @@
 #ifndef FTGXVAL_H_
 #define FTGXVAL_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -73,8 +72,8 @@ FT_BEGIN_HEADER
   /**************************************************************************
    *
    *
-   * Warning: Use FT_VALIDATE_XXX to validate a table.
-   *         Following definitions are for gxvalid developers.
+   * Warning: Use `FT_VALIDATE_XXX` to validate a table.
+   *          Following definitions are for gxvalid developers.
    *
    *
    */
@@ -92,14 +91,14 @@ FT_BEGIN_HEADER
 #define FT_VALIDATE_GX_LAST_INDEX  FT_VALIDATE_lcar_INDEX
 
 
-  /*************************************************************************
+  /**************************************************************************
    *
    * @macro:
    *   FT_VALIDATE_GX_LENGTH
    *
    * @description:
    *   The number of tables checked in this module.  Use it as a parameter
-   *   for the 'table-length' argument of function @FT_TrueTypeGX_Validate.
+   *   for the `table-length` argument of function @FT_TrueTypeGX_Validate.
    */
 #define FT_VALIDATE_GX_LENGTH  ( FT_VALIDATE_GX_LAST_INDEX + 1 )
 
@@ -112,7 +111,7 @@ FT_BEGIN_HEADER
           ( FT_VALIDATE_GX_START << FT_VALIDATE_##tag##_INDEX )
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *    FT_VALIDATE_GXXXX
@@ -181,7 +180,7 @@ FT_BEGIN_HEADER
                           FT_VALIDATE_lcar )
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_TrueTypeGX_Validate
@@ -201,7 +200,7 @@ FT_BEGIN_HEADER
    *      @FT_VALIDATE_GXXXX for possible values.
    *
    *    table_length ::
-   *      The size of the 'tables' array.  Normally, @FT_VALIDATE_GX_LENGTH
+   *      The size of the `tables` array.  Normally, @FT_VALIDATE_GX_LENGTH
    *      should be passed.
    *
    * @output:
@@ -217,7 +216,7 @@ FT_BEGIN_HEADER
    *   otherwise.
    *
    *   After use, the application should deallocate the buffers pointed to by
-   *   each 'tables' element, by calling @FT_TrueTypeGX_Free.  A NULL value
+   *   each `tables` element, by calling @FT_TrueTypeGX_Free.  A `NULL` value
    *   indicates that the table either doesn't exist in the font, the
    *   application hasn't asked for validation, or the validator doesn't have
    *   the ability to validate the sfnt table.
@@ -229,7 +228,7 @@ FT_BEGIN_HEADER
                           FT_UInt   table_length );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_TrueTypeGX_Free
@@ -253,7 +252,7 @@ FT_BEGIN_HEADER
                       FT_Bytes  table );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @enum:
    *    FT_VALIDATE_CKERNXXX
@@ -279,7 +278,7 @@ FT_BEGIN_HEADER
 #define FT_VALIDATE_CKERN  ( FT_VALIDATE_MS | FT_VALIDATE_APPLE )
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_ClassicKern_Validate
@@ -311,7 +310,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *   After use, the application should deallocate the buffers pointed to by
-   *   `ckern_table`, by calling @FT_ClassicKern_Free.  A NULL value
+   *   `ckern_table`, by calling @FT_ClassicKern_Free.  A `NULL` value
    *   indicates that the table doesn't exist in the font.
    */
   FT_EXPORT( FT_Error )
@@ -320,7 +319,7 @@ FT_BEGIN_HEADER
                            FT_Bytes  *ckern_table );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_ClassicKern_Free

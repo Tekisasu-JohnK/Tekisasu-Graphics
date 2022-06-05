@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -23,18 +23,18 @@
 #include "app/file/format_options.h"
 #include "app/flatten.h"
 #include "app/pref/preferences.h"
-#include "app/util/create_cel_copy.h"
+#include "app/util/cel_ops.h"
 #include "base/memory.h"
 #include "doc/cel.h"
 #include "doc/layer.h"
 #include "doc/mask.h"
 #include "doc/mask_boundaries.h"
 #include "doc/palette.h"
+#include "doc/slice.h"
 #include "doc/sprite.h"
 #include "doc/tag.h"
-#include "doc/slice.h"
-#include "os/display.h"
 #include "os/system.h"
+#include "os/window.h"
 #include "ui/system.h"
 
 #include <limits>
@@ -260,6 +260,13 @@ void Doc::notifySelectionBoundariesChanged()
   notify_observers<DocEvent&>(&DocObserver::onSelectionBoundariesChanged, ev);
 }
 
+void Doc::notifyTilesetChanged(Tileset* tileset)
+{
+  DocEvent ev(this);
+  ev.tileset(tileset);
+  notify_observers<DocEvent&>(&DocObserver::onTilesetChanged, ev);
+}
+
 bool Doc::isModified() const
 {
   return !m_undo->isSavedState();
@@ -396,7 +403,7 @@ void Doc::setTransformation(const Transformation& transform)
 
 void Doc::resetTransformation()
 {
-  m_transformation = Transformation(gfx::RectF(m_mask->bounds()));
+  m_transformation = Transformation(gfx::RectF(m_mask->bounds()), m_transformation.cornerThick());
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -444,7 +451,8 @@ void Doc::copyLayerContent(const Layer* sourceLayer0, Doc* destDoc, Layer* destL
                                    it->second));
       }
       else {
-        newCel.reset(create_cel_copy(sourceCel,
+        newCel.reset(create_cel_copy(nullptr, // TODO add undo information?
+                                     sourceCel,
                                      destLayer->sprite(),
                                      destLayer,
                                      sourceCel->frame()));
@@ -576,6 +584,13 @@ Doc* Doc::duplicate(DuplicateType type) const
 
 void Doc::close()
 {
+  try {
+    notify_observers<Doc*>(&DocObserver::onCloseDocument, this);
+  }
+  catch (...) {
+    LOG(ERROR, "DOC: Exception on DocObserver::onCloseDocument()\n");
+  }
+
   removeFromContext();
 }
 
@@ -603,9 +618,9 @@ void Doc::updateOSColorSpace(bool appWideSignal)
 {
   auto system = os::instance();
   if (system) {
-    m_osColorSpace = system->createColorSpace(sprite()->colorSpace());
-    if (!m_osColorSpace && system->defaultDisplay())
-      m_osColorSpace = system->defaultDisplay()->colorSpace();
+    m_osColorSpace = system->makeColorSpace(sprite()->colorSpace());
+    if (!m_osColorSpace && system->defaultWindow())
+      m_osColorSpace = system->defaultWindow()->colorSpace();
   }
 
   if (appWideSignal &&

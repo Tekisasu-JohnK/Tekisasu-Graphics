@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,10 +16,12 @@
 #include "base/clamp.h"
 #include "base/memory.h"
 #include "base/string.h"
-#include "os/display.h"
+#include "base/utf8_decode.h"
 #include "os/font.h"
 #include "os/surface.h"
 #include "os/system.h"
+#include "os/window.h"
+#include "ui/app_state.h"
 #include "ui/init_theme_event.h"
 #include "ui/intern.h"
 #include "ui/layout_io.h"
@@ -28,9 +30,9 @@
 #include "ui/message.h"
 #include "ui/move_region.h"
 #include "ui/paint_event.h"
-#include "ui/size_hint_event.h"
 #include "ui/resize_event.h"
 #include "ui/save_layout_event.h"
+#include "ui/size_hint_event.h"
 #include "ui/system.h"
 #include "ui/theme.h"
 #include "ui/view.h"
@@ -64,6 +66,7 @@ Widget::Widget(WidgetType type)
   , m_bgColor(gfx::ColorNone)
   , m_bounds(0, 0, 0, 0)
   , m_parent(nullptr)
+  , m_parentIndex(-1)
   , m_sizeHint(nullptr)
   , m_mnemonic(0)
   , m_minSize(0, 0)
@@ -164,8 +167,8 @@ void Widget::setTextQuiet(const std::string& text)
 os::Font* Widget::font() const
 {
   if (!m_font && m_theme)
-    m_font = m_theme->getWidgetFont(this);
-  return m_font;
+    m_font = AddRef(m_theme->getWidgetFont(this));
+  return m_font.get();
 }
 
 void Widget::setBgColor(gfx::Color color)
@@ -202,7 +205,7 @@ void Widget::setStyle(Style* style)
   m_border = m_theme->calcBorder(this, style);
   m_bgColor = m_theme->calcBgColor(this, style);
   if (style->font())
-    m_font = style->font();
+    m_font = AddRef(style->font());
 }
 
 // ===============================================================
@@ -420,13 +423,27 @@ Manager* Widget::manager() const
   return Manager::getDefault();
 }
 
+Display* Widget::display() const
+{
+  if (Window* win = this->window())
+    return win->display();
+  else
+    return manager()->display();
+}
+
 int Widget::getChildIndex(Widget* child)
 {
-  auto it = std::find(m_children.begin(), m_children.end(), child);
-  if (it != m_children.end())
-    return it - m_children.begin();
-  else
+  if (!child)
     return -1;
+
+#ifdef _DEBUG
+  ASSERT(child->parent() == this);
+  auto it = std::find(m_children.begin(), m_children.end(), child);
+  ASSERT(it != m_children.end());
+  ASSERT(child->parentIndex() == (it - m_children.begin()));
+#endif
+
+  return child->parentIndex();
 }
 
 Widget* Widget::nextSibling()
@@ -436,12 +453,9 @@ Widget* Widget::nextSibling()
   if (!m_parent)
     return nullptr;
 
-  WidgetsList::iterator begin = m_parent->m_children.begin();
-  WidgetsList::iterator end = m_parent->m_children.end();
-  WidgetsList::iterator it = std::find(begin, end, this);
-
-  if (it == end)
-    return nullptr;
+  auto begin = m_parent->m_children.begin();
+  auto end = m_parent->m_children.end();
+  auto it = begin + m_parentIndex;
 
   if (++it == end)
     return nullptr;
@@ -456,11 +470,10 @@ Widget* Widget::previousSibling()
   if (!m_parent)
     return nullptr;
 
-  WidgetsList::iterator begin = m_parent->m_children.begin();
-  WidgetsList::iterator end = m_parent->m_children.end();
-  WidgetsList::iterator it = std::find(begin, end, this);
+  auto begin = m_parent->m_children.begin();
+  auto it = begin + m_parentIndex;
 
-  if (it == begin || it == end)
+  if (it == begin)
     return nullptr;
 
   return *(--it);
@@ -491,6 +504,11 @@ Widget* Widget::pick(const gfx::Point& pt,
   return const_cast<Widget*>(picked);
 }
 
+Widget* Widget::pickFromScreenPos(const gfx::Point& screenPos) const
+{
+  return pick(display()->nativeWindow()->pointFromScreen(screenPos));
+}
+
 bool Widget::hasChild(Widget* child)
 {
   ASSERT_VALID_WIDGET(child);
@@ -508,7 +526,7 @@ bool Widget::hasAncestor(Widget* ancestor)
   return false;
 }
 
-Widget* Widget::findChild(const char* id)
+Widget* Widget::findChild(const char* id) const
 {
   for (auto child : m_children) {
     if (child->id() == id)
@@ -524,7 +542,7 @@ Widget* Widget::findChild(const char* id)
   return nullptr;
 }
 
-Widget* Widget::findSibling(const char* id)
+Widget* Widget::findSibling(const char* id) const
 {
   return window()->findChild(id);
 }
@@ -534,32 +552,50 @@ void Widget::addChild(Widget* child)
   ASSERT_VALID_WIDGET(this);
   ASSERT_VALID_WIDGET(child);
 
+  // Remove the widget from its current parent
+  if (child->m_parent)
+    child->m_parent->removeChild(child);
+
+  int i = int(m_children.size());
   m_children.push_back(child);
   child->m_parent = this;
+  child->m_parentIndex = i;
 }
 
-void Widget::removeChild(WidgetsList::iterator& it)
+void Widget::removeChild(const WidgetsList::iterator& it)
 {
-  Widget* child = *it;
+  Widget* child = nullptr;
 
   ASSERT(it != m_children.end());
-  if (it != m_children.end())
-    m_children.erase(it);
+  if (it != m_children.end()) {
+    child = *it;
 
-  // Free from manager
+    auto it2 = m_children.erase(it);
+    for (auto end=m_children.end(); it2!=end; ++it2)
+      --(*it2)->m_parentIndex;
+
+    ASSERT(child);
+    if (!child)
+      return;
+  }
+  else
+    return;
+
+  // Free child from manager
   if (auto man = manager())
     man->freeWidget(child);
 
   child->m_parent = nullptr;
+  child->m_parentIndex = -1;
 }
 
 void Widget::removeChild(Widget* child)
 {
   ASSERT_VALID_WIDGET(this);
   ASSERT_VALID_WIDGET(child);
-
-  WidgetsList::iterator it = std::find(m_children.begin(), m_children.end(), child);
-  removeChild(it);
+  ASSERT(child->parent() == this);
+  if (child->parent() == this)
+    removeChild(m_children.begin() + child->m_parentIndex);
 }
 
 void Widget::removeAllChildren()
@@ -573,18 +609,29 @@ void Widget::replaceChild(Widget* oldChild, Widget* newChild)
   ASSERT_VALID_WIDGET(oldChild);
   ASSERT_VALID_WIDGET(newChild);
 
-  WidgetsList::iterator before =
-    std::find(m_children.begin(), m_children.end(), oldChild);
-  if (before == m_children.end()) {
+#if _DEBUG
+  {
+    auto it = std::find(m_children.begin(), m_children.end(), oldChild);
+    ASSERT(it != m_children.end());
+    ASSERT(oldChild->m_parentIndex == (it - m_children.begin()));
+  }
+#endif
+
+  if (oldChild->parent() != this) {
     ASSERT(false);
     return;
   }
-  int index = before - m_children.begin();
+  int index = oldChild->m_parentIndex;
 
   removeChild(oldChild);
 
-  m_children.insert(m_children.begin()+index, newChild);
+  auto it = m_children.begin() + index;
+  it = m_children.insert(it, newChild);
+  for (auto end=m_children.end(); it!=end; ++it)
+    ++(*it)->m_parentIndex;
+
   newChild->m_parent = this;
+  newChild->m_parentIndex = index;
 }
 
 void Widget::insertChild(int index, Widget* child)
@@ -592,21 +639,37 @@ void Widget::insertChild(int index, Widget* child)
   ASSERT_VALID_WIDGET(this);
   ASSERT_VALID_WIDGET(child);
 
-  m_children.insert(m_children.begin()+index, child);
+  index = base::clamp(index, 0, int(m_children.size()));
+
+  auto it = m_children.begin() + index;
+  it = m_children.insert(it, child);
+  ++it;
+  for (auto end=m_children.end(); it!=end; ++it)
+    ++(*it)->m_parentIndex;
+
   child->m_parent = this;
+  child->m_parentIndex = index;
 }
 
 void Widget::moveChildTo(Widget* thisChild, Widget* toThisPosition)
 {
-  auto itA = std::find(m_children.begin(), m_children.end(), thisChild);
-  auto itB = std::find(m_children.begin(), m_children.end(), toThisPosition);
-  if (itA == m_children.end()) {
-    ASSERT(false);
-    return;
-  }
-  int index = itB - m_children.begin();
-  m_children.erase(itA);
-  m_children.insert(m_children.begin() + index, thisChild);
+  ASSERT(thisChild->parent() == this);
+  ASSERT(toThisPosition->parent() == this);
+
+  const int from = thisChild->m_parentIndex;
+  const int to = toThisPosition->m_parentIndex;
+
+  auto it = m_children.begin() + from;
+  it = m_children.erase(it);
+  auto end = m_children.end();
+  for (; it!=end; ++it)
+    --(*it)->m_parentIndex;
+
+  it = m_children.begin() + to;
+  it = m_children.insert(it, thisChild);
+  thisChild->m_parentIndex = to;
+  for (++it, end=m_children.end(); it!=end; ++it)
+    ++(*it)->m_parentIndex;
 }
 
 // ===============================================================
@@ -685,8 +748,22 @@ Rect Widget::clientChildrenBounds() const
               m_bounds.h - border().height());
 }
 
+gfx::Rect Widget::boundsOnScreen() const
+{
+  gfx::Rect rc = bounds();
+  os::Window* nativeWindow = display()->nativeWindow();
+  rc = gfx::Rect(
+    nativeWindow->pointToScreen(rc.origin()),
+    nativeWindow->pointToScreen(rc.point2()));
+  return rc;
+}
+
 void Widget::setBounds(const Rect& rc)
 {
+  // Don't generate onResize() events if the app is being closed
+  if (is_app_state_closing())
+    return;
+
   ResizeEvent ev(this, rc);
   onResize(ev);
 }
@@ -754,36 +831,31 @@ void Widget::getRegion(gfx::Region& region)
 
 void Widget::getDrawableRegion(gfx::Region& region, DrawableRegionFlags flags)
 {
-  Widget* window, *manager, *view;
+  Window* window = this->window();
+  Display* display = this->display();
 
   getRegion(region);
 
   // Cut the top windows areas
   if (flags & kCutTopWindows) {
-    window = this->window();
-    manager = (window ? window->manager(): nullptr);
+    const auto& uiWindows = display->getWindows();
 
-    while (manager) {
-      const WidgetsList& windows_list = manager->children();
-      WidgetsList::const_reverse_iterator it =
-        std::find(windows_list.rbegin(), windows_list.rend(), window);
+    // Reverse iterator
+    auto it = std::find(uiWindows.rbegin(),
+                        uiWindows.rend(), window);
 
-      if (!windows_list.empty() &&
-          window != windows_list.front() &&
-          it != windows_list.rend()) {
-        // Subtract the rectangles
-        for (++it; it != windows_list.rend(); ++it) {
-          if (!(*it)->isVisible())
-            continue;
+    if (!uiWindows.empty() &&
+        window != uiWindows.front() &&
+        it != uiWindows.rend()) {
+      // Subtract the rectangles of each window
+      for (++it; it != uiWindows.rend(); ++it) {
+        if (!(*it)->isVisible())
+          continue;
 
-          Region reg1;
-          (*it)->getRegion(reg1);
-          region.createSubtraction(region, reg1);
-        }
+        Region reg1;
+        (*it)->getRegion(reg1);
+        region -= reg1;
       }
-
-      window = manager->window();
-      manager = (window ? window->manager(): nullptr);
     }
   }
 
@@ -804,7 +876,7 @@ void Widget::getDrawableRegion(gfx::Region& region, DrawableRegionFlags flags)
         else {
           reg1.createIntersection(reg2, reg3);
         }
-        region.createSubtraction(region, reg1);
+        region -= reg1;
       }
     }
   }
@@ -812,38 +884,27 @@ void Widget::getDrawableRegion(gfx::Region& region, DrawableRegionFlags flags)
   // Intersect with the parent area
   if (!hasFlags(DECORATIVE)) {
     Widget* p = this->parent();
-    while (p) {
-      region.createIntersection(
-        region, Region(p->childrenBounds()));
+    while (p && p->type() != kManagerWidget) {
+      region &= Region(p->childrenBounds());
       p = p->parent();
     }
   }
   else {
     Widget* p = parent();
     if (p) {
-      region.createIntersection(
-        region, Region(p->bounds()));
+      region &= Region(p->bounds());
     }
   }
 
-  // Limit to the manager area
-  window = this->window();
-  manager = (window ? window->manager(): nullptr);
+  // Limit to the displayable area
+  View* view = View::getView(display->containedWidget());
+  Rect cpos;
+  if (view)
+    cpos = static_cast<View*>(view)->viewportBounds();
+  else
+    cpos = display->containedWidget()->bounds();
 
-  while (manager) {
-    view = View::getView(manager);
-
-    Rect cpos;
-    if (view)
-      cpos = static_cast<View*>(view)->viewportBounds();
-    else
-      cpos = manager->childrenBounds();
-
-    region.createIntersection(region, Region(cpos));
-
-    window = manager->window();
-    manager = (window ? window->manager(): nullptr);
-  }
+  region &= Region(cpos);
 }
 
 int Widget::textWidth() const
@@ -970,6 +1031,17 @@ void Widget::setMaxSize(const gfx::Size& sz)
   m_maxSize = sz;
 }
 
+void Widget::resetMinSize()
+{
+  m_minSize = gfx::Size(0, 0);
+}
+
+void Widget::resetMaxSize()
+{
+  m_maxSize = gfx::Size(std::numeric_limits<int>::max(),
+                        std::numeric_limits<int>::max());
+}
+
 void Widget::flushRedraw()
 {
   std::queue<Widget*> processing;
@@ -1014,17 +1086,19 @@ void Widget::flushRedraw()
       Region::const_iterator it = widget->m_updateRegion.begin();
 
       // Draw the widget
+      Display* display = widget->display();
       int count = nrects-1;
       for (c=0; c<nrects; ++c, ++it, --count) {
         // Create the draw message
         msg = new PaintMessage(count, *it);
+        msg->setDisplay(display);
         msg->setRecipient(widget);
 
         // Enqueue the draw message
         manager->enqueueMessage(msg);
       }
 
-      manager->addInvalidRegion(widget->m_updateRegion);
+      display->addInvalidRegion(widget->m_updateRegion);
       widget->m_updateRegion.clear();
     }
   }
@@ -1039,6 +1113,8 @@ void Widget::paint(Graphics* graphics,
 
   std::queue<Widget*> processing;
   processing.push(this);
+
+  Display* display = this->display();
 
   while (!processing.empty()) {
     Widget* widget = processing.front();
@@ -1059,17 +1135,17 @@ void Widget::paint(Graphics* graphics,
     region.createIntersection(region, drawRegion);
 
     Graphics graphics2(
-      graphics->getInternalSurface(),
+      display,
+      base::AddRef(graphics->getInternalSurface()),
       widget->bounds().x,
       widget->bounds().y);
-    graphics2.setFont(widget->font());
+    graphics2.setFont(AddRef(widget->font()));
 
-    for (Region::const_iterator
-           it = region.begin(),
-           end = region.end(); it != end; ++it) {
-      IntersectClip clip(&graphics2, Rect(*it).offset(
-          -widget->bounds().x,
-          -widget->bounds().y));
+    for (const gfx::Rect& rc : region) {
+      IntersectClip clip(&graphics2,
+                         Rect(rc).offset(
+                           -widget->bounds().x,
+                           -widget->bounds().y));
       widget->paintEvent(&graphics2, isBg);
     }
   }
@@ -1083,20 +1159,48 @@ bool Widget::paintEvent(Graphics* graphics,
 #if _DEBUG
     // In debug mode we can fill the area with Red so we know if the
     // we are drawing the parent correctly.
-    graphics->fillRect(gfx::rgba(255, 0, 0), clientBounds());
+    if (window() && !window()->ownDisplay())
+      graphics->fillRect(gfx::rgba(255, 0, 0), clientBounds());
 #endif
 
     enableFlags(HIDDEN);
 
-    if (parent()) {
-      gfx::Region rgn(parent()->bounds());
-      rgn.createIntersection(
-        rgn,
-        gfx::Region(
-          graphics->getClipBounds().offset(
-            graphics->getInternalDeltaX(),
-            graphics->getInternalDeltaY())));
-      parent()->paint(graphics, rgn, true);
+    Widget* parentWidget = nullptr;
+    if (type() == kWindowWidget) {
+      parentWidget = display()->containedWidget();
+
+      if (get_multiple_displays()) {
+        // Draw the desktop window as the background, not the manager
+        // (as the manager contains all windows as children and will
+        // try to draw other foreground windows here).
+        if (parentWidget->type() == kManagerWidget) {
+          parentWidget = static_cast<Manager*>(parentWidget)->getDesktopWindow();
+        }
+        // If this ui::Window has it's own native window (os::Window),
+        // we'll fill a transparent rectangle because we already have
+        // a transparent native window.
+        else if (static_cast<Window*>(this)->ownDisplay()) {
+          parentWidget = nullptr;
+        }
+      }
+    }
+    else {
+      parentWidget = parent();
+    }
+    if (parentWidget) {
+      gfx::Region rgn(parentWidget->bounds());
+      rgn &= gfx::Region(
+        graphics->getClipBounds().offset(
+          graphics->getInternalDeltaX(),
+          graphics->getInternalDeltaY()));
+      parentWidget->paint(graphics, rgn, true);
+    }
+    else {
+      // Clear surface with transparent color
+      os::Paint p;
+      p.color(gfx::rgba(0, 0, 0, 0));
+      p.blendMode(os::BlendMode::Src);
+      graphics->drawRect(clientBounds(), p);
     }
 
     disableFlags(HIDDEN);
@@ -1151,48 +1255,53 @@ void Widget::invalidateRegion(const Region& region)
 
 class DeleteGraphicsAndSurface {
 public:
-  DeleteGraphicsAndSurface(const gfx::Rect& clip, os::Surface* surface)
-    : m_pt(clip.origin()), m_surface(surface) {
+  DeleteGraphicsAndSurface(const gfx::Rect& clip,
+                           const os::SurfaceRef& surface,
+                           os::SurfaceRef& dst)
+    : m_pt(clip.origin())
+    , m_surface(surface)
+    , m_dst(dst) {
   }
 
   void operator()(Graphics* graphics) {
     {
-      os::Surface* dst = os::instance()->defaultDisplay()->getSurface();
-      os::SurfaceLock lockSrc(m_surface);
-      os::SurfaceLock lockDst(dst);
+      os::SurfaceLock lockSrc(m_surface.get());
+      os::SurfaceLock lockDst(m_dst.get());
       m_surface->blitTo(
-        dst, 0, 0, m_pt.x, m_pt.y,
+        m_dst.get(), 0, 0, m_pt.x, m_pt.y,
         m_surface->width(), m_surface->height());
     }
-    m_surface->dispose();
+    m_surface.reset();
     delete graphics;
   }
 
 private:
   gfx::Point m_pt;
-  os::Surface* m_surface;
+  os::SurfaceRef m_surface;
+  os::SurfaceRef m_dst;
 };
 
 GraphicsPtr Widget::getGraphics(const gfx::Rect& clip)
 {
   GraphicsPtr graphics;
-  os::Surface* surface;
-  os::Surface* defaultSurface = os::instance()->defaultDisplay()->getSurface();
+  Display* display = this->display();
+  os::SurfaceRef dstSurface = AddRef(display->surface());
 
   // In case of double-buffering, we need to create the temporary
   // buffer only if the default surface is the screen.
-  if (isDoubleBuffered() && defaultSurface->isDirectToScreen()) {
-    surface = os::instance()->createSurface(clip.w, clip.h);
-    graphics.reset(new Graphics(surface, -clip.x, -clip.y),
-      DeleteGraphicsAndSurface(clip, surface));
+  if (isDoubleBuffered() && dstSurface->isDirectToScreen()) {
+    os::SurfaceRef surface =
+      os::instance()->makeSurface(clip.w, clip.h);
+    graphics.reset(new Graphics(display, surface, -clip.x, -clip.y),
+                   DeleteGraphicsAndSurface(clip, surface,
+                                            dstSurface));
   }
   // In other case, we can draw directly onto the screen.
   else {
-    surface = defaultSurface;
-    graphics.reset(new Graphics(surface, bounds().x, bounds().y));
+    graphics.reset(new Graphics(display, dstSurface, bounds().x, bounds().y));
   }
 
-  graphics->setFont(font());
+  graphics->setFont(AddRef(font()));
   return graphics;
 }
 
@@ -1212,9 +1321,10 @@ void Widget::closeWindow()
     w->closeWindow(this);
 }
 
-void Widget::broadcastMouseMessage(WidgetsList& targets)
+void Widget::broadcastMouseMessage(const gfx::Point& screenPos,
+                                   WidgetsList& targets)
 {
-  onBroadcastMouseMessage(targets);
+  onBroadcastMouseMessage(screenPos, targets);
 }
 
 // ===============================================================
@@ -1344,17 +1454,17 @@ void Widget::releaseMouse()
 bool Widget::offerCapture(ui::MouseMessage* mouseMsg, int widget_type)
 {
   if (hasCapture()) {
+    const gfx::Point screenPos = mouseMsg->display()->nativeWindow()->pointToScreen(mouseMsg->position());
     auto man = manager();
-    Widget* pick = (man ? man->pick(mouseMsg->position()): nullptr);
+    Widget* pick = (man ? man->pickFromScreenPos(screenPos): nullptr);
     if (pick && pick != this && pick->type() == widget_type) {
       releaseMouse();
 
       MouseMessage* mouseMsg2 = new MouseMessage(
         kMouseDownMessage,
-        mouseMsg->pointerType(),
-        mouseMsg->button(),
-        mouseMsg->modifiers(),
-        mouseMsg->position());
+        *mouseMsg,
+        mouseMsg->positionForDisplay(pick->display()));
+      mouseMsg2->setDisplay(pick->display());
       mouseMsg2->setRecipient(pick);
       man->enqueueMessage(mouseMsg2);
       return true;
@@ -1365,7 +1475,12 @@ bool Widget::offerCapture(ui::MouseMessage* mouseMsg, int widget_type)
 
 bool Widget::hasMouseOver() const
 {
-  return (this == pick(get_mouse_position()));
+  return (this == pickFromScreenPos(get_mouse_position()));
+}
+
+gfx::Point Widget::mousePosInDisplay() const
+{
+  return display()->nativeWindow()->pointFromScreen(get_mouse_position());
 }
 
 void Widget::setMnemonic(int mnemonic)
@@ -1383,19 +1498,18 @@ void Widget::processMnemonicFromText(int escapeChar)
   if (!m_text.empty())
     newText.reserve(m_text.size());
 
-  for (base::utf8_const_iterator
-         it(m_text.begin()),
-         end(m_text.end()); it != end; ++it) {
-    if (*it == escapeChar) {
-      ++it;
-      if (it == end) {
+  base::utf8_decode decode(m_text);
+  while (int chr = decode.next()) {
+    if (chr == escapeChar) {
+      chr = decode.next();
+      if (!chr) {
         break;    // Ill-formed string (it ends with escape character)
       }
-      else if (*it != escapeChar) {
-        setMnemonic(*it);
+      else if (chr != escapeChar) {
+        setMnemonic(chr);
       }
     }
-    newText.push_back(*it);
+    newText.push_back(chr);
   }
 
   setText(base::to_utf8(newText));
@@ -1438,12 +1552,9 @@ bool Widget::onProcessMessage(Message* msg)
       // Convert double clicks into mouse down
       MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
       MouseMessage mouseMsg2(kMouseDownMessage,
-                             mouseMsg->pointerType(),
-                             mouseMsg->button(),
-                             mouseMsg->modifiers(),
-                             mouseMsg->position(),
-                             mouseMsg->wheelDelta());
-
+                             *mouseMsg,
+                             mouseMsg->position());
+      mouseMsg2.setDisplay(mouseMsg->display());
       sendMessage(&mouseMsg2);
       break;
     }
@@ -1547,7 +1658,8 @@ void Widget::onPaint(PaintEvent& ev)
                          clientBounds());
 }
 
-void Widget::onBroadcastMouseMessage(WidgetsList& targets)
+void Widget::onBroadcastMouseMessage(const gfx::Point& screenPos,
+                                     WidgetsList& targets)
 {
   // Do nothing
 }

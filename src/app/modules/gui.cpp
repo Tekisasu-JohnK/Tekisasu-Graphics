@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -42,10 +42,11 @@
 #include "base/memory.h"
 #include "base/string.h"
 #include "doc/sprite.h"
-#include "os/display.h"
 #include "os/error.h"
+#include "os/screen.h"
 #include "os/surface.h"
 #include "os/system.h"
+#include "os/window.h"
 #include "ui/intern.h"
 #include "ui/ui.h"
 
@@ -54,6 +55,7 @@
 #endif
 
 #include <algorithm>
+#include <cstdio>
 #include <list>
 #include <vector>
 
@@ -81,8 +83,13 @@ static struct {
 
 //////////////////////////////////////////////////////////////////////
 
-class CustomizedGuiManager : public Manager
-                           , public LayoutIO {
+class CustomizedGuiManager : public ui::Manager
+                           , public ui::LayoutIO {
+public:
+  CustomizedGuiManager(const os::WindowRef& nativeWindow)
+    : ui::Manager(nativeWindow) {
+  }
+
 protected:
   bool onProcessMessage(Message* msg) override;
 #if ENABLE_DEVMODE
@@ -90,32 +97,31 @@ protected:
 #endif
   void onInitTheme(InitThemeEvent& ev) override;
   LayoutIO* onGetLayoutIO() override { return this; }
-  void onNewDisplayConfiguration() override;
+  void onNewDisplayConfiguration(Display* display) override;
 
   // LayoutIO implementation
   std::string loadLayout(Widget* widget) override;
   void saveLayout(Widget* widget, const std::string& str) override;
 };
 
-static os::Display* main_display = NULL;
-static CustomizedGuiManager* manager = NULL;
-static Theme* gui_theme = NULL;
+static os::WindowRef main_window = nullptr;
+static CustomizedGuiManager* manager = nullptr;
+static Theme* gui_theme = nullptr;
 
 static ui::Timer* defered_invalid_timer = nullptr;
 static gfx::Region defered_invalid_region;
 
 // Load & save graphics configuration
-static void load_gui_config(int& w, int& h, bool& maximized,
-                            std::string& windowLayout);
+static bool load_gui_config(os::WindowSpec& spec, bool& maximized);
 static void save_gui_config();
 
-static bool create_main_display(bool gpuAccel,
-                                bool& maximized,
-                                std::string& lastError)
+static bool create_main_window(bool gpuAccel,
+                               bool& maximized,
+                               std::string& lastError)
 {
-  int w, h;
-  std::string windowLayout;
-  load_gui_config(w, h, maximized, windowLayout);
+  os::WindowSpec spec;
+  if (!load_gui_config(spec, maximized))
+    return false;
 
   // Scale is equal to 0 when it's the first time the program is
   // executed.
@@ -124,45 +130,45 @@ static bool create_main_display(bool gpuAccel,
   os::instance()->setGpuAcceleration(gpuAccel);
 
   try {
-    if (w > 0 && h > 0) {
-      main_display = os::instance()->createDisplay(
-        w, h, (scale == 0 ? 2: base::clamp(scale, 1, 4)));
+    if (!spec.frame().isEmpty() ||
+        !spec.contentRect().isEmpty()) {
+      spec.scale(scale == 0 ? 2: base::clamp(scale, 1, 4));
+      main_window = os::instance()->makeWindow(spec);
     }
   }
-  catch (const os::DisplayCreationException& e) {
+  catch (const os::WindowCreationException& e) {
     lastError = e.what();
   }
 
-  if (!main_display) {
+  if (!main_window) {
     for (int c=0; try_resolutions[c].width; ++c) {
       try {
-        main_display =
-          os::instance()->createDisplay(
-            try_resolutions[c].width,
-            try_resolutions[c].height,
-            (scale == 0 ? try_resolutions[c].scale: scale));
+        spec.frame();
+        spec.position(os::WindowSpec::Position::Default);
+        spec.scale(scale == 0 ? try_resolutions[c].scale: scale);
+        spec.contentRect(gfx::Rect(0, 0,
+                                   try_resolutions[c].width * spec.scale(),
+                                   try_resolutions[c].height * spec.scale()));
+        main_window = os::instance()->makeWindow(spec);
         break;
       }
-      catch (const os::DisplayCreationException& e) {
+      catch (const os::WindowCreationException& e) {
         lastError = e.what();
       }
     }
   }
 
-  if (main_display) {
+  if (main_window) {
     // Change the scale value only in the first run (this will be
     // saved when the program is closed).
     if (scale == 0)
-      Preferences::instance().general.screenScale(main_display->scale());
+      Preferences::instance().general.screenScale(main_window->scale());
 
-    if (!windowLayout.empty()) {
-      main_display->setLayout(windowLayout);
-      if (main_display->isMinimized())
-        main_display->maximize();
-    }
+    if (main_window->isMinimized())
+      main_window->maximize();
   }
 
-  return (main_display != nullptr);
+  return (main_window != nullptr);
 }
 
 // Initializes GUI.
@@ -173,40 +179,56 @@ int init_module_gui()
   std::string lastError = "Unknown error";
   bool gpuAccel = pref.general.gpuAcceleration();
 
-  if (!create_main_display(gpuAccel, maximized, lastError)) {
-    // If we've created the display with hardware acceleration,
+  if (!create_main_window(gpuAccel, maximized, lastError)) {
+    // If we've created the native window with hardware acceleration,
     // now we try to do it without hardware acceleration.
     if (gpuAccel &&
-        (int(os::instance()->capabilities()) &
-         int(os::Capabilities::GpuAccelerationSwitch)) == int(os::Capabilities::GpuAccelerationSwitch)) {
-      if (create_main_display(false, maximized, lastError)) {
+        os::instance()->hasCapability(os::Capabilities::GpuAccelerationSwitch)) {
+      if (create_main_window(false, maximized, lastError)) {
         // Disable hardware acceleration
         pref.general.gpuAcceleration(false);
       }
     }
   }
 
-  if (!main_display) {
+  if (!main_window) {
     os::error_message(
-      ("Unable to create a user-interface display.\nDetails: "+lastError+"\n").c_str());
+      ("Unable to create a user-interface window.\nDetails: "+lastError+"\n").c_str());
     return -1;
   }
 
   // Create the default-manager
-  manager = new CustomizedGuiManager();
-  manager->setDisplay(main_display);
+  manager = new CustomizedGuiManager(main_window);
 
   // Setup the GUI theme for all widgets
   gui_theme = new SkinTheme;
   ui::set_theme(gui_theme, pref.general.uiScale());
 
   if (maximized)
-    main_display->maximize();
+    main_window->maximize();
+
+  // Handle live resize too redraw the entire manager, dispatch the UI
+  // messages, and flip the window.
+  os::instance()->handleWindowResize =
+    [](os::Window* window) {
+      Display* display = Manager::getDisplayFromNativeWindow(window);
+      if (!display)
+        display = manager->display();
+      ASSERT(display);
+
+      Message* msg = new Message(kResizeDisplayMessage);
+      msg->setDisplay(display);
+      msg->setRecipient(manager);
+      msg->setPropagateToChildren(false);
+
+      manager->enqueueMessage(msg);
+      manager->dispatchMessages();
+    };
 
   // Set graphics options for next time
   save_gui_config();
 
-  update_displays_color_profile_from_preferences();
+  update_windows_color_profile_from_preferences();
 
   return 0;
 }
@@ -222,10 +244,11 @@ void exit_module_gui()
   ui::set_theme(nullptr, ui::guiscale());
   delete gui_theme;
 
-  main_display->dispose();
+  // This should be the last unref() of the display to delete it.
+  main_window.reset();
 }
 
-void update_displays_color_profile_from_preferences()
+void update_windows_color_profile_from_preferences()
 {
   auto system = os::instance();
 
@@ -235,56 +258,125 @@ void update_displays_color_profile_from_preferences()
   else
     windowProfile = gen::WindowColorProfile::SRGB;
 
+  os::ColorSpaceRef osCS = nullptr;
+
   switch (windowProfile) {
     case gen::WindowColorProfile::MONITOR:
-      system->setDisplaysColorSpace(nullptr);
+      osCS = nullptr;
       break;
     case gen::WindowColorProfile::SRGB:
-      system->setDisplaysColorSpace(
-        system->createColorSpace(gfx::ColorSpace::MakeSRGB()));
+      osCS = system->makeColorSpace(gfx::ColorSpace::MakeSRGB());
       break;
     case gen::WindowColorProfile::SPECIFIC: {
       std::string name =
         Preferences::instance().color.windowProfileName();
 
-      std::vector<os::ColorSpacePtr> colorSpaces;
+      std::vector<os::ColorSpaceRef> colorSpaces;
       system->listColorSpaces(colorSpaces);
 
       for (auto& cs : colorSpaces) {
         auto gfxCs = cs->gfxColorSpace();
         if (gfxCs->type() == gfx::ColorSpace::ICC &&
             gfxCs->name() == name) {
-          system->setDisplaysColorSpace(cs);
+          osCS = cs;
           break;
         }
       }
       break;
     }
   }
+
+  // Set the default color space for all windows (osCS can be nullptr
+  // which means that each window should use its monitor color space)
+  system->setWindowsColorSpace(osCS);
+
+  // Set the color space of all windows
+  for (ui::Widget* widget : manager->children()) {
+    ASSERT(widget->type() == ui::kWindowWidget);
+    auto window = static_cast<ui::Window*>(widget);
+    if (window->ownDisplay()) {
+      if (auto display = window->display())
+        display->nativeWindow()->setColorSpace(osCS);
+    }
+  }
 }
 
-static void load_gui_config(int& w, int& h, bool& maximized,
-                            std::string& windowLayout)
+static bool load_gui_config(os::WindowSpec& spec, bool& maximized)
 {
-  gfx::Size defSize = os::instance()->defaultNewDisplaySize();
+  os::ScreenRef screen = os::instance()->mainScreen();
+#ifdef LAF_SKIA
+  ASSERT(screen);
+#else
+  // Compiled without Skia (none backend), without screen.
+  if (!screen) {
+    std::printf(
+      "\n"
+      "  Aseprite cannot initialize GUI because it was compiled with LAF_BACKEND=none\n"
+      "\n"
+      "  Check the documentation in:\n"
+      "  https://github.com/aseprite/laf/blob/main/README.md\n"
+      "  https://github.com/aseprite/aseprite/blob/main/INSTALL.md\n"
+      "\n");
+    return false;
+  }
+#endif
 
-  w = get_config_int("GfxMode", "Width", defSize.w);
-  h = get_config_int("GfxMode", "Height", defSize.h);
-  maximized = get_config_bool("GfxMode", "Maximized", false);
-  windowLayout = get_config_string("GfxMode", "WindowLayout", "");
+  spec.screen(screen);
+
+  gfx::Rect frame;
+  frame = get_config_rect("GfxMode", "Frame", frame);
+  if (!frame.isEmpty()) {
+    spec.position(os::WindowSpec::Position::Frame);
+
+    // Limit the content rect position into the available workarea,
+    // e.g. this is needed in case that the user closed Aseprite in a
+    // 2nd monitor that then unplugged and start Aseprite again.
+    bool ok = false;
+    os::ScreenList screens;
+    os::instance()->listScreens(screens);
+    for (const auto& screen : screens) {
+      gfx::Rect wa = screen->workarea();
+      gfx::Rect intersection = (frame & wa);
+      if (intersection.w >= 32 &&
+          intersection.h >= 32) {
+        ok = true;
+        break;
+      }
+    }
+
+    // Reset content rect
+    if (!ok) {
+      spec.position(os::WindowSpec::Position::Default);
+      frame = gfx::Rect();
+    }
+  }
+
+  if (frame.isEmpty()) {
+    frame = screen->workarea().shrink(64);
+
+    // Try to get Width/Height from previous Aseprite versions
+    frame.w = get_config_int("GfxMode", "Width", frame.w);
+    frame.h = get_config_int("GfxMode", "Height", frame.h);
+  }
+  spec.frame(frame);
+
+  maximized = get_config_bool("GfxMode", "Maximized", true);
+
+  ui::set_multiple_displays(Preferences::instance().experimental.multipleWindows());
+  return true;
 }
 
 static void save_gui_config()
 {
-  os::Display* display = manager->getDisplay();
-  if (display) {
-    set_config_bool("GfxMode", "Maximized", display->isMaximized());
-    set_config_int("GfxMode", "Width", display->originalWidth());
-    set_config_int("GfxMode", "Height", display->originalHeight());
+  os::Window* window = manager->display()->nativeWindow();
+  if (window) {
+    const bool maximized = (window->isMaximized() ||
+                            window->isFullscreen());
+    const gfx::Rect frame = (maximized ? window->restoredFrame():
+                                         window->frame());
 
-    std::string windowLayout = display->getLayout();
-    if (!windowLayout.empty())
-      set_config_string("GfxMode", "WindowLayout", windowLayout.c_str());
+    set_config_bool("GfxMode", "Maximized", maximized);
+    set_config_rect("GfxMode", "Frame", frame);
   }
 }
 
@@ -308,34 +400,66 @@ void update_screen_for_document(const Doc* document)
   }
 }
 
-void load_window_pos(Widget* window, const char* section,
+void load_window_pos(Window* window, const char* section,
                      const bool limitMinSize)
 {
+  Display* parentDisplay =
+    (window->display() ? window->display():
+                         window->manager()->display());
+  Rect workarea =
+    (get_multiple_displays() ?
+     parentDisplay->nativeWindow()->screen()->workarea():
+     parentDisplay->bounds());
+
   // Default position
-  Rect orig_pos = window->bounds();
-  Rect pos = orig_pos;
+  Rect origPos = window->bounds();
 
   // Load configurated position
-  pos = get_config_rect(section, "WindowPos", pos);
+  Rect pos = get_config_rect(section, "WindowPos", origPos);
 
   if (limitMinSize) {
-    pos.w = base::clamp(pos.w, orig_pos.w, ui::display_w());
-    pos.h = base::clamp(pos.h, orig_pos.h, ui::display_h());
+    pos.w = base::clamp(pos.w, origPos.w, workarea.w);
+    pos.h = base::clamp(pos.h, origPos.h, workarea.h);
   }
   else {
-    pos.w = std::min(pos.w, ui::display_w());
-    pos.h = std::min(pos.h, ui::display_h());
+    pos.w = std::min(pos.w, workarea.w);
+    pos.h = std::min(pos.h, workarea.h);
   }
 
-  pos.setOrigin(Point(base::clamp(pos.x, 0, ui::display_w()-pos.w),
-                      base::clamp(pos.y, 0, ui::display_h()-pos.h)));
+  pos.setOrigin(Point(base::clamp(pos.x, workarea.x, workarea.x2()-pos.w),
+                      base::clamp(pos.y, workarea.y, workarea.y2()-pos.h)));
 
   window->setBounds(pos);
+
+  if (get_multiple_displays()) {
+    Rect frame = get_config_rect(section, "WindowFrame", gfx::Rect());
+    if (!frame.isEmpty()) {
+      limit_with_workarea(parentDisplay, frame);
+      window->loadNativeFrame(frame);
+    }
+  }
+  else {
+    del_config_value(section, "WindowFrame");
+  }
 }
 
-void save_window_pos(Widget* window, const char *section)
+void save_window_pos(Window* window, const char* section)
 {
-  set_config_rect(section, "WindowPos", window->bounds());
+  gfx::Rect rc;
+
+  if (!window->lastNativeFrame().isEmpty()) {
+    const os::Window* mainNativeWindow = manager->display()->nativeWindow();
+    rc = window->lastNativeFrame();
+    set_config_rect(section, "WindowFrame", rc);
+    rc.offset(-mainNativeWindow->frame().origin());
+    rc /= mainNativeWindow->scale();
+  }
+  else {
+    del_config_value(section, "WindowFrame");
+    rc = window->bounds();
+  }
+
+  set_config_rect(section, "WindowPos", rc);
 }
 
 // TODO Replace this with new theme styles
@@ -380,12 +504,18 @@ bool CustomizedGuiManager::onProcessMessage(Message* msg)
 
   switch (msg->type()) {
 
-    case kCloseDisplayMessage: {
-      // Execute the "Exit" command.
-      Command* command = Commands::instance()->byId(CommandId::Exit());
-      UIContext::instance()->executeCommandFromMenuOrShortcut(command);
+    case kCloseDisplayMessage:
+      // Only call the exit command/close the app when the the main
+      // display is the closed window in this kCloseDisplayMessage
+      // message and it's the current running foreground window.
+      if (msg->display() == this->display() &&
+          getForegroundWindow() == App::instance()->mainWindow()) {
+        // Execute the "Exit" command.
+        Command* command = Commands::instance()->byId(CommandId::Exit());
+        UIContext::instance()->executeCommandFromMenuOrShortcut(command);
+        return true;
+      }
       break;
-    }
 
     case kDropFilesMessage:
       // Files are processed only when the main window is the current
@@ -555,12 +685,12 @@ bool CustomizedGuiManager::onProcessDevModeKeyDown(KeyMessage* msg)
     return true; // This line should not be executed anyway
   }
 
-  // F1 switches screen/UI scaling
+  // Ctrl+F1 switches screen/UI scaling
   if (msg->ctrlPressed() &&
       msg->scancode() == kKeyF1) {
     try {
-      os::Display* display = getDisplay();
-      int screenScale = display->scale();
+      os::Window* window = display()->nativeWindow();
+      int screenScale = window->scale();
       int uiScale = ui::guiscale();
 
       if (msg->shiftPressed()) {
@@ -595,9 +725,8 @@ bool CustomizedGuiManager::onProcessDevModeKeyDown(KeyMessage* msg)
       if (uiScale != ui::guiscale()) {
         ui::set_theme(ui::get_theme(), uiScale);
       }
-      if (screenScale != display->scale()) {
-        display->setScale(screenScale);
-        setDisplay(display);
+      if (screenScale != window->scale()) {
+        updateAllDisplaysWithNewScale(screenScale);
       }
     }
     catch (const std::exception& ex) {
@@ -637,14 +766,18 @@ void CustomizedGuiManager::onInitTheme(InitThemeEvent& ev)
   AppMenus::instance()->initTheme();
 }
 
-void CustomizedGuiManager::onNewDisplayConfiguration()
+void CustomizedGuiManager::onNewDisplayConfiguration(Display* display)
 {
-  Manager::onNewDisplayConfiguration();
-  save_gui_config();
+  Manager::onNewDisplayConfiguration(display);
 
-  // TODO Should we provide a more generic way for all ui::Window to
-  //      detect the ui::Display (or UI Screen Scaling) change?
-  Console::notifyNewDisplayConfiguration();
+  // Only whne the main display/window is modified
+  if (display == this->display()) {
+    save_gui_config();
+
+    // TODO Should we provide a more generic way for all ui::Window to
+    //      detect the os::Window (or UI Screen Scaling) change?
+    Console::notifyNewDisplayConfiguration();
+  }
 }
 
 std::string CustomizedGuiManager::loadLayout(Widget* widget)

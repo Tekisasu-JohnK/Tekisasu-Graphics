@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,10 +17,6 @@ class CommonFileDialog : public FileDialog {
 public:
   CommonFileDialog()
     : m_type(Type::OpenFile) {
-  }
-
-  void dispose() override {
-    delete this;
   }
 
   void setType(const Type type) override {

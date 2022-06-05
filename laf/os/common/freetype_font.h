@@ -1,4 +1,5 @@
 // LAF OS Library
+// Copyright (C) 2020  Igara Studio S.A.
 // Copyright (C) 2016-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -17,7 +18,7 @@ namespace os {
 
   class FreeTypeFont : public Font {
   public:
-    typedef ft::Face Face;
+    using Face = ft::Face;
 
     FreeTypeFont(ft::Lib& lib,
                  const char* filename,
@@ -25,7 +26,6 @@ namespace os {
     ~FreeTypeFont();
 
     bool isValid() const;
-    void dispose() override;
     FontType type() override;
     int height() const override;
     int textLength(const std::string& str) const override;
@@ -40,9 +40,9 @@ namespace os {
     mutable Face m_face;
   };
 
-  FreeTypeFont* load_free_type_font(ft::Lib& lib,
-                                    const char* filename,
-                                    const int height);
+  Ref<FreeTypeFont> load_free_type_font(ft::Lib& lib,
+                                        const char* filename,
+                                        const int height);
 
 } // namespace os
 

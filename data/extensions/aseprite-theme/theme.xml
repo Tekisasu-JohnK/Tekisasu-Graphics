@@ -3,6 +3,8 @@
     <authors>
         <author name="Tekisasu" url="https://tekisasu.com" />
         <author name="Lyutria" url="lyutria.com" />
+        <author name="David Capello" url="https://davidcapello.com/" />
+        <author name="Ilija Melentijevic" url="https://ilkke.net/" />
     </authors>
     <fonts>
         <font id="default" font="Aseprite" />
@@ -11,15 +13,15 @@
     <dimensions>
         <dim id="scrollbar_size" value="12" />
         <dim id="mini_scrollbar_size" value="6" />
-        <dim id="tabs_width" value="90" />
+        <dim id="tabs_width" value="80" />
         <dim id="tabs_height" value="17" />
         <dim id="tabs_bottom_height" value="5" />
         <dim id="docked_tabs_height" value="12" />
         <dim id="tabs_close_icon_width" value="14" />
         <dim id="tabs_close_icon_height" value="12" />
         <dim id="tabs_icon_width" value="10" />
-        <dim id="timeline_top_border" value="1" />
-        <dim id="timeline_tags_area_height" value="3" />
+        <dim id="timeline_top_border" value="2" />
+        <dim id="timeline_tags_area_height" value="4" />
         <dim id="timeline_outline_width" value="2" />
         <dim id="palette_outline_width" value="3" />
         <dim id="palette_entries_separator" value="1" />
@@ -27,16 +29,16 @@
         <dim id="timeline_base_size" value="12" />
         <dim id="color_bar_buttons_height" value="16" />
         <dim id="context_bar_height" value="18" />
-        <dim id="brush_type_width" value="24" />
+        <dim id="brush_type_width" value="16" />
         <dim id="color_selector_bar_size" value="8" />
     </dimensions>
     <colors>
         <color id="text" value="#cccccc" />
-        <color id="selected_text" value="#ffffff" />
         <color id="disabled" value="#777777" />
         <color id="face" value="#3f3333" />
         <color id="hot_face" value="#888888" />
         <color id="selected" value="#555555" />
+        <color id="selected_text" value="#ffffff" />
         <color id="separator_label" value="#eeeeee" />
         <color id="background" value="#333333" />
         <color id="textbox_text" value="#cccccc" />
@@ -156,22 +158,22 @@
         <part id="sunken_normal" x="0" y="32" w1="4" w2="4" w3="4" h1="4" h2="4" h3="4" />
         <part id="sunken_focused" x="0" y="48" w1="4" w2="4" w3="4" h1="4" h2="4" h3="4" />
         <part id="sunken2_normal" x="0" y="64" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
-        <part id="sunken2_focused" x="0" y="80" w1="5" w2="6" w3="5" h1="6" h2="5" h3="5" />
+        <part id="sunken2_focused" x="0" y="80" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
         <part id="sunken_mini_normal" x="16" y="64" w1="4" w2="4" w3="4" h1="3" h2="6" h3="3" />
         <part id="sunken_mini_focused" x="16" y="80" w1="4" w2="4" w3="4" h1="3" h2="6" h3="3" />
-        <part id="window" x="0" y="0" w1="3" w2="7" w3="3" h1="14" h2="5" h3="5" />
+        <part id="window" x="0" y="0" w1="3" w2="7" w3="3" h1="15" h2="4" h3="5" />
         <part id="menu" x="0" y="96" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
-        <part id="window_button_normal" x="16" y="0" w="9" h="9" />
-        <part id="window_button_hot" x="25" y="0" w="9" h="9" />
-        <part id="window_button_selected" x="34" y="0" w="9" h="9" />
-        <part id="window_close_icon" x="16" y="11" w="5" h="5" />
-        <part id="window_play_icon" x="21" y="11" w="5" h="5" />
-        <part id="window_stop_icon" x="26" y="11" w="5" h="5" />
-        <part id="window_center_icon" x="31" y="11" w="5" h="5" />
-        <part id="slider_full" x="0" y="144" w1="2" w2="12" w3="2" h1="5" h2="1" h3="10" />
-        <part id="slider_empty" x="16" y="144" w1="2" w2="12" w3="2" h1="5" h2="1" h3="10" />
-        <part id="slider_full_focused" x="0" y="160" w1="2" w2="12" w3="2" h1="5" h2="1" h3="10" />
-        <part id="slider_empty_focused" x="16" y="160" w1="2" w2="12" w3="2" h1="5" h2="1" h3="10" />
+        <part id="window_button_normal" x="16" y="0" w="9" h="11" />
+        <part id="window_button_hot" x="25" y="0" w="9" h="11" />
+        <part id="window_button_selected" x="34" y="0" w="9" h="11" />
+        <part id="window_close_icon" x="16" y="11" w="5" h="6" />
+        <part id="window_play_icon" x="21" y="11" w="5" h="6" />
+        <part id="window_stop_icon" x="26" y="11" w="5" h="6" />
+        <part id="window_center_icon" x="31" y="11" w="5" h="6" />
+        <part id="slider_full" x="0" y="144" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
+        <part id="slider_empty" x="16" y="144" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
+        <part id="slider_full_focused" x="0" y="160" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
+        <part id="slider_empty_focused" x="16" y="160" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
         <part id="mini_slider_full" x="32" y="144" w1="2" w2="12" w3="2" h1="2" h2="11" h3="3" />
         <part id="mini_slider_empty" x="48" y="144" w1="2" w2="12" w3="2" h1="2" h2="11" h3="3" />
         <part id="mini_slider_full_focused" x="32" y="160" w1="2" w2="12" w3="2" h1="2" h2="11" h3="3" />
@@ -180,27 +182,29 @@
         <part id="mini_slider_thumb_focused" x="48" y="176" w="5" h="4" />
         <part id="separator_horz" x="32" y="80" w="9" h="5" />
         <part id="separator_vert" x="32" y="96" w="5" h="9" />
-        <part id="combobox_arrow_down" x="109" y="145" w="6" h="8" />
-        <part id="combobox_arrow_down_selected" x="116" y="145" w="6" h="8" />
-        <part id="combobox_arrow_down_disabled" x="123" y="145" w="6" h="8" />
-        <part id="combobox_arrow_up" x="99" y="173" w="12" h="10" />
-        <part id="combobox_arrow_up_selected" x="115" y="173" w="12" h="10" />
-        <part id="combobox_arrow_up_disabled" x="131" y="173" w="12" h="10" />
-        <part id="combobox_arrow_left" x="99" y="185" w="12" h="10" />
-        <part id="combobox_arrow_left_selected" x="115" y="185" w="12" h="10" />
-        <part id="combobox_arrow_left_disabled" x="131" y="185" w="12" h="10" />
-        <part id="combobox_arrow_right" x="99" y="196" w="12" h="10" />
-        <part id="combobox_arrow_right_selected" x="115" y="196" w="12" h="10" />
-        <part id="combobox_arrow_right_disabled" x="131" y="196" w="12" h="10" />
+        <part id="combobox_arrow_down" x="100" y="148" w="9" h="9" />
+        <part id="combobox_arrow_down_selected" x="116" y="148" w="9" h="9" />
+        <part id="combobox_arrow_down_disabled" x="132" y="148" w="9" h="9" />
+        <part id="combobox_arrow_up" x="100" y="163" w="9" h="9" />
+        <part id="combobox_arrow_up_selected" x="116" y="163" w="9" h="9" />
+        <part id="combobox_arrow_up_disabled" x="132" y="163" w="9" h="9" />
+        <part id="combobox_arrow_left" x="99" y="180" w="9" h="9" />
+        <part id="combobox_arrow_left_selected" x="115" y="180" w="9" h="9" />
+        <part id="combobox_arrow_left_disabled" x="131" y="180" w="9" h="9" />
+        <part id="combobox_arrow_right" x="99" y="196" w="9" h="9" />
+        <part id="combobox_arrow_right_selected" x="115" y="196" w="9" h="9" />
+        <part id="combobox_arrow_right_disabled" x="131" y="196" w="9" h="9" />
+        <part id="arrow_circle_cw" x="99" y="243" w="10" h="10" />
+        <part id="arrow_circle_cw_selected" x="115" y="243" w="10" h="10" />
         <part id="newfolder" x="99" y="211" w="9" h="9" />
-        <part id="newfolder_selected" x="110" y="211" w="9" h="9" />
+        <part id="newfolder_selected" x="115" y="211" w="9" h="9" />
         <part id="list_view" x="96" y="224" w="9" h="9" />
         <part id="small_icon_view" x="105" y="224" w="9" h="9" />
         <part id="big_icon_view" x="114" y="224" w="9" h="9" />
         <part id="toolbutton_normal" x="96" y="0" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
-        <part id="toolbutton_hot" x="128" y="32" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
-        <part id="toolbutton_last" x="112" y="32" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
-        <part id="toolbutton_pushed" x="128" y="48" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
+        <part id="toolbutton_hot" x="112" y="0" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
+        <part id="toolbutton_last" x="96" y="16" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
+        <part id="toolbutton_pushed" x="112" y="16" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
         <part id="buttonset_item_normal" x="96" y="16" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
         <part id="buttonset_item_hot" x="112" y="0" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
         <part id="buttonset_item_hot_focused" x="128" y="0" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
@@ -208,13 +212,13 @@
         <part id="buttonset_item_pushed" x="112" y="16" w1="3" w2="10" w3="3" h1="3" h2="9" h3="4" />
         <part id="tab_normal" x="2" y="112" w1="4" w2="5" w3="5" h1="4" h2="6" h3="2" />
         <part id="tab_active" x="16" y="112" w1="4" w2="7" w3="5" h1="4" h2="6" h3="2" />
-        <part id="tab_bottom_active" x="16" y="124" w1="2" w2="9" w3="5" h1="4" h2="1" h3="1" />
+        <part id="tab_bottom_active" x="16" y="124" w1="4" w2="7" w3="5" h1="2" h2="1" h3="2" />
         <part id="tab_bottom_normal" x="2" y="124" w="12" h="5" />
         <part id="tab_filler" x="0" y="112" w="2" h="12" />
-        <part id="tab_modified_icon_normal" x="32" y="112" w="5" h="6" />
-        <part id="tab_modified_icon_active" x="32" y="118" w="5" h="6" />
-        <part id="tab_close_icon_normal" x="37" y="112" w="5" h="6" />
-        <part id="tab_close_icon_active" x="37" y="118" w="5" h="6" />
+        <part id="tab_modified_icon_normal" x="32" y="112" w="5" h="5" />
+        <part id="tab_modified_icon_active" x="32" y="117" w="5" h="5" />
+        <part id="tab_close_icon_normal" x="37" y="112" w="5" h="5" />
+        <part id="tab_close_icon_active" x="37" y="117" w="5" h="5" />
         <part id="tab_icon_bg_clicked" x="42" y="112" w="14" h="12" />
         <part id="tab_icon_bg_hover" x="56" y="112" w="14" h="12" />
         <part id="tab_home_icon_normal" x="32" y="240" w="7" h="8" />
@@ -223,8 +227,8 @@
         <part id="editor_selected" x="56" y="96" w1="3" w2="10" w3="3" h1="3" h2="10" h3="3" />
         <part id="colorbar_0" x="0" y="192" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
         <part id="colorbar_1" x="16" y="192" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
-        <part id="colorbar_2" x="0" y="208" w1="5" w2="6" w3="5" h1="5" h2="1" h3="10" />
-        <part id="colorbar_3" x="16" y="208" w1="5" w2="6" w3="5" h1="5" h2="1" h3="10" />
+        <part id="colorbar_2" x="0" y="208" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
+        <part id="colorbar_3" x="16" y="208" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
         <part id="colorbar_selection_hot" x="0" y="224" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
         <part id="colorbar_selection" x="16" y="224" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
         <part id="scrollbar_bg" x="64" y="144" w1="5" w2="6" w3="5" h1="5" h2="6" h3="5" />
@@ -245,13 +249,19 @@
         <part id="ani_stop" x="168" y="192" w="5" h="5" />
         <part id="ani_next" x="176" y="192" w="5" h="5" />
         <part id="ani_last" x="184" y="192" w="5" h="5" />
-        <part id="pal_sort" x="152" y="199" w="5" h="7" />
-        <part id="pal_presets" x="160" y="199" w="5" h="7" />
-        <part id="pal_options" x="168" y="199" w="5" h="7" />
-        <part id="pal_resize" x="175" y="200" w="7" h="5" />
-        <part id="selection_replace" x="176" y="159" w="7" h="9" />
-        <part id="selection_add" x="184" y="159" w="7" h="9" />
-        <part id="selection_subtract" x="192" y="159" w="7" h="9" />
+        <part id="pal_sort" x="152" y="200" w="5" h="5" />
+        <part id="pal_presets" x="160" y="200" w="5" h="5" />
+        <part id="pal_options" x="168" y="200" w="5" h="5" />
+        <part id="pal_resize" x="176" y="200" w="5" h="5" />
+        <part id="debug_continue" x="208" y="240" w="7" h="7" />
+        <part id="debug_pause" x="208" y="247" w="7" h="7" />
+        <part id="debug_step_into" x="222" y="240" w="7" h="7" />
+        <part id="debug_step_over" x="215" y="240" w="7" h="7" />
+        <part id="debug_step_out" x="229" y="240" w="7" h="7" />
+        <part id="debug_breakpoint" x="236" y="240" w="7" h="7" />
+        <part id="selection_replace" x="176" y="160" w="7" h="7" />
+        <part id="selection_add" x="184" y="160" w="7" h="7" />
+        <part id="selection_subtract" x="192" y="160" w="7" h="7" />
         <part id="selection_intersect" x="200" y="160" w="7" h="7" />
         <part id="unpinned" x="192" y="144" w="8" h="8" />
         <part id="pinned" x="200" y="144" w="8" h="8" />
@@ -261,8 +271,8 @@
         <part id="drop_down_button_left_selected" x="64" y="48" w1="3" w2="2" w3="3" h1="4" h2="6" h3="6" />
         <part id="drop_down_button_right_normal" x="56" y="32" w1="2" w2="1" w3="3" h1="4" h2="6" h3="6" />
         <part id="drop_down_button_right_hot" x="72" y="32" w1="2" w2="1" w3="3" h1="4" h2="6" h3="6" />
-        <part id="drop_down_button_right_focused" x="56" y="48" w1="2" w2="2" w3="2" h1="4" h2="6" h3="6" />
-        <part id="drop_down_button_right_selected" x="72" y="48" w1="2" w2="2" w3="2" h1="4" h2="6" h3="6" />
+        <part id="drop_down_button_right_focused" x="55" y="48" w1="2" w2="2" w3="3" h1="4" h2="6" h3="6" />
+        <part id="drop_down_button_right_selected" x="71" y="48" w1="2" w2="2" w3="3" h1="4" h2="6" h3="6" />
         <part id="transformation_handle" x="208" y="144" w="5" h="5" />
         <part id="pivot_handle" x="224" y="144" w="9" h="9" />
         <part id="timeline_none" x="228" y="0" w1="2" w2="8" w3="2" h1="2" h2="8" h3="2" />
@@ -276,7 +286,7 @@
         <part id="timeline_closed_eye_normal" x="240" y="24" w="12" h="12" />
         <part id="timeline_closed_eye_active" x="252" y="24" w="12" h="12" />
         <part id="timeline_open_padlock_normal" x="240" y="36" w="12" h="12" />
-        <part id="timeline_open_padlock_active" x="196" y="49" w="12" h="12" />
+        <part id="timeline_open_padlock_active" x="252" y="36" w="12" h="12" />
         <part id="timeline_closed_padlock_normal" x="240" y="48" w="12" h="12" />
         <part id="timeline_closed_padlock_active" x="252" y="48" w="12" h="12" />
         <part id="timeline_continuous_normal" x="276" y="36" w="12" h="12" />
@@ -419,6 +429,18 @@
         <part id="outline_empty_pixel" x="208" y="224" w="5" h="5" />
         <part id="outline_full_pixel" x="214" y="224" w="5" h="5" />
         <part id="dynamics" x="176" y="144" w="16" h="16" />
+        <part id="tiles" x="144" y="208" w="6" h="6" />
+        <part id="tiles_manual" x="150" y="208" w="6" h="6" />
+        <part id="tiles_auto" x="156" y="208" w="6" h="6" />
+        <part id="tiles_stack" x="162" y="208" w="6" h="6" />
+        <part id="cursor_skew_n" x="272" y="192" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_s" x="288" y="192" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_sw" x="272" y="208" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_se" x="288" y="208" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_w" x="272" y="176" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_e" x="288" y="176" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_nw" x="272" y="160" w="16" h="16" focusx="8" focusy="8" />
+        <part id="cursor_skew_ne" x="288" y="160" w="16" h="16" focusx="8" focusy="8" />
     </parts>
     <styles>
         <style id="box" />
@@ -629,6 +651,10 @@
             <icon part="combobox_arrow_up_selected" state="selected" />
             <icon part="combobox_arrow_up_disabled" state="disabled" />
         </style>
+        <style id="refresh_button" extends="mini_button">
+            <icon part="arrow_circle_cw" />
+            <icon part="arrow_circle_cw_selected" state="selected" />
+        </style>
         <style id="new_folder_button" extends="mini_button">
             <icon part="newfolder" />
             <icon part="newfolder_selected" state="selected" />
@@ -722,6 +748,9 @@
         </style>
         <style id="workspace_tabs">
             <background color="workspace" />
+        </style>
+        <style id="workspace_check_box" extends="check_box" padding="4">
+            <text color="workspace_text" align="left middle" x="14" />
         </style>
         <style id="tab">
             <background part="tab_normal" align="middle" />
@@ -842,6 +871,11 @@
             <background-border part="timeline_none" state="focus mouse" />
             <background-border part="timeline_none" state="selected" />
         </style>
+        <style id="timeline_tilemap_layer">
+            <icon part="tiles" color="timeline_normal_text" align="left middle" x="4" />
+            <icon part="tiles" color="timeline_active_text" align="left middle" x="4" state="focus" />
+            <icon part="tiles" color="timeline_clicked_text" align="left middle" x="4" state="selected" />
+        </style>
         <style id="timeline_header_frame" extends="timeline_box" font="mini">
             <text color="timeline_normal_text" />
             <text color="timeline_hover_text" state="mouse" />
@@ -959,15 +993,15 @@
             <icon part="aseprite_face_pushed" state="mouse selected" />
         </style>
         <style id="slider" border-top="4" border-bottom="5">
-          <background part="slider_empty" />
-          <background part="slider_empty_focused" state="focus" />
-          <text color="slider_empty_text" align="center middle" />
-          <text color="slider_empty_text" align="center middle" state="focus" y="1" />
+            <background part="slider_empty" />
+            <background part="slider_empty_focused" state="focus" />
+            <text color="slider_empty_text" align="center middle" />
+            <text color="slider_empty_text" align="center middle" state="focus" y="1" />
         </style>
         <style id="mini_slider" extends="slider" font="mini" padding-top="1" padding-bottom="3">
-          <background part="mini_slider_empty" />
-          <text color="slider_empty_text" align="center middle" />
-          <text color="slider_empty_text" align="center middle" state="focus" />
+            <background part="mini_slider_empty" />
+            <text color="slider_empty_text" align="center middle" />
+            <text color="slider_empty_text" align="center middle" state="focus" />
         </style>
     </styles>
 </theme>

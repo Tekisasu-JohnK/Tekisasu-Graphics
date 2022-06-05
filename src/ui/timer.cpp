@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -18,6 +18,7 @@
 #include "ui/widget.h"
 
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 namespace ui {
@@ -55,6 +56,10 @@ Timer::~Timer()
 void Timer::start()
 {
   assert_ui_thread();
+
+  // Infinite timer? Do nothing.
+  if (m_interval == 0)
+    return;
 
   m_lastTick = base::current_tick();
   if (!m_running) {
@@ -108,6 +113,8 @@ void Timer::pollTimers()
 
     for (auto timer : timers) {
       if (timer && timer->isRunning()) {
+        ASSERT(timer->interval() > 0);
+
         int64_t count = ((t - timer->m_lastTick) / timer->m_interval);
         if (count > 0) {
           timer->m_lastTick += count * timer->m_interval;
@@ -128,9 +135,28 @@ bool Timer::haveTimers()
   return !timers.empty();
 }
 
-bool Timer::haveRunningTimers()
+bool Timer::getNextTimeout(double& timeout)
 {
-  return (running_timers != 0);
+  if (running_timers == 0)
+    return false;
+
+  base::tick_t t = base::current_tick();
+  bool result = false;
+  timeout = std::numeric_limits<double>::max();
+  for (auto timer : timers) {
+    if (timer && timer->isRunning()) {
+      int64_t diff = (timer->m_lastTick + timer->m_interval) - t;
+      if (diff < 0) {
+        timeout = 0.0;         // Right-now
+        return true;
+      }
+      else {
+        timeout = std::min<double>(timeout, diff / 1000.0);
+        result = true;
+      }
+    }
+  }
+  return result;
 }
 
 } // namespace ui

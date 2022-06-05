@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2020  Igara Studio S.A.
+# Copyright (C) 2019-2022  Igara Studio S.A.
 #
 # This file is released under the terms of the MIT license.
 # Read LICENSE.txt for more information.
@@ -7,9 +7,16 @@ set(SKIA_DIR "" CACHE PATH "Skia source code directory")
 if(NOT SKIA_DIR)
   set(SKIA_LIBRARY_DIR "" CACHE PATH "Skia library directory (where libskia.a is located)")
 else()
-  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(SKIA_ARCH "x64")
-  else()
+    if(APPLE)
+      if(CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR
+         (CMAKE_OSX_ARCHITECTURES STREQUAL "" AND
+          CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64"))
+        set(SKIA_ARCH "arm64")
+      endif()
+    endif()
+  elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(SKIA_ARCH "x86")
   endif()
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
@@ -29,32 +36,100 @@ else()
   find_library(SKIA_OPENGL_LIBRARY opengl NAMES GL)
 endif()
 
-# SkShaper module + freetype + harfbuzz
+# SkShaper module + freetype + harfbuzz + zlib
 find_library(SKSHAPER_LIBRARY skshaper PATH "${SKIA_LIBRARY_DIR}")
-if(NOT FREETYPE_LIBRARIES)
-  set(FREETYPE_FOUND ON)
-  find_library(FREETYPE_LIBRARY freetype2 PATH "${SKIA_LIBRARY_DIR}")
-  set(FREETYPE_LIBRARIES ${FREETYPE_LIBRARY})
-  set(FREETYPE_INCLUDE_DIRS "${SKIA_DIR}/third_party/externals/freetype/include")
-endif()
-if(NOT HARFBUZZ_LIBRARIES)
-  find_library(HARFBUZZ_LIBRARY harfbuzz PATH "${SKIA_LIBRARY_DIR}")
-  set(HARFBUZZ_LIBRARIES ${HARFBUZZ_LIBRARY})
-  set(HARFBUZZ_INCLUDE_DIRS "${SKIA_DIR}/third_party/externals/harfbuzz/src")
+
+# Check that if Skia is compiled with libc++, we use -stdlib=libc++
+if(UNIX AND NOT APPLE AND EXISTS "${SKIA_LIBRARY_DIR}/args.gn")
+  file(READ "${SKIA_LIBRARY_DIR}/args.gn" SKIA_ARGS_GN)
+  string(FIND "${SKIA_ARGS_GN}" "-stdlib=libc++" matchres)
+  if(${matchres} GREATER_EQUAL 0)
+    set(not_using_libcxx_error "")
+    set(not_using_clang_error "")
+
+    if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang" OR
+       NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+      set(not_using_clang_error " You must use Clang compiler: \n\
+ \n\
+   rm CMakeCache.txt \n\
+   export CC=clang \n\
+   export CXX=clang++ \n\
+   cmake ...\n")
+    endif()
+
+    string(FIND "${CMAKE_CXX_FLAGS}" "-stdlib=libc++" matchres2)
+    string(FIND "${CMAKE_EXE_LINKER_FLAGS}" "-stdlib=libc++" matchres3)
+    if(${matchres2} EQUAL -1 OR ${matchres3} EQUAL -1)
+      if(not_using_clang_error)
+        set(not_using_libcxx_error " \n")
+      endif()
+      set(not_using_libcxx_error
+        "${not_using_libcxx_error} Skia was compiled with -stdlib=libc++ so you must use: \n\
+ \n\
+   -DCMAKE_CXX_FLAGS=-stdlib=libc++ \n\
+   -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \n")
+    endif()
+
+    if(not_using_libcxx_error OR not_using_clang_error)
+      message(FATAL_ERROR
+        "----------------------------------------------------------------------"
+        "                        INCOMPATIBILITY ERROR "
+        "----------------------------------------------------------------------\n"
+        "${not_using_clang_error}"
+        "${not_using_libcxx_error}"
+        " \n"
+        " When calling cmake (or modify these variables in your CMakeCache.txt)\n"
+        "----------------------------------------------------------------------")
+    endif()
+
+  endif ()
 endif()
 
-find_path(SKIA_CONFIG_INCLUDE_DIR SkUserConfig.h HINTS "${SKIA_DIR}/include/config")
-find_path(SKIA_CORE_INCLUDE_DIR SkCanvas.h HINTS "${SKIA_DIR}/include/core")
-find_path(SKIA_UTILS_INCLUDE_DIR SkRandom.h HINTS "${SKIA_DIR}/include/utils")
-find_path(SKIA_CODEC_INCLUDE_DIR SkCodec.h HINTS "${SKIA_DIR}/include/codec")
-find_path(SKIA_EFFECTS_INCLUDE_DIR SkImageSource.h HINTS "${SKIA_DIR}/include/effects")
-find_path(SKIA_GPU_INCLUDE_DIR GrContext.h HINTS "${SKIA_DIR}/include/gpu")
-find_path(SKIA_GPU2_INCLUDE_DIR gl/GrGLDefines.h HINTS "${SKIA_DIR}/src/gpu")
-find_path(SKIA_ANGLE_INCLUDE_DIR angle_gl.h HINTS "${SKIA_DIR}/third_party/externals/angle2/include")
-find_path(SKIA_SKCMS_INCLUDE_DIR skcms.h
-  HINTS
-  "${SKIA_DIR}/third_party/skcms"
-  "${SKIA_DIR}/include/third_party/skcms")
+# We require zlib because freetype expects to be linked with zlib
+if(NOT ZLIB_LIBRARIES)
+  if(UNIX)
+    set(ZLIB_LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/third_party/zlib/lib/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  else()
+    set(ZLIB_LIB_FILE "${CMAKE_CURRENT_BINARY_DIR}/third_party/zlib/lib/zlib${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  endif()
+
+  include(ExternalProject)
+  ExternalProject_Add(zlib-project
+    URL https://github.com/aseprite/zlib/archive/refs/tags/v1.2.12.zip
+    DOWNLOAD_NAME zlib-1.2.12.zip
+    URL_HASH SHA1=35c02072f6e3d673f01df54735d5b6af786e0e84
+    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third_party/zlib"
+    INSTALL_DIR "${CMAKE_CURRENT_BINARY_DIR}/third_party/zlib"
+    BUILD_BYPRODUCTS "${ZLIB_LIB_FILE}"
+    CMAKE_CACHE_ARGS
+      -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+      -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+      -DCMAKE_INSTALL_LIBDIR:PATH=<INSTALL_DIR>)
+
+  ExternalProject_Get_Property(zlib-project install_dir)
+  set(ZLIB_INCLUDE_DIRS ${install_dir})
+
+  # Create the directory so changing INTERFACE_INCLUDE_DIRECTORIES doesn't fail
+  file(MAKE_DIRECTORY ${ZLIB_INCLUDE_DIRS})
+
+  add_library(zlib STATIC IMPORTED)
+  set_target_properties(zlib PROPERTIES
+    IMPORTED_LOCATION "${ZLIB_LIB_FILE}"
+    INTERFACE_INCLUDE_DIRECTORIES ${ZLIB_INCLUDE_DIRS})
+  add_dependencies(zlib zlib-project)
+
+  set(ZLIB_LIBRARY zlib)
+  set(ZLIB_LIBRARIES ${ZLIB_LIBRARY})
+endif()
+
+set(FREETYPE_FOUND ON)
+find_library(FREETYPE_LIBRARY freetype2 PATH "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH)
+set(FREETYPE_LIBRARIES ${FREETYPE_LIBRARY})
+set(FREETYPE_INCLUDE_DIRS "${SKIA_DIR}/third_party/externals/freetype/include")
+
+find_library(HARFBUZZ_LIBRARY harfbuzz PATH "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH)
+set(HARFBUZZ_LIBRARIES ${HARFBUZZ_LIBRARY})
+set(HARFBUZZ_INCLUDE_DIRS "${SKIA_DIR}/third_party/externals/harfbuzz/src")
 
 set(SKIA_LIBRARIES
   ${SKIA_LIBRARY}
@@ -64,20 +139,8 @@ set(SKIA_LIBRARIES
 add_library(skia INTERFACE)
 target_include_directories(skia INTERFACE
   ${SKIA_DIR}
-  ${SKIA_CONFIG_INCLUDE_DIR}
-  ${SKIA_CORE_INCLUDE_DIR}
-  ${SKIA_PORTS_INCLUDE_DIR}
-  ${SKIA_UTILS_INCLUDE_DIR}
-  ${SKIA_CODEC_INCLUDE_DIR}
-  ${SKIA_GPU_INCLUDE_DIR}
-  ${SKIA_GPU2_INCLUDE_DIR}
-  ${SKIA_SKCMS_INCLUDE_DIR}
   ${FREETYPE_INCLUDE_DIRS}
   ${HARFBUZZ_INCLUDE_DIRS})
-if(WIN32)
-  target_include_directories(skia INTERFACE
-    ${SKIA_ANGLE_INCLUDE_DIR})
-endif()
 target_link_libraries(skia INTERFACE ${SKIA_LIBRARIES})
 target_compile_definitions(skia INTERFACE
   SK_INTERNAL
@@ -85,21 +148,23 @@ target_compile_definitions(skia INTERFACE
   SK_GAMMA_APPLY_TO_A8
   SK_SCALAR_TO_FLOAT_EXCLUDED
   SK_ALLOW_STATIC_GLOBAL_INITIALIZERS=1
-  SK_SUPPORT_OPENCL=0
-  SK_FORCE_DISTANCE_FIELD_TEXT=0
-  GR_GL_FUNCTION_TYPE=__stdcall
-  SK_SUPPORT_GPU=0) # TODO change this to 1
+  SK_SUPPORT_GPU=1
+  SK_ENABLE_SKSL=1
+  SK_GL=1)
+
+# Freetype is used by skia, and it needs zlib
+target_link_libraries(skia INTERFACE ${ZLIB_LIBRARIES})
 
 if(WIN32)
   target_compile_definitions(skia INTERFACE
-    SK_BUILD_FOR_WIN32
+    SK_BUILD_FOR_WIN
     _CRT_SECURE_NO_WARNINGS)
 elseif(APPLE)
   target_compile_definitions(skia INTERFACE
     SK_BUILD_FOR_MAC)
 else()
   target_compile_definitions(skia INTERFACE
-    SK_SAMPLES_FOR_X)
+    SK_BUILD_FOR_UNIX)
 endif()
 
 if(APPLE)

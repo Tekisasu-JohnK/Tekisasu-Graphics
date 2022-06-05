@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,7 +11,7 @@
 
 #include "base/string.h"
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #ifdef __MINGW32__
     #define FSTREAM_PATH(path) (std::string(path).c_str())
   #else

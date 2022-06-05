@@ -5,7 +5,7 @@
  *   FreeType glyph image formats and default raster interface
  *   (specification).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -26,12 +26,6 @@
 
 #ifndef FTIMAGE_H_
 #define FTIMAGE_H_
-
-
-  /* STANDALONE_ is from ftgrays.c */
-#ifndef STANDALONE_
-#include <ft2build.h>
-#endif
 
 
 FT_BEGIN_HEADER
@@ -110,7 +104,7 @@ FT_BEGIN_HEADER
    *
    *   If `yMin` is negative, this value gives the glyph's descender.
    *   Otherwise, the glyph doesn't descend below the baseline.  Similarly,
-   *   if 'ymax' is positive, this value gives the glyph's ascender.
+   *   if `ymax` is positive, this value gives the glyph's ascender.
    *
    *   `xMin` gives the horizontal distance from the glyph's origin to the
    *   left edge of the glyph's bounding box.  If `xMin` is negative, the
@@ -194,13 +188,18 @@ FT_BEGIN_HEADER
   } FT_Pixel_Mode;
 
 
-  /* these constants are deprecated; use the corresponding `FT_Pixel_Mode' */
+  /* these constants are deprecated; use the corresponding `FT_Pixel_Mode` */
   /* values instead.                                                       */
 #define ft_pixel_mode_none   FT_PIXEL_MODE_NONE
 #define ft_pixel_mode_mono   FT_PIXEL_MODE_MONO
 #define ft_pixel_mode_grays  FT_PIXEL_MODE_GRAY
 #define ft_pixel_mode_pal2   FT_PIXEL_MODE_GRAY2
 #define ft_pixel_mode_pal4   FT_PIXEL_MODE_GRAY4
+
+  /* */
+
+  /* For debugging, the @FT_Pixel_Mode enumeration must stay in sync */
+  /* with the `pixel_modes` array in file `ftobjs.c`.                */
 
 
   /**************************************************************************
@@ -231,7 +230,7 @@ FT_BEGIN_HEADER
    *     border, and FreeType functions normally align to the smallest
    *     possible integer value.
    *
-   *     For the B/W rasterizer, 'pitch' is always an even number.
+   *     For the B/W rasterizer, `pitch` is always an even number.
    *
    *     To change the pitch of a bitmap (say, to make it a multiple of 4),
    *     use @FT_Bitmap_Convert.  Alternatively, you might use callback
@@ -313,15 +312,15 @@ FT_BEGIN_HEADER
    *
    *     If bit~2 is set, bits 5-7 contain the drop-out mode (as defined in
    *     the OpenType specification; the value is the same as the argument to
-   *     the SCANMODE instruction).
+   *     the 'SCANMODE' instruction).
    *
    *     Bits 3 and~4 are reserved for internal purposes.
    *
    *   contours ::
    *     An array of `n_contours` shorts, giving the end point of each
    *     contour within the outline.  For example, the first contour is
-   *     defined by the points '0' to 'contours[0]', the second one is
-   *     defined by the points 'contours[0]+1' to 'contours[1]', etc.
+   *     defined by the points '0' to `contours[0]`, the second one is
+   *     defined by the points `contours[0]+1` to `contours[1]`, etc.
    *
    *   flags ::
    *     A set of bit flags used to characterize the outline and give hints
@@ -329,10 +328,10 @@ FT_BEGIN_HEADER
    *     @FT_OUTLINE_XXX.
    *
    * @note:
-   *   The B/W rasterizer only checks bit~2 in the 'tags' array for the first
+   *   The B/W rasterizer only checks bit~2 in the `tags` array for the first
    *   point of each contour.  The drop-out mode as given with
    *   @FT_OUTLINE_IGNORE_DROPOUTS, @FT_OUTLINE_SMART_DROPOUTS, and
-   *   @FT_OUTLINE_INCLUDE_STUBS in 'flags' is then overridden.
+   *   @FT_OUTLINE_INCLUDE_STUBS in `flags` is then overridden.
    */
   typedef struct  FT_Outline_
   {
@@ -362,7 +361,7 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   A list of bit-field constants used for the flags in an outline's
-   *   'flags' field.
+   *   `flags` field.
    *
    * @values:
    *   FT_OUTLINE_NONE ::
@@ -370,7 +369,7 @@ FT_BEGIN_HEADER
    *
    *   FT_OUTLINE_OWNER ::
    *     If set, this flag indicates that the outline's field arrays (i.e.,
-   *     'points', 'flags', and 'contours') are 'owned' by the outline
+   *     `points`, `flags`, and `contours`) are 'owned' by the outline
    *     object, and should thus be freed when it is destroyed.
    *
    *   FT_OUTLINE_EVEN_ODD_FILL ::
@@ -401,6 +400,13 @@ FT_BEGIN_HEADER
    *     if @FT_OUTLINE_IGNORE_DROPOUTS is set.  See below for more
    *     information.
    *
+   *   FT_OUTLINE_OVERLAP ::
+   *     [Since 2.10.3] This flag indicates that this outline contains
+   *     overlapping contours and the anti-aliased renderer should perform
+   *     oversampling to mitigate possible artifacts.  This flag should _not_
+   *     be set for well designed glyphs without overlaps because it quadruples
+   *     the rendering time.
+   *
    *   FT_OUTLINE_HIGH_PRECISION ::
    *     This flag indicates that the scan-line converter should try to
    *     convert this outline to bitmaps with the highest possible quality.
@@ -419,7 +425,7 @@ FT_BEGIN_HEADER
    *   @FT_OUTLINE_INCLUDE_STUBS are ignored by the smooth rasterizer.
    *
    *   There exists a second mechanism to pass the drop-out mode to the B/W
-   *   rasterizer; see the 'tags' field in @FT_Outline.
+   *   rasterizer; see the `tags` field in @FT_Outline.
    *
    *   Please refer to the description of the 'SCANTYPE' instruction in the
    *   OpenType specification (in file `ttinst1.doc`) how simple drop-outs,
@@ -432,13 +438,14 @@ FT_BEGIN_HEADER
 #define FT_OUTLINE_IGNORE_DROPOUTS  0x8
 #define FT_OUTLINE_SMART_DROPOUTS   0x10
 #define FT_OUTLINE_INCLUDE_STUBS    0x20
+#define FT_OUTLINE_OVERLAP          0x40
 
 #define FT_OUTLINE_HIGH_PRECISION   0x100
 #define FT_OUTLINE_SINGLE_PASS      0x200
 
 
   /* these constants are deprecated; use the corresponding */
-  /* `FT_OUTLINE_XXX' values instead                       */
+  /* `FT_OUTLINE_XXX` values instead                       */
 #define ft_outline_none             FT_OUTLINE_NONE
 #define ft_outline_owner            FT_OUTLINE_OWNER
 #define ft_outline_even_odd_fill    FT_OUTLINE_EVEN_ODD_FILL
@@ -451,7 +458,7 @@ FT_BEGIN_HEADER
 
 #define FT_CURVE_TAG( flag )  ( flag & 0x03 )
 
-  /* see the `tags' field in `FT_Outline' for a description of the values */
+  /* see the `tags` field in `FT_Outline` for a description of the values */
 #define FT_CURVE_TAG_ON            0x01
 #define FT_CURVE_TAG_CONIC         0x00
 #define FT_CURVE_TAG_CUBIC         0x02
@@ -467,7 +474,7 @@ FT_BEGIN_HEADER
 
 
   /* these constants are deprecated; use the corresponding */
-  /* `FT_CURVE_TAG_XXX' values instead                     */
+  /* `FT_CURVE_TAG_XXX` values instead                     */
 #define FT_Curve_Tag_On       FT_CURVE_TAG_ON
 #define FT_Curve_Tag_Conic    FT_CURVE_TAG_CONIC
 #define FT_Curve_Tag_Cubic    FT_CURVE_TAG_CUBIC
@@ -548,7 +555,7 @@ FT_BEGIN_HEADER
    * @input:
    *   control ::
    *     An intermediate control point between the last position and the new
-   *     target in 'to'.
+   *     target in `to`.
    *
    *   to ::
    *     A pointer to the target end point of the conic arc.
@@ -645,7 +652,7 @@ FT_BEGIN_HEADER
    *     y' = (y << shift) - delta
    *   ```
    *
-   *   Set the values of 'shift' and 'delta' to~0 to get the original point
+   *   Set the values of `shift` and `delta` to~0 to get the original point
    *   coordinates.
    */
   typedef struct  FT_Outline_Funcs_
@@ -688,11 +695,13 @@ FT_BEGIN_HEADER
    *   to get a simple enumeration without assigning special numbers.
    */
 #ifndef FT_IMAGE_TAG
-#define FT_IMAGE_TAG( value, _x1, _x2, _x3, _x4 )  \
-          value = ( ( (unsigned long)_x1 << 24 ) | \
-                    ( (unsigned long)_x2 << 16 ) | \
-                    ( (unsigned long)_x3 << 8  ) | \
-                      (unsigned long)_x4         )
+
+#define FT_IMAGE_TAG( value, _x1, _x2, _x3, _x4 )                         \
+          value = ( ( FT_STATIC_BYTE_CAST( unsigned long, _x1 ) << 24 ) | \
+                    ( FT_STATIC_BYTE_CAST( unsigned long, _x2 ) << 16 ) | \
+                    ( FT_STATIC_BYTE_CAST( unsigned long, _x3 ) << 8  ) | \
+                      FT_STATIC_BYTE_CAST( unsigned long, _x4 )         )
+
 #endif /* FT_IMAGE_TAG */
 
 
@@ -718,13 +727,13 @@ FT_BEGIN_HEADER
    *
    *   FT_GLYPH_FORMAT_BITMAP ::
    *     The glyph image is a bitmap, and can be described as an @FT_Bitmap.
-   *     You generally need to access the 'bitmap' field of the
+   *     You generally need to access the `bitmap` field of the
    *     @FT_GlyphSlotRec structure to read it.
    *
    *   FT_GLYPH_FORMAT_OUTLINE ::
    *     The glyph image is a vectorial outline made of line segments and
    *     Bezier arcs; it can be described as an @FT_Outline; you generally
-   *     want to access the 'outline' field of the @FT_GlyphSlotRec structure
+   *     want to access the `outline` field of the @FT_GlyphSlotRec structure
    *     to read it.
    *
    *   FT_GLYPH_FORMAT_PLOTTER ::
@@ -732,6 +741,10 @@ FT_BEGIN_HEADER
    *     contours.  Some Type~1 fonts, like those in the Hershey family,
    *     contain glyphs in this format.  These are described as @FT_Outline,
    *     but FreeType isn't currently capable of rendering them correctly.
+   *
+   *   FT_GLYPH_FORMAT_SVG ::
+   *     [Since 2.12] The glyph is represented by an SVG document in the
+   *     'SVG~' table.
    */
   typedef enum  FT_Glyph_Format_
   {
@@ -740,13 +753,14 @@ FT_BEGIN_HEADER
     FT_IMAGE_TAG( FT_GLYPH_FORMAT_COMPOSITE, 'c', 'o', 'm', 'p' ),
     FT_IMAGE_TAG( FT_GLYPH_FORMAT_BITMAP,    'b', 'i', 't', 's' ),
     FT_IMAGE_TAG( FT_GLYPH_FORMAT_OUTLINE,   'o', 'u', 't', 'l' ),
-    FT_IMAGE_TAG( FT_GLYPH_FORMAT_PLOTTER,   'p', 'l', 'o', 't' )
+    FT_IMAGE_TAG( FT_GLYPH_FORMAT_PLOTTER,   'p', 'l', 'o', 't' ),
+    FT_IMAGE_TAG( FT_GLYPH_FORMAT_SVG,       'S', 'V', 'G', ' ' )
 
   } FT_Glyph_Format;
 
 
   /* these constants are deprecated; use the corresponding */
-  /* `FT_Glyph_Format' values instead.                     */
+  /* `FT_Glyph_Format` values instead.                     */
 #define ft_glyph_format_none       FT_GLYPH_FORMAT_NONE
 #define ft_glyph_format_composite  FT_GLYPH_FORMAT_COMPOSITE
 #define ft_glyph_format_bitmap     FT_GLYPH_FORMAT_BITMAP
@@ -765,17 +779,6 @@ FT_BEGIN_HEADER
   /*************************************************************************/
 
 
-  /**************************************************************************
-   *
-   * A raster is a scan converter, in charge of rendering an outline into a
-   * bitmap.  This section contains the public API for rasters.
-   *
-   * Note that in FreeType 2, all rasters are now encapsulated within
-   * specific modules called 'renderers'.  See `ftrender.h` for more details
-   * on renderers.
-   *
-   */
-
 
   /**************************************************************************
    *
@@ -789,16 +792,35 @@ FT_BEGIN_HEADER
    *   How vectorial outlines are converted into bitmaps and pixmaps.
    *
    * @description:
-   *   This section contains technical definitions.
+   *   A raster or a rasterizer is a scan converter in charge of producing a
+   *   pixel coverage bitmap that can be used as an alpha channel when
+   *   compositing a glyph with a background.  FreeType comes with two
+   *   rasterizers: bilevel `raster1` and anti-aliased `smooth` are two
+   *   separate modules.  They are usually called from the high-level
+   *   @FT_Load_Glyph or @FT_Render_Glyph functions and produce the entire
+   *   coverage bitmap at once, while staying largely invisible to users.
+   *
+   *   Instead of working with complete coverage bitmaps, it is also possible
+   *   to intercept consecutive pixel runs on the same scanline with the same
+   *   coverage, called _spans_, and process them individually.  Only the
+   *   `smooth` rasterizer permits this when calling @FT_Outline_Render with
+   *   @FT_Raster_Params as described below.
+   *
+   *   Working with either complete bitmaps or spans it is important to think
+   *   of them as colorless coverage objects suitable as alpha channels to
+   *   blend arbitrary colors with a background.  For best results, it is
+   *   recommended to use gamma correction, too.
+   *
+   *   This section also describes the public API needed to set up alternative
+   *   @FT_Renderer modules.
    *
    * @order:
-   *   FT_Raster
    *   FT_Span
    *   FT_SpanFunc
-   *
    *   FT_Raster_Params
    *   FT_RASTER_FLAG_XXX
    *
+   *   FT_Raster
    *   FT_Raster_NewFunc
    *   FT_Raster_DoneFunc
    *   FT_Raster_ResetFunc
@@ -811,24 +833,12 @@ FT_BEGIN_HEADER
 
   /**************************************************************************
    *
-   * @type:
-   *   FT_Raster
-   *
-   * @description:
-   *   An opaque handle (pointer) to a raster object.  Each object can be
-   *   used independently to convert an outline into a bitmap or pixmap.
-   */
-  typedef struct FT_RasterRec_*  FT_Raster;
-
-
-  /**************************************************************************
-   *
    * @struct:
    *   FT_Span
    *
    * @description:
-   *   A structure used to model a single span of gray pixels when rendering
-   *   an anti-aliased bitmap.
+   *   A structure to model a single span of consecutive pixels when
+   *   rendering an anti-aliased bitmap.
    *
    * @fields:
    *   x ::
@@ -845,8 +855,8 @@ FT_BEGIN_HEADER
    *   This structure is used by the span drawing callback type named
    *   @FT_SpanFunc that takes the y~coordinate of the span as a parameter.
    *
-   *   The coverage value is always between 0 and 255.  If you want less gray
-   *   values, the callback function has to reduce them.
+   *   The anti-aliased rasterizer produces coverage values from 0 to 255,
+   *   this is, from completely transparent to completely opaque.
    */
   typedef struct  FT_Span_
   {
@@ -864,28 +874,29 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   A function used as a call-back by the anti-aliased renderer in order
-   *   to let client applications draw themselves the gray pixel spans on
-   *   each scan line.
+   *   to let client applications draw themselves the pixel spans on each
+   *   scan line.
    *
    * @input:
    *   y ::
-   *     The scanline's y~coordinate.
+   *     The scanline's upward y~coordinate.
    *
    *   count ::
    *     The number of spans to draw on this scanline.
    *
    *   spans ::
-   *     A table of 'count' spans to draw on the scanline.
+   *     A table of `count` spans to draw on the scanline.
    *
    *   user ::
    *     User-supplied data that is passed to the callback.
    *
    * @note:
-   *   This callback allows client applications to directly render the gray
-   *   spans of the anti-aliased bitmap to any kind of surfaces.
+   *   This callback allows client applications to directly render the spans
+   *   of the anti-aliased bitmap to any kind of surfaces.
    *
    *   This can be used to write anti-aliased outlines directly to a given
-   *   background bitmap, and even perform translucency.
+   *   background bitmap using alpha compositing.  It can also be used for
+   *   oversampling and averaging.
    */
   typedef void
   (*FT_SpanFunc)( int             y,
@@ -930,7 +941,7 @@ FT_BEGIN_HEADER
    *   FT_RASTER_FLAG_XXX
    *
    * @description:
-   *   A list of bit flag constants as used in the 'flags' field of a
+   *   A list of bit flag constants as used in the `flags` field of a
    *   @FT_Raster_Params structure.
    *
    * @values:
@@ -945,27 +956,30 @@ FT_BEGIN_HEADER
    *     This flag is set to indicate direct rendering.  In this mode, client
    *     applications must provide their own span callback.  This lets them
    *     directly draw or compose over an existing bitmap.  If this bit is
-   *     not set, the target pixmap's buffer _must_ be zeroed before
-   *     rendering.
+   *     _not_ set, the target pixmap's buffer _must_ be zeroed before
+   *     rendering and the output will be clipped to its size.
    *
    *     Direct rendering is only possible with anti-aliased glyphs.
    *
    *   FT_RASTER_FLAG_CLIP ::
    *     This flag is only used in direct rendering mode.  If set, the output
    *     will be clipped to a box specified in the `clip_box` field of the
-   *     @FT_Raster_Params structure.
+   *     @FT_Raster_Params structure.  Otherwise, the `clip_box` is
+   *     effectively set to the bounding box and all spans are generated.
    *
-   *     Note that by default, the glyph bitmap is clipped to the target
-   *     pixmap, except in direct rendering mode where all spans are
-   *     generated if no clipping box is set.
+   *   FT_RASTER_FLAG_SDF ::
+   *     This flag is set to indicate that a signed distance field glyph
+   *     image should be generated.  This is only used while rendering with
+   *     the @FT_RENDER_MODE_SDF render mode.
    */
 #define FT_RASTER_FLAG_DEFAULT  0x0
 #define FT_RASTER_FLAG_AA       0x1
 #define FT_RASTER_FLAG_DIRECT   0x2
 #define FT_RASTER_FLAG_CLIP     0x4
+#define FT_RASTER_FLAG_SDF      0x8
 
   /* these constants are deprecated; use the corresponding */
-  /* `FT_RASTER_FLAG_XXX' values instead                   */
+  /* `FT_RASTER_FLAG_XXX` values instead                   */
 #define ft_raster_flag_default  FT_RASTER_FLAG_DEFAULT
 #define ft_raster_flag_aa       FT_RASTER_FLAG_AA
 #define ft_raster_flag_direct   FT_RASTER_FLAG_DIRECT
@@ -978,7 +992,8 @@ FT_BEGIN_HEADER
    *   FT_Raster_Params
    *
    * @description:
-   *   A structure to hold the arguments used by a raster's render function.
+   *   A structure to hold the parameters used by a raster's render function,
+   *   passed as an argument to @FT_Outline_Render.
    *
    * @fields:
    *   target ::
@@ -1006,20 +1021,26 @@ FT_BEGIN_HEADER
    *     User-supplied data that is passed to each drawing callback.
    *
    *   clip_box ::
-   *     An optional clipping box.  It is only used in direct rendering mode.
-   *     Note that coordinates here should be expressed in _integer_ pixels
-   *     (and not in 26.6 fixed-point units).
+   *     An optional span clipping box expressed in _integer_ pixels
+   *     (not in 26.6 fixed-point units).
    *
    * @note:
-   *   An anti-aliased glyph bitmap is drawn if the @FT_RASTER_FLAG_AA bit
-   *   flag is set in the 'flags' field, otherwise a monochrome bitmap is
-   *   generated.
+   *   The @FT_RASTER_FLAG_AA bit flag must be set in the `flags` to
+   *   generate an anti-aliased glyph bitmap, otherwise a monochrome bitmap
+   *   is generated.  The `target` should have appropriate pixel mode and its
+   *   dimensions define the clipping region.
    *
-   *   If the @FT_RASTER_FLAG_DIRECT bit flag is set in 'flags', the raster
-   *   will call the `gray_spans` callback to draw gray pixel spans.  This
-   *   allows direct composition over a pre-existing bitmap through
-   *   user-provided callbacks to perform the span drawing and composition.
-   *   Not supported by the monochrome rasterizer.
+   *   If both @FT_RASTER_FLAG_AA and @FT_RASTER_FLAG_DIRECT bit flags
+   *   are set in `flags`, the raster calls an @FT_SpanFunc callback
+   *   `gray_spans` with `user` data as an argument ignoring `target`.  This
+   *   allows direct composition over a pre-existing user surface to perform
+   *   the span drawing and composition.  To optionally clip the spans, set
+   *   the @FT_RASTER_FLAG_CLIP flag and `clip_box`.  The monochrome raster
+   *   does not support the direct mode.
+   *
+   *   The gray-level rasterizer always uses 256 gray levels.  If you want
+   *   fewer gray levels, you have to use @FT_RASTER_FLAG_DIRECT and reduce
+   *   the levels in the callback function.
    */
   typedef struct  FT_Raster_Params_
   {
@@ -1034,6 +1055,23 @@ FT_BEGIN_HEADER
     FT_BBox                 clip_box;
 
   } FT_Raster_Params;
+
+
+  /**************************************************************************
+   *
+   * @type:
+   *   FT_Raster
+   *
+   * @description:
+   *   An opaque handle (pointer) to a raster object.  Each object can be
+   *   used independently to convert an outline into a bitmap or pixmap.
+   *
+   * @note:
+   *   In FreeType 2, all rasters are now encapsulated within specific
+   *   @FT_Renderer modules and only used in their context.
+   *
+   */
+  typedef struct FT_RasterRec_*  FT_Raster;
 
 
   /**************************************************************************
@@ -1056,7 +1094,7 @@ FT_BEGIN_HEADER
    *   Error code.  0~means success.
    *
    * @note:
-   *   The 'memory' parameter is a typeless pointer in order to avoid
+   *   The `memory` parameter is a typeless pointer in order to avoid
    *   un-wanted dependencies on the rest of the FreeType code.  In practice,
    *   it is an @FT_Memory object, i.e., a handle to the standard FreeType
    *   memory allocator.  However, this field can be completely ignored by a
@@ -1105,7 +1143,7 @@ FT_BEGIN_HEADER
    *
    *   pool_base ::
    *     Previously, the address in memory of the render pool.  Set this to
-   *     NULL.
+   *     `NULL`.
    *
    *   pool_size ::
    *     Previously, the size in bytes of the render pool.  Set this to 0.
@@ -1180,12 +1218,6 @@ FT_BEGIN_HEADER
    *   Note also that the render function can fail and return a
    *   `FT_Err_Unimplemented_Feature` error code if the raster used does not
    *   support direct composition.
-   *
-   *   XXX: For now, the standard raster doesn't support direct
-   *        composition but this should change for the final release (see the
-   *        files 'demos/src/ftgrays.c' and 'demos/src/ftgrays2.c' for
-   *        examples of distinct implementations that support direct
-   *        composition).
    */
   typedef int
   (*FT_Raster_RenderFunc)( FT_Raster                raster,

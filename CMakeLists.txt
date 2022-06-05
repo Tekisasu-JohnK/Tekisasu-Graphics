@@ -1,12 +1,13 @@
 # Aseprite
-# Copyright (C) 2018-2021  Igara Studio S.A.
+# Copyright (C) 2018-2022  Igara Studio S.A.
 # Copyright (C) 2001-2018  David Capello
 
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) # We use -std=c++11 instead of -std=gnu++11 in macOS
+set(CMAKE_CXX_EXTENSIONS OFF) # We use -std=c++17 instead of -std=gnu++17 in macOS
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 if(COMMAND cmake_policy)
   # CMP0003: Libraries linked via full path no longer produce linker search paths.
@@ -30,19 +31,13 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX ${CMAKE_CURRENT_SOURCE_DIR}/laf/cmake/cxx
 # Aseprite project
 project(aseprite C CXX)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  # As we compile with CMAKE_OSX_DEPLOYMENT_TARGET=10.7, we have to
-  # explicitly say that we want to use libc++ instead of the GNU libstdc++
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-endif()
-
 # Check repository status
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/laf/CMakeLists.txt)
   message(FATAL_ERROR "Your Aseprite repository is incomplete, initialize submodules using:\n  git submodule update --init --recursive")
 endif()
 
-# This required for KDE/Qt destop integration, which sets BUILD_SHARED_LIBS to
-# TRUE by default
+# This is required for KDE/Qt destop integration, which sets
+# BUILD_SHARED_LIBS to TRUE by default
 set(BUILD_SHARED_LIBS off)
 
 enable_testing()
@@ -50,10 +45,6 @@ enable_testing()
 ######################################################################
 # Options (these can be specified in cmake command line or modifying
 # CMakeCache.txt)
-
-option(WITH_WEBP_SUPPORT            "Enable support to load/save .webp files" on)
-option(WITH_DESKTOP_INTEGRATION     "Enable desktop integration modules" off)
-option(WITH_QT_THUMBNAILER          "Enable kde5/qt5 thumnailer" off)
 
 option(USE_SHARED_CMARK   "Use your installed copy of cmark" off)
 option(USE_SHARED_CURL    "Use your installed copy of curl" off)
@@ -70,6 +61,7 @@ option(ENABLE_MEMLEAK      "Enable memory-leaks detector (only for developers)" 
 option(ENABLE_NEWS         "Enable the news in Home tab" on)
 option(ENABLE_UPDATER      "Enable automatic check for updates" off)
 option(ENABLE_SCRIPTING    "Compile with scripting support" on)
+option(ENABLE_WEBSOCKET    "Compile with websocket support" on)
 option(ENABLE_TESTS        "Compile unit tests" off)
 option(ENABLE_BENCHMARKS   "Compile benchmarks" off)
 option(ENABLE_TRIAL_MODE   "Compile the trial version" off)
@@ -79,7 +71,17 @@ option(ENABLE_UI           "Compile UI (turn off to compile CLI-only version)" o
 option(FULLSCREEN_PLATFORM "Enable fullscreen by default" off)
 option(ENABLE_CLANG_TIDY   "Enable static analysis" off)
 option(ENABLE_CCACHE       "Use CCache to improve recompilation speed (optional)" on)
+option(ENABLE_SENTRY       "Use Sentry SDK to report crashes" off)
+option(ENABLE_WEBP         "Enable support to load/save .webp files" on)
+option(ENABLE_PSD          "Enable experimental support for .psd files" off)
+option(ENABLE_DESKTOP_INTEGRATION  "Enable desktop integration modules" off)
+option(ENABLE_QT_THUMBNAILER       "Enable kde5/qt5 thumnailer" off)
 set(CUSTOM_WEBSITE_URL "" CACHE STRING "Enable custom local webserver to check updates")
+
+if(ENABLE_SENTRY)
+  set(SENTRY_DIR "" CACHE STRING "Sentry native location")
+  set(SENTRY_DNS "" CACHE STRING "Sentry DNS URL")
+endif()
 
 if(ENABLE_NEWS OR ENABLE_UPDATER)
   set(REQUIRE_CURL ON)
@@ -227,7 +229,7 @@ include_directories(${PNG_INCLUDE_DIRS})
 add_definitions(-DPNG_NO_MMX_CODE) # Do not use MMX optimizations in PNG code
 
 # libwebp
-if(WITH_WEBP_SUPPORT)
+if(ENABLE_WEBP)
   set(WEBP_LIBRARIES webp webpdemux libwebpmux)
   set(WEBP_INCLUDE_DIR ${LIBWEBP_DIR}/src)
   include_directories(${WEBP_INCLUDE_DIR})
@@ -258,7 +260,7 @@ include_directories(${PIXMAN_INCLUDE_DIR})
 # freetype
 if(USE_SHARED_FREETYPE)
   find_package(Freetype REQUIRED)
-else()
+elseif(NOT LAF_BACKEND STREQUAL "skia")
   set(FREETYPE_FOUND ON)
   set(FREETYPE_LIBRARY freetype)
   set(FREETYPE_LIBRARIES ${FREETYPE_LIBRARY})
@@ -269,7 +271,7 @@ include_directories(${FREETYPE_INCLUDE_DIRS})
 # harfbuzz
 if(USE_SHARED_HARFBUZZ)
   find_package(HarfBuzz)
-else()
+elseif(NOT LAF_BACKEND STREQUAL "skia")
   set(HARFBUZZ_LIBRARIES harfbuzz)
   set(HARFBUZZ_INCLUDE_DIRS ${HARFBUZZ_DIR}/src)
 endif()
@@ -280,7 +282,7 @@ if(USE_SHARED_GIFLIB)
 else()
   set(GIF_LIBRARY giflib)
   set(GIF_LIBRARIES ${GIF_LIBRARY})
-  set(GIF_INCLUDE_DIR ${GIFLIB_DIR}/lib)
+  set(GIF_INCLUDE_DIR ${GIFLIB_DIR})
   set(GIF_INCLUDE_DIRS ${GIF_INCLUDE_DIR})
 endif()
 include_directories(${GIF_INCLUDE_DIRS})
@@ -308,6 +310,8 @@ if(REQUIRE_CURL)
   if(USE_SHARED_CURL)
     find_package(CURL REQUIRED)
   else()
+    set(CURL_FOUND 1)
+    set(CURL_LIBRARY libcurl)
     set(CURL_LIBRARIES libcurl)
     set(CURL_INCLUDE_DIRS ${CURL_DIR}/include)
   endif()
@@ -320,9 +324,6 @@ include_directories(${SIMPLEINI_DIR})
 # Third parties
 add_subdirectory(third_party)
 
-# LAF libraries + Aseprite are compiled with config.h
-include_directories(src)
-add_definitions(-DHAVE_CONFIG_H)
 if(ENABLE_MEMLEAK)
   add_definitions(-DLAF_MEMLEAK)
 endif()
@@ -331,6 +332,11 @@ set(LAF_WITH_TESTS ${ENABLE_TESTS} CACHE BOOL "Enable LAF tests")
 set(UNDO_TESTS     ${ENABLE_TESTS} CACHE BOOL "Enable undo tests")
 
 add_subdirectory(laf)
+
+# LAF libraries + Aseprite are compiled with config.h
+target_include_directories(laf-base PUBLIC src)
+target_compile_definitions(laf-base PUBLIC HAVE_CONFIG_H)
+
 add_subdirectory(src)
 
 ######################################################################

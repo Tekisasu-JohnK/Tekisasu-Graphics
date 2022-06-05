@@ -158,6 +158,7 @@ libarchive_la_SOURCES= \
 	libarchive/archive_read_set_options.c \
 	libarchive/archive_read_support_filter_all.c \
 	libarchive/archive_read_support_filter_bzip2.c \
+	libarchive/archive_read_support_filter_by_code.c \
 	libarchive/archive_read_support_filter_compress.c \
 	libarchive/archive_read_support_filter_grzip.c \
 	libarchive/archive_read_support_filter_gzip.c \
@@ -223,7 +224,9 @@ libarchive_la_SOURCES= \
 	libarchive/archive_write_set_format_ar.c \
 	libarchive/archive_write_set_format_by_name.c \
 	libarchive/archive_write_set_format_cpio.c \
+	libarchive/archive_write_set_format_cpio_binary.c \
 	libarchive/archive_write_set_format_cpio_newc.c \
+	libarchive/archive_write_set_format_cpio_odc.c \
 	libarchive/archive_write_set_format_filter_by_ext.c \
 	libarchive/archive_write_set_format_iso9660.c \
 	libarchive/archive_write_set_format_mtree.c \
@@ -539,13 +542,15 @@ libarchive_test_SOURCES= \
 	libarchive/test/test_read_format_zip_zip64.c \
 	libarchive/test/test_read_format_zip_with_invalid_traditional_eocd.c \
 	libarchive/test/test_read_large.c \
-	libarchive/test/test_read_pax_schily_xattr.c \
+	libarchive/test/test_read_pax_xattr_rht_security_selinux.c \
+	libarchive/test/test_read_pax_xattr_schily.c \
 	libarchive/test/test_read_pax_truncated.c \
 	libarchive/test/test_read_position.c \
 	libarchive/test/test_read_set_format.c \
 	libarchive/test/test_read_too_many_filters.c \
 	libarchive/test/test_read_truncated.c \
 	libarchive/test/test_read_truncated_filter.c \
+	libarchive/test/test_short_writes.c \
 	libarchive/test/test_sparse_basic.c \
 	libarchive/test/test_tar_filenames.c \
 	libarchive/test/test_tar_large.c \
@@ -701,6 +706,7 @@ libarchive_test_EXTRA_DIST=\
 	libarchive/test/test_compat_zip_7.xps.uu \
 	libarchive/test/test_compat_zip_8.zip.uu \
 	libarchive/test/test_compat_zstd_1.tar.zst.uu \
+	libarchive/test/test_compat_zstd_2.tar.zst.uu \
 	libarchive/test/test_fuzz.cab.uu \
 	libarchive/test/test_fuzz.lzh.uu \
 	libarchive/test/test_fuzz_1.iso.Z.uu \
@@ -895,6 +901,8 @@ libarchive_test_EXTRA_DIST=\
 	libarchive/test/test_read_format_warc.warc.uu \
 	libarchive/test/test_read_format_zip.zip.uu \
 	libarchive/test/test_read_format_zip_7075_utf8_paths.zip.uu \
+	libarchive/test/test_read_format_zip_7z_deflate.zip.uu \
+	libarchive/test/test_read_format_zip_7z_lzma.zip.uu \
 	libarchive/test/test_read_format_zip_bz2_hang.zip.uu \
 	libarchive/test/test_read_format_zip_bzip2.zipx.uu \
 	libarchive/test/test_read_format_zip_bzip2_multi.zipx.uu \
@@ -946,7 +954,8 @@ libarchive_test_EXTRA_DIST=\
 	libarchive/test/test_read_large_splitted_rar_ac.uu \
 	libarchive/test/test_read_large_splitted_rar_ad.uu \
 	libarchive/test/test_read_large_splitted_rar_ae.uu \
-	libarchive/test/test_read_pax_schily_xattr.tar.uu \
+	libarchive/test/test_read_pax_xattr_rht_security_selinux.tar.uu \
+	libarchive/test/test_read_pax_xattr_schily.tar.uu \
 	libarchive/test/test_read_splitted_rar_aa.uu \
 	libarchive/test/test_read_splitted_rar_ab.uu \
 	libarchive/test/test_read_splitted_rar_ac.uu \

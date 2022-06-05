@@ -4,7 +4,7 @@
  *
  *   FreeType modules public interface (specification).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -20,8 +20,7 @@
 #define FTMODAPI_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -46,10 +45,12 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   The definitions below are used to manage modules within FreeType.
-   *   Modules can be added, upgraded, and removed at runtime.  Additionally,
-   *   some module properties can be controlled also.
+   *   Internal and external modules can be added, upgraded, and removed at
+   *   runtime.  For example, an alternative renderer or proprietary font
+   *   driver can be registered and prioritized.  Additionally, some module
+   *   properties can also be controlled.
    *
-   *   Here is a list of possible values of the `module_name` field in the
+   *   Here is a list of existing values of the `module_name` field in the
    *   @FT_Module_Class structure.
    *
    *   ```
@@ -65,7 +66,7 @@ FT_BEGIN_HEADER
    *     psnames
    *     raster1
    *     sfnt
-   *     smooth, smooth-lcd, smooth-lcdv
+   *     smooth
    *     truetype
    *     type1
    *     type42
@@ -87,6 +88,7 @@ FT_BEGIN_HEADER
    *   FT_Remove_Module
    *   FT_Add_Default_Modules
    *
+   *   FT_FACE_DRIVER_NAME
    *   FT_Property_Set
    *   FT_Property_Get
    *   FT_Set_Default_Properties
@@ -329,7 +331,28 @@ FT_BEGIN_HEADER
                     FT_Module   module );
 
 
-  /**********************************************************************
+  /**************************************************************************
+   *
+   * @macro:
+   *   FT_FACE_DRIVER_NAME
+   *
+   * @description:
+   *   A macro that retrieves the name of a font driver from a face object.
+   *
+   * @note:
+   *   The font driver name is a valid `module_name` for @FT_Property_Set
+   *   and @FT_Property_Get.  This is not the same as @FT_Get_Font_Format.
+   *
+   * @since:
+   *   2.11
+   *
+   */
+#define FT_FACE_DRIVER_NAME( face )                                     \
+          ( ( *FT_REINTERPRET_CAST( FT_Module_Class**,                  \
+                                    ( face )->driver ) )->module_name )
+
+
+  /**************************************************************************
    *
    * @function:
    *    FT_Property_Set
@@ -352,7 +375,7 @@ FT_BEGIN_HEADER
    *
    *    value ::
    *      A generic pointer to a variable or structure that gives the new
-   *      value of the property.  The exact definition of 'value' is
+   *      value of the property.  The exact definition of `value` is
    *      dependent on the property; see section @properties.
    *
    * @return:
@@ -360,7 +383,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *    If `module_name` isn't a valid module name, or `property_name`
-   *    doesn't specify a valid property, or if 'value' doesn't represent a
+   *    doesn't specify a valid property, or if `value` doesn't represent a
    *    valid value for the given property, an error is returned.
    *
    *    The following example sets property 'bar' (a simple integer) in
@@ -393,7 +416,7 @@ FT_BEGIN_HEADER
                    const void*       value );
 
 
-  /**********************************************************************
+  /**************************************************************************
    *
    * @function:
    *    FT_Property_Get
@@ -415,7 +438,7 @@ FT_BEGIN_HEADER
    * @inout:
    *    value ::
    *      A generic pointer to a variable or structure that gives the value
-   *      of the property.  The exact definition of 'value' is dependent on
+   *      of the property.  The exact definition of `value` is dependent on
    *      the property; see section @properties.
    *
    * @return:
@@ -423,7 +446,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *    If `module_name` isn't a valid module name, or `property_name`
-   *    doesn't specify a valid property, or if 'value' doesn't represent a
+   *    doesn't specify a valid property, or if `value` doesn't represent a
    *    valid value for the given property, an error is returned.
    *
    *    The following example gets property 'baz' (a range) in module 'foo'.
@@ -462,9 +485,10 @@ FT_BEGIN_HEADER
    *   FT_Set_Default_Properties
    *
    * @description:
-   *   If compilation option FT_CONFIG_OPTION_ENVIRONMENT_PROPERTIES is set,
-   *   this function reads the `FREETYPE_PROPERTIES` environment variable to
-   *   control driver properties.  See section @properties for more.
+   *   If compilation option `FT_CONFIG_OPTION_ENVIRONMENT_PROPERTIES` is
+   *   set, this function reads the `FREETYPE_PROPERTIES` environment
+   *   variable to control driver properties.  See section @properties for
+   *   more.
    *
    *   If the compilation option is not set, this function does nothing.
    *
@@ -485,8 +509,7 @@ FT_BEGIN_HEADER
    *
    *   ```
    *     FREETYPE_PROPERTIES=truetype:interpreter-version=35 \
-   *                         cff:no-stem-darkening=1 \
-   *                         autofitter:warping=1
+   *                         cff:no-stem-darkening=0
    *   ```
    *
    * @inout:
@@ -591,10 +614,54 @@ FT_BEGIN_HEADER
   FT_EXPORT( FT_Error )
   FT_Done_Library( FT_Library  library );
 
-  /* */
 
-  typedef void
+  /**************************************************************************
+   *
+   * @functype:
+   *   FT_DebugHook_Func
+   *
+   * @description:
+   *   A drop-in replacement (or rather a wrapper) for the bytecode or
+   *   charstring interpreter's main loop function.
+   *
+   *   Its job is essentially
+   *
+   *   - to activate debug mode to enforce single-stepping,
+   *
+   *   - to call the main loop function to interpret the next opcode, and
+   *
+   *   - to show the changed context to the user.
+   *
+   *   An example for such a main loop function is `TT_RunIns` (declared in
+   *   FreeType's internal header file `src/truetype/ttinterp.h`).
+   *
+   *   Have a look at the source code of the `ttdebug` FreeType demo program
+   *   for an example of a drop-in replacement.
+   *
+   * @inout:
+   *   arg ::
+   *     A typeless pointer, to be cast to the main loop function's data
+   *     structure (which depends on the font module).  For TrueType fonts
+   *     it is bytecode interpreter's execution context, `TT_ExecContext`,
+   *     which is declared in FreeType's internal header file `tttypes.h`.
+   */
+  typedef FT_Error
   (*FT_DebugHook_Func)( void*  arg );
+
+
+  /**************************************************************************
+   *
+   * @enum:
+   *   FT_DEBUG_HOOK_XXX
+   *
+   * @description:
+   *   A list of named debug hook indices.
+   *
+   * @values:
+   *   FT_DEBUG_HOOK_TRUETYPE::
+   *     This hook index identifies the TrueType bytecode debugger.
+   */
+#define FT_DEBUG_HOOK_TRUETYPE  0
 
 
   /**************************************************************************
@@ -606,25 +673,27 @@ FT_BEGIN_HEADER
    *   Set a debug hook function for debugging the interpreter of a font
    *   format.
    *
+   *   While this is a public API function, an application needs access to
+   *   FreeType's internal header files to do something useful.
+   *
+   *   Have a look at the source code of the `ttdebug` FreeType demo program
+   *   for an example of its usage.
+   *
    * @inout:
    *   library ::
    *     A handle to the library object.
    *
    * @input:
    *   hook_index ::
-   *     The index of the debug hook.  You should use the values defined in
-   *     `ftobjs.h`, e.g., `FT_DEBUG_HOOK_TRUETYPE`.
+   *     The index of the debug hook.  You should use defined enumeration
+   *     macros like @FT_DEBUG_HOOK_TRUETYPE.
    *
    *   debug_hook ::
    *     The function used to debug the interpreter.
    *
    * @note:
-   *   Currently, four debug hook slots are available, but only two (for the
-   *   TrueType and the Type~1 interpreter) are defined.
-   *
-   *   Since the internal headers of FreeType are no longer installed, the
-   *   symbol `FT_DEBUG_HOOK_TRUETYPE` isn't available publicly.  This is a
-   *   bug and will be fixed in a forthcoming release.
+   *   Currently, four debug hook slots are available, but only one (for the
+   *   TrueType interpreter) is defined.
    */
   FT_EXPORT( void )
   FT_Set_Debug_Hook( FT_Library         library,

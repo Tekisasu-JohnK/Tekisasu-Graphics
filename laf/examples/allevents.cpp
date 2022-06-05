@@ -1,5 +1,5 @@
 // LAF Library
-// Copyright (c) 2019-2020  Igara Studio S.A.
+// Copyright (c) 2019-2021  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -17,9 +17,8 @@
 class LogWindow {
 public:
   LogWindow(os::System* system)
-    : m_display(system->createDisplay(800, 600, 1)) {
-    m_display->setNativeMouseCursor(os::kArrowCursor);
-    m_display->setTitle("All Events");
+    : m_window(system->makeWindow(800, 600)) {
+    m_window->setTitle("All Events");
 
     recalcMaxLines();
 
@@ -29,13 +28,14 @@ public:
   bool processEvent(const os::Event& ev) {
     switch (ev.type()) {
 
-      case os::Event::CloseDisplay:
+      case os::Event::CloseApp:
+      case os::Event::CloseWindow:
         return false;
 
-      case os::Event::ResizeDisplay:
-        logLine("ResizeDisplay size=%d,%d",
-                m_display->width(),
-                m_display->height());
+      case os::Event::ResizeWindow:
+        logLine("ResizeWindow size=%d,%d",
+                m_window->width(),
+                m_window->height());
         recalcMaxLines();
         break;
 
@@ -117,11 +117,11 @@ public:
 
 private:
   void recalcMaxLines() {
-    m_maxlines = (m_display->height() - m_lineHeight) / m_lineHeight;
+    m_maxlines = (m_window->height() - m_lineHeight) / m_lineHeight;
   }
 
   void scrollAndDrawLog(const int newlines) {
-    os::Surface* surface = m_display->getSurface();
+    os::Surface* surface = m_window->surface();
     os::SurfaceLock lock(surface);
     const gfx::Rect rc = surface->bounds();
 
@@ -158,8 +158,11 @@ private:
     paint.antialias(true);
     surface->drawCircle(m_mousePos.x, m_mousePos.y, m_brushSize, paint);
 
-    // Invalidates the whole display to show it on the screen.
-    m_display->invalidateRegion(gfx::Region(rc));
+    // Invalidates the whole window to show it on the screen.
+    if (m_window->isVisible())
+      m_window->invalidateRegion(gfx::Region(rc));
+    else
+      m_window->setVisible(true);
   }
 
   void logMouseEvent(const os::Event& ev, const char* eventName) {
@@ -206,7 +209,7 @@ private:
     return s;
   }
 
-  os::DisplayHandle m_display;
+  os::WindowRef m_window;
   std::vector<std::string> m_textLog;
   size_t m_oldLogSize = 0;
   int m_lineHeight = 12;
@@ -219,10 +222,10 @@ private:
 
 int app_main(int argc, char* argv[])
 {
-  os::SystemHandle system(os::create_system());
+  auto system = os::make_system();
   system->setAppMode(os::AppMode::GUI);
 
-  LogWindow window(system);
+  LogWindow window(system.get());
 
   system->finishLaunching();
   system->activateApp();
@@ -232,7 +235,7 @@ int app_main(int argc, char* argv[])
     window.flush();
 
     os::Event ev;
-    queue->getEvent(ev, true);
+    queue->getEvent(ev);
     if (!window.processEvent(ev))
       break;
   }

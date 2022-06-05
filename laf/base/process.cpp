@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2015-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,17 +11,17 @@
 
 #include "base/process.h"
 
-#ifdef _WIN32
-#include <windows.h>
+#if LAF_WINDOWS
+  #include <windows.h>
 #else
-#include <signal.h>
-#include <sys/types.h>
-#include <unistd.h>
+  #include <signal.h>
+  #include <sys/types.h>
+  #include <unistd.h>
 #endif
 
 namespace base {
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 
 pid get_current_process_id()
 {
@@ -43,7 +44,7 @@ bool is_process_running(pid pid)
   return running;
 }
 
-#else
+#else // !LAF_WINDOWS
 
 pid get_current_process_id()
 {

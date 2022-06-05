@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,7 +11,7 @@
 
 #include "base/mutex.h"
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include "base/mutex_win32.h"
 #else
   #include "base/mutex_pthread.h"

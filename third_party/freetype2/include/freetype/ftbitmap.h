@@ -4,7 +4,7 @@
  *
  *   FreeType utility functions for bitmaps (specification).
  *
- * Copyright 2004-2018 by
+ * Copyright (C) 2004-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -20,9 +20,8 @@
 #define FTBITMAP_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_COLOR_H
+#include <freetype/freetype.h>
+#include <freetype/ftcolor.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -50,10 +49,10 @@ FT_BEGIN_HEADER
    *   automatically adjusting the target's bitmap buffer size as needed.
    *
    *   Note that none of the functions changes the bitmap's 'flow' (as
-   *   indicated by the sign of the 'pitch' field in @FT_Bitmap).
+   *   indicated by the sign of the `pitch` field in @FT_Bitmap).
    *
    *   To set the flow, assign an appropriate positive or negative value to
-   *   the 'pitch' field of the target @FT_Bitmap object after calling
+   *   the `pitch` field of the target @FT_Bitmap object after calling
    *   @FT_Bitmap_Init but before calling any of the other functions
    *   described here.
    */
@@ -169,7 +168,7 @@ FT_BEGIN_HEADER
    * @description:
    *   Convert a bitmap object with depth 1bpp, 2bpp, 4bpp, 8bpp or 32bpp to
    *   a bitmap object with depth 8bpp, making the number of used bytes per
-   *   line (a.k.a. the 'pitch') a multiple of 'alignment'.
+   *   line (a.k.a. the 'pitch') a multiple of `alignment`.
    *
    * @input:
    *   library ::
@@ -195,7 +194,7 @@ FT_BEGIN_HEADER
    *
    *   Use @FT_Bitmap_Done to finally remove the bitmap object.
    *
-   *   The 'library' argument is taken to have access to FreeType's memory
+   *   The `library` argument is taken to have access to FreeType's memory
    *   handling functions.
    *
    *   `source->buffer` and `target->buffer` must neither be equal nor
@@ -225,10 +224,11 @@ FT_BEGIN_HEADER
    *
    *   source_offset ::
    *     The offset vector to the upper left corner of the source bitmap in
-   *     26.6 pixel format.  This can be a fractional pixel value.
+   *     26.6 pixel format.  It should represent an integer offset; the
+   *     function will set the lowest six bits to zero to enforce that.
    *
    *   color ::
-   *     The color used to draw 'source' onto 'target'.
+   *     The color used to draw `source` onto `target`.
    *
    * @inout:
    *   target ::
@@ -247,12 +247,12 @@ FT_BEGIN_HEADER
    * @note:
    *   This function doesn't perform clipping.
    *
-   *   The bitmap in 'target' gets allocated or reallocated as needed; the
+   *   The bitmap in `target` gets allocated or reallocated as needed; the
    *   vector `atarget_offset` is updated accordingly.
    *
    *   In case of allocation or reallocation, the bitmap's pitch is set to
-   *   '4~*~width'.  Both 'source' and 'target' must have the same bitmap
-   *   flow (as indicated by the sign of the 'pitch' field).
+   *   `4 * width`.  Both `source` and `target` must have the same bitmap
+   *   flow (as indicated by the sign of the `pitch` field).
    *
    *   `source->buffer` and `target->buffer` must neither be equal nor
    *   overlap.
@@ -310,7 +310,7 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   The 'library' argument is taken to have access to FreeType's memory
+   *   The `library` argument is taken to have access to FreeType's memory
    *   handling functions.
    */
   FT_EXPORT( FT_Error )

@@ -1,5 +1,5 @@
 # LAF OS
-# Copyright (C) 2018-2020  Igara Studio S.A.
+# Copyright (C) 2018-2022  Igara Studio S.A.
 # Copyright (C) 2012-2018  David Capello
 
 ######################################################################
@@ -8,8 +8,8 @@
 set(LAF_OS_SOURCES
   common/event_queue.cpp
   common/main.cpp
-  display.cpp
-  system.cpp)
+  system.cpp
+  window.cpp)
 if(WIN32)
   list(APPEND LAF_OS_SOURCES
     win/color_space.cpp
@@ -34,15 +34,19 @@ elseif(APPLE)
       osx/logger.mm
       osx/menus.mm
       osx/native_dialogs.mm
+      osx/system.mm
       osx/view.mm
-      osx/window.mm)
+      osx/window.mm
+      gl/gl_context_nsgl.mm)
   endif()
 else()
   list(APPEND LAF_OS_SOURCES
     x11/event_queue.cpp
     x11/keys.cpp
+    x11/system.cpp
     x11/window.cpp
-    x11/x11.cpp)
+    x11/x11.cpp
+    x11/xinput.cpp)
   if(LAF_OS_WITH_GTK)
     list(APPEND LAF_OS_SOURCES
       gtk/native_dialogs.cpp)
@@ -58,12 +62,12 @@ if(LAF_BACKEND STREQUAL "skia")
   endif()
   list(APPEND LAF_OS_SOURCES
     skia/os.cpp
-    skia/resize_surface.cpp
     skia/skia_color_space.cpp
-    skia/skia_display.cpp
     skia/skia_draw_text.cpp
     skia/skia_draw_text_with_shaper.cpp
-    skia/skia_surface.cpp)
+    skia/skia_gl.cpp
+    skia/skia_surface.cpp
+    skia/skia_window.cpp)
   if(WIN32)
     list(APPEND LAF_OS_SOURCES
       skia/skia_window_win.cpp)
@@ -101,7 +105,8 @@ set(LAF_OS_PLATFORM_LIBS)
 if(WIN32)
   list(APPEND LAF_OS_PLATFORM_LIBS
     kernel32 user32 gdi32 comdlg32 ole32 winmm
-    shlwapi psapi wininet comctl32 dbghelp)
+    shlwapi psapi wininet comctl32 dbghelp dwmapi
+    msimg32)
 
   # Don't define min/max() macros when including <windows.h>
   target_compile_options(laf-os PRIVATE -DNOMINMAX)
@@ -116,7 +121,10 @@ elseif(APPLE)
   endif()
 
   target_compile_options(laf-os PRIVATE
-    -Wno-ignored-attributes -Wno-unused-result -Wno-deprecated-declarations
+    -Wno-ignored-attributes
+    -Wno-unused-result
+    -Wno-deprecated-declarations
+    -Werror=inconsistent-missing-override
     # Use Automatic Reference Counting
     -fobjc-arc)
 else()
@@ -139,9 +147,16 @@ else()
   if(LAF_OS_WITH_GTK)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK gtk+-3.0)
-    target_link_directories(laf-os ${GTK_LIBRARY_DIRS})
+    if(GTK_LIBRARY_DIRS)
+      target_link_directories(laf-os ${GTK_LIBRARY_DIRS})
+    endif()
+    target_link_libraries(laf-os ${GTK_LIBRARIES})
     target_include_directories(laf-os PRIVATE ${GTK_INCLUDE_DIRS})
     target_compile_definitions(laf-os PRIVATE LAF_OS_WITH_GTK)
+  endif()
+
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(laf-os PRIVATE -Werror=suggest-override)
   endif()
 endif()
 

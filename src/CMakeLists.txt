@@ -1,5 +1,5 @@
 # Aseprite
-# Copyright (C) 2019-2020  Igara Studio S.A.
+# Copyright (C) 2019-2022  Igara Studio S.A.
 # Copyright (C) 2001-2018  David Capello
 
 ######################################################################
@@ -74,6 +74,11 @@ if(ENABLE_SCRIPTING)
   add_definitions(-DENABLE_SCRIPTING)
 endif()
 
+if(ENABLE_WEBSOCKET)
+  # Needed for "app" and "main"
+  add_definitions(-DENABLE_WEBSOCKET)
+endif()
+
 ######################################################################
 # Aseprite Libraries (in preferred order to be built)
 
@@ -97,6 +102,9 @@ add_subdirectory(doc)
 add_subdirectory(filters)
 add_subdirectory(fixmath)
 add_subdirectory(flic)
+if(ENABLE_PSD)
+  add_subdirectory(psd)
+endif()
 add_subdirectory(tga)
 add_subdirectory(render)
 add_subdirectory(dio)
@@ -125,7 +133,7 @@ if(ENABLE_STEAM)
   add_subdirectory(steam)
 endif()
 
-if(WITH_DESKTOP_INTEGRATION)
+if(ENABLE_DESKTOP_INTEGRATION)
   add_subdirectory(desktop)
 endif()
 
@@ -134,33 +142,35 @@ add_subdirectory(app)
 ######################################################################
 # Copy data/ directory target
 
+set(DATA_OUTPUT_DIR ${CMAKE_BINARY_DIR}/bin/data)
+
 file(GLOB_RECURSE src_data_files
   RELATIVE ${SOURCE_DATA_DIR}/ "${SOURCE_DATA_DIR}/*.*")
 foreach(fn ${src_data_files})
   add_custom_command(
-    OUTPUT ${CMAKE_BINARY_DIR}/bin/data/${fn}
-    COMMAND ${CMAKE_COMMAND} -E copy ${SOURCE_DATA_DIR}/${fn} ${CMAKE_BINARY_DIR}/bin/data/${fn}
+    OUTPUT ${DATA_OUTPUT_DIR}/${fn}
+    COMMAND ${CMAKE_COMMAND} -E copy ${SOURCE_DATA_DIR}/${fn} ${DATA_OUTPUT_DIR}/${fn}
     MAIN_DEPENDENCY ${SOURCE_DATA_DIR}/${fn})
-  list(APPEND out_data_files ${CMAKE_BINARY_DIR}/bin/data/${fn})
+  list(APPEND out_data_files ${DATA_OUTPUT_DIR}/${fn})
 endforeach()
 
 add_custom_command(
-  OUTPUT ${CMAKE_BINARY_DIR}/bin/data/README.md
-  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../README.md ${CMAKE_BINARY_DIR}/bin/data/README.md
+  OUTPUT ${DATA_OUTPUT_DIR}/README.md
+  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../README.md ${DATA_OUTPUT_DIR}/README.md
   MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/../README.md)
-list(APPEND out_data_files ${CMAKE_BINARY_DIR}/bin/data/README.md)
+list(APPEND out_data_files ${DATA_OUTPUT_DIR}/README.md)
 
 add_custom_command(
-  OUTPUT ${CMAKE_BINARY_DIR}/bin/data/EULA.txt
-  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../EULA.txt ${CMAKE_BINARY_DIR}/bin/data/EULA.txt
+  OUTPUT ${DATA_OUTPUT_DIR}/EULA.txt
+  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../EULA.txt ${DATA_OUTPUT_DIR}/EULA.txt
   MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/../EULA.txt)
-list(APPEND out_data_files ${CMAKE_BINARY_DIR}/bin/data/EULA.txt)
+list(APPEND out_data_files ${DATA_OUTPUT_DIR}/EULA.txt)
 
 add_custom_command(
-  OUTPUT ${CMAKE_BINARY_DIR}/bin/data/docs/LICENSES.md
-  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../docs/LICENSES.md ${CMAKE_BINARY_DIR}/bin/data/docs/LICENSES.md
+  OUTPUT ${DATA_OUTPUT_DIR}/docs/LICENSES.md
+  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../docs/LICENSES.md ${DATA_OUTPUT_DIR}/docs/LICENSES.md
   MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/../docs/LICENSES.md)
-list(APPEND out_data_files ${CMAKE_BINARY_DIR}/bin/data/docs/LICENSES.md)
+list(APPEND out_data_files ${DATA_OUTPUT_DIR}/docs/LICENSES.md)
 
 add_custom_target(copy_data DEPENDS ${out_data_files})
 
@@ -168,26 +178,32 @@ add_custom_target(copy_data DEPENDS ${out_data_files})
 # Aseprite application
 
 if(ENABLE_ASEPRITE_EXE)
+  set(main_target aseprite)
+
   if(WIN32)
-    set(win32_resources
+    set(main_resources
       main/resources_win32.rc
       main/settings.manifest)
   endif()
 
-  add_executable(aseprite main/main.cpp ${win32_resources})
-  if(WIN32 AND ENABLE_UI)
-    set_target_properties(aseprite PROPERTIES WIN32_EXECUTABLE true)
+  add_executable(${main_target}
+    main/main.cpp
+    ${main_resources})
+  if(ENABLE_UI)
+    if(WIN32)
+      set_target_properties(${main_target} PROPERTIES WIN32_EXECUTABLE true)
+    endif()
   endif()
-  set_target_properties(aseprite PROPERTIES LINK_FLAGS "${LAF_BACKEND_LINK_FLAGS}")
-  target_link_libraries(aseprite app-lib)
-  add_dependencies(aseprite copy_data)
+  set_target_properties(${main_target} PROPERTIES LINK_FLAGS "${LAF_BACKEND_LINK_FLAGS}")
+  target_link_libraries(${main_target} app-lib)
+  add_dependencies(${main_target} copy_data)
 
   if(LAF_OS_BACKEND_LINK_FLAGS)
-    set_target_properties(aseprite PROPERTIES LINK_FLAGS
+    set_target_properties(${main_target} PROPERTIES LINK_FLAGS
       ${LAF_OS_BACKEND_LINK_FLAGS})
   endif()
 
-  install(TARGETS aseprite
+  install(TARGETS ${main_target}
     RUNTIME DESTINATION bin)
 
   install(DIRECTORY ../data
@@ -211,6 +227,7 @@ endif()
 
 if(ENABLE_BENCHMARKS)
   include(FindBenchmarks)
+  find_benchmarks(app app-lib)
   find_benchmarks(doc doc-lib)
   find_benchmarks(doc/algorithm doc-lib)
   find_benchmarks(render render-lib)

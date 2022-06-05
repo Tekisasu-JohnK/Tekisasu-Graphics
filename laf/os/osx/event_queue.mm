@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2015-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -18,62 +18,80 @@
 
 namespace os {
 
-OSXEventQueue::OSXEventQueue()
+EventQueueOSX::EventQueueOSX()
   : m_sleeping(false)
 {
 }
 
-void OSXEventQueue::getEvent(Event& ev, bool canWait)
+void EventQueueOSX::getEvent(Event& ev, double timeout)
 {
+  // Calculate the date to wait messages if there are no messages in
+  // the queue (we calculate this date here because the "timeout"
+  // parameter depends on the current time, so we prefer to use it
+  // ASAP inside the function).
+  NSDate* untilDate;
+  if (timeout != kWithoutTimeout) {
+    untilDate = [[NSDate alloc] init]; // Equivalent to [NSDate now] on macOS 10.15+
+    if (timeout > 0.0)
+      untilDate = [untilDate dateByAddingTimeInterval:timeout];
+  }
+  else {
+    untilDate = [NSDate distantFuture];
+  }
+
   ev.setType(Event::None);
+  ev.setWindow(nullptr);
 
-  @autoreleasepool {
-    NSApplication* app = [NSApplication sharedApplication];
-    if (!app)
-      return;
+  NSApplication* app = [NSApplication sharedApplication];
+  if (!app)
+    return;
 
-    NSEvent* event;
-    do {
-      // Pump the whole queue of Cocoa events
-      event = [app nextEventMatchingMask:NSEventMaskAny
-                               untilDate:[NSDate distantPast]
-                                  inMode:NSDefaultRunLoopMode
-                                 dequeue:YES];
-    retry:
-      if (event) {
-        // Intercept <Control+Tab>, <Cmd+[>, and other keyboard
-        // combinations, and send them directly to the main
-        // NSView. Without this, the NSApplication intercepts the key
-        // combination and use it to go to the next key view.
-        if (event.type == NSEventTypeKeyDown) {
-          [app.mainWindow.contentView keyDown:event];
-        }
-        else {
-          [app sendEvent:event];
-        }
+  NSEvent* event;
+  do {
+    // Pump the whole queue of Cocoa events
+    event = [app nextEventMatchingMask:NSEventMaskAny
+                             untilDate:[NSDate distantPast]
+                                inMode:NSDefaultRunLoopMode
+                               dequeue:YES];
+  retry:
+    if (event) {
+      // Intercept <Control+Tab>, <Cmd+[>, and other keyboard
+      // combinations, and send them directly to the main
+      // NSView. Without this, the NSApplication intercepts the key
+      // combination and use it to go to the next key view.
+      if (event.type == NSEventTypeKeyDown &&
+          app.keyWindow) {
+        [app.keyWindow.contentView keyDown:event];
       }
-    } while (event);
-
-    if (!m_events.try_pop(ev)) {
-      if (canWait) {
-        EV_TRACE("EV: Waiting for events\n");
-
-        // Wait until there is a Cocoa event in queue
-        m_sleeping = true;
-        event = [app nextEventMatchingMask:NSEventMaskAny
-                                 untilDate:[NSDate distantFuture]
-                                    inMode:NSDefaultRunLoopMode
-                                   dequeue:YES];
-        m_sleeping = false;
-
-        EV_TRACE("EV: Event received!\n");
-        goto retry;
+      else {
+        [app sendEvent:event];
       }
+    }
+  } while (event);
+
+  if (!m_events.try_pop(ev)) {
+    if (timeout == kWithoutTimeout)
+      EV_TRACE("EV: Waiting for events\n");
+
+    // Wait until there is a Cocoa event in queue
+    m_sleeping = true;
+    event = [app nextEventMatchingMask:NSEventMaskAny
+                             untilDate:untilDate
+                                inMode:NSDefaultRunLoopMode
+                               dequeue:YES];
+    m_sleeping = false;
+
+    if (event) {
+      EV_TRACE("EV: Event received!\n");
+      goto retry;
+    }
+    else {
+      EV_TRACE("EV: Timeout!");
     }
   }
 }
 
-void OSXEventQueue::queueEvent(const Event& ev)
+void EventQueueOSX::queueEvent(const Event& ev)
 {
   if (m_sleeping) {
     // Wake up the macOS event queue. This is necessary in case that we
@@ -90,25 +108,29 @@ void OSXEventQueue::queueEvent(const Event& ev)
   m_events.push(ev);
 }
 
-void OSXEventQueue::wakeUpQueue()
+void EventQueueOSX::wakeUpQueue()
 {
   EV_TRACE("EV: Force queue wake up!\n");
 
-  @autoreleasepool {
-    NSApplication* app = [NSApplication sharedApplication];
-    if (!app)
-      return;
-    [app postEvent:[NSEvent otherEventWithType:NSApplicationDefined
-                                      location:NSZeroPoint
-                                 modifierFlags:0
-                                     timestamp:0
-                                  windowNumber:0
-                                       context:nullptr
-                                       subtype:0
-                                         data1:0
-                                         data2:0]
-           atStart:NO];
-  }
+  NSApplication* app = [NSApplication sharedApplication];
+  if (!app)
+    return;
+
+  [app postEvent:[NSEvent otherEventWithType:NSApplicationDefined
+                                    location:NSZeroPoint
+                               modifierFlags:0
+                                   timestamp:0
+                                windowNumber:0
+                                     context:nullptr
+                                     subtype:0
+                                       data1:0
+                                       data2:0]
+         atStart:NO];
+}
+
+void EventQueueOSX::clearEvents()
+{
+  m_events.clear();
 }
 
 } // namespace os

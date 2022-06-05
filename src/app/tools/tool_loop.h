@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -10,12 +10,15 @@
 #pragma once
 
 #include "app/shade.h"
+#include "app/util/tiled_mode.h"
 #include "app/tools/dynamics.h"
+#include "app/tools/stroke.h"
 #include "app/tools/tool_loop_modifiers.h"
 #include "app/tools/trace_policy.h"
 #include "doc/brush.h"
 #include "doc/color.h"
 #include "doc/frame.h"
+#include "doc/grid.h"
 #include "filters/tiled_mode.h"
 #include "gfx/point.h"
 #include "gfx/rect.h"
@@ -29,10 +32,12 @@ namespace doc {
   class Image;
   class Layer;
   class Mask;
+  class Palette;
   class Remap;
   class RgbMap;
   class Slice;
   class Sprite;
+  class Tileset;
 }
 
 namespace render {
@@ -67,7 +72,8 @@ namespace app {
 
       virtual ~ToolLoop() { }
 
-      virtual void commitOrRollback() = 0;
+      virtual void commit() = 0;
+      virtual void rollback() = 0;
 
       // Returns the tool to use to draw or use
       virtual Tool* getTool() = 0;
@@ -85,6 +91,13 @@ namespace app {
       // Returns the layer that will be modified if the tool paints
       virtual Layer* getLayer() = 0;
 
+      virtual const Cel* getCel() = 0;
+
+      // Returns true if the current mode is TileMap (false = Pixels)
+      virtual bool isTilemapMode() = 0;
+
+      virtual bool isManualTilesetMode() const = 0;
+
       // Returns the frame where we're paiting
       virtual frame_t getFrame() = 0;
 
@@ -97,6 +110,11 @@ namespace app {
       // Should return an image where we can write pixels
       virtual Image* getDstImage() = 0;
 
+      // Can return a tileset used for preview purposes in Manual
+      // tiles mode (to show a preview modifying all instances of the
+      // same tile at the same time).
+      virtual Tileset* getDstTileset() = 0;
+
       // Makes the specified region valid in the source
       // image. Basically the implementation should copy from the
       // original cel the given region to the source image. The source
@@ -108,6 +126,7 @@ namespace app {
       // brush, so we've to make sure that the destination image
       // matches the original cel when we make that composition.
       virtual void validateDstImage(const gfx::Region& rgn) = 0;
+      virtual void validateDstTileset(const gfx::Region& rgn) = 0;
 
       // Invalidates the whole destination image. It's used for tools
       // like line or rectangle which don't accumulate the effect so
@@ -119,6 +138,9 @@ namespace app {
       // Copies the given region from the destination to the source
       // image, used by "overlap" tools like jumble or spray.
       virtual void copyValidDstToSrcImage(const gfx::Region& rgn) = 0;
+
+      // Returns the current Palette.
+      virtual Palette* getPalette() = 0;
 
       // Returns the RGB map used to convert RGB values to palette index.
       virtual RgbMap* getRgbMap() = 0;
@@ -182,6 +204,7 @@ namespace app {
       virtual bool getSnapToGrid() = 0;
       virtual bool isSelectingTiles() = 0;
       virtual bool getStopAtGrid() = 0; // For floodfill-like tools
+      virtual const doc::Grid& getGrid() const = 0;
       virtual gfx::Rect getGridBounds() = 0;
       virtual bool isPixelConnectivityEightConnected() = 0;
 
@@ -200,6 +223,7 @@ namespace app {
 
       // X,Y origin of the cel where we are drawing
       virtual gfx::Point getCelOrigin() = 0;
+      virtual bool needsCelCoordinates() = 0;
 
       // Velocity vector of the mouse
       virtual void setSpeed(const gfx::Point& speed) = 0;
@@ -219,13 +243,6 @@ namespace app {
       virtual const Shade& getShade() = 0;
       virtual const doc::Remap* getShadingRemap() = 0;
 
-      // Used by the tool when the user cancels the operation pressing the
-      // other mouse button.
-      virtual void cancel() = 0;
-
-      // Returns true if the loop was canceled by the user
-      virtual bool isCanceled() = 0;
-
       virtual void limitDirtyAreaToViewport(gfx::Region& rgn) = 0;
 
       // Redraws the dirty area.
@@ -244,6 +261,8 @@ namespace app {
 
       // Called when the user release the mouse on SliceInk
       virtual void onSliceRect(const gfx::Rect& bounds) = 0;
+
+      virtual const app::TiledModeHelper& getTiledModeHelper() = 0;
     };
 
   } // namespace tools

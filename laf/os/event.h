@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -14,6 +14,7 @@
 #include "gfx/size.h"
 #include "os/keys.h"
 #include "os/pointer_type.h"
+#include "os/window.h"
 
 #include <functional>
 
@@ -22,15 +23,26 @@
 
 namespace os {
 
-  class Display;
-
   class Event {
   public:
     enum Type {
       None,
-      CloseDisplay,
-      ResizeDisplay,
+
+      // macOS: When the Quit option is selected from the popup menu
+      // of the app icon in the dock bar.
+      CloseApp,
+
+      // When the X is pressed in the current window.
+      CloseWindow,
+
+      // When the window is resized/maximized/restored (any time the
+      // client area size of the window changes)
+      ResizeWindow,
+
+      // Some files are dropped in the window
       DropFiles,
+
+      // Common mouse events
       MouseEnter,
       MouseLeave,
       MouseMove,
@@ -38,8 +50,14 @@ namespace os {
       MouseUp,
       MouseWheel,
       MouseDoubleClick,
+
+      // A key is pressed (or is autorepeated if the key is kept pressed)
       KeyDown,
+
+      // A key is released
       KeyUp,
+
+      // Pinch gesture with fingers to zoom in/out
       TouchMagnify,
       Callback,
     };
@@ -54,7 +72,7 @@ namespace os {
     };
 
     Event() : m_type(None),
-              m_display(nullptr),
+              m_window(nullptr),
               m_scancode(kKeyNil),
               m_modifiers(kKeyUninitializedModifier),
               m_unicodeChar(0),
@@ -68,7 +86,7 @@ namespace os {
     }
 
     Type type() const { return m_type; }
-    Display* display() const { return m_display; }
+    const WindowRef& window() const { return m_window; }
     const base::paths& files() const { return m_files; }
     // TODO Rename this to virtualKey(), which is the real
     // meaning. Then we need another kind of "scan code" with the
@@ -94,7 +112,7 @@ namespace os {
     float pressure() const { return m_pressure; }
 
     void setType(Type type) { m_type = type; }
-    void setDisplay(Display* display) { m_display = display; }
+    void setWindow(const WindowRef& window) { m_window = window; }
     void setFiles(const base::paths& files) { m_files = files; }
     void setCallback(std::function<void()>&& func) { m_callback = std::move(func); }
 
@@ -115,7 +133,7 @@ namespace os {
 
   private:
     Type m_type;
-    Display* m_display;
+    WindowRef m_window;
     base::paths m_files;
     std::function<void()> m_callback;
     KeyScancode m_scancode;

@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2022 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,11 +11,12 @@
 
 #include "base/debug.h"
 #include "base/string.h"
+#include "base/utf8_decode.h"
 
 #include <cctype>
 #include <vector>
 
-#ifdef _WIN32
+#ifdef LAF_WINDOWS
   #include <windows.h>
 #endif
 
@@ -68,7 +69,7 @@ std::string string_to_upper(const std::string& original)
   return to_utf8(result);
 }
 
-#ifdef _WIN32
+#ifdef LAF_WINDOWS
 
 std::string to_utf8(const wchar_t* src, const int n)
 {
@@ -178,14 +179,12 @@ std::wstring from_utf8(const std::string& src)
 #ifdef _DEBUG
   std::vector<wchar_t>::iterator buf_end = buf.end();
 #endif
-  utf8_const_iterator it(src.begin());
-  utf8_const_iterator end(src.end());
+  utf8_decode decode(src);
 
-  while (it != end) {
+  while (int chr = decode.next()) {
     ASSERT(buf_it != buf_end);
-    *buf_it = *it;
+    *buf_it = chr;
     ++buf_it;
-    ++it;
   }
 
   return std::wstring(&buf[0]);
@@ -195,27 +194,34 @@ std::wstring from_utf8(const std::string& src)
 
 int utf8_length(const std::string& utf8string)
 {
-  utf8_const_iterator it(utf8string.begin());
-  utf8_const_iterator end(utf8string.end());
+  utf8_decode decode(utf8string);
   int c = 0;
 
-  while (it != end)
-    ++it, ++c;
+  while (decode.next())
+    ++c;
 
   return c;
 }
 
 int utf8_icmp(const std::string& a, const std::string& b, int n)
 {
-  utf8_const_iterator a_it(a.begin());
-  utf8_const_iterator a_end(a.end());
-  utf8_const_iterator b_it(b.begin());
-  utf8_const_iterator b_end(b.end());
+  utf8_decode a_decode(a);
+  utf8_decode b_decode(b);
   int i = 0;
 
-  for (; (n == 0 || i < n) && a_it != a_end && b_it != b_end; ++a_it, ++b_it, ++i) {
-    int a_chr = std::tolower(*a_it);
-    int b_chr = std::tolower(*b_it);
+  for (; (n == 0 || i < n)
+         && !a_decode.is_end()
+         && !b_decode.is_end(); ++i) {
+    int a_chr = a_decode.next();
+    if (!a_chr)
+      break;
+
+    int b_chr = b_decode.next();
+    if (!b_chr)
+      break;
+
+    a_chr = std::tolower(a_chr);
+    b_chr = std::tolower(b_chr);
 
     if (a_chr < b_chr)
       return -1;
@@ -225,9 +231,9 @@ int utf8_icmp(const std::string& a, const std::string& b, int n)
 
   if (n > 0 && i == n)
     return 0;
-  else if (a_it == a_end && b_it == b_end)
+  else if (a_decode.is_end() && b_decode.is_end())
     return 0;
-  else if (a_it == a_end)
+  else if (a_decode.is_end())
     return -1;
   else
     return 1;

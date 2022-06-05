@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -27,7 +27,10 @@
 #include "app/resource_finder.h"
 #include "app/tx.h"
 #include "app/ui/color_button.h"
+#include "app/ui/main_window.h"
 #include "app/ui/pref_widget.h"
+#include "app/ui/rgbmap_algorithm_selector.h"
+#include "app/ui/sampling_selector.h"
 #include "app/ui/separator_in_view.h"
 #include "app/ui/skin/skin_theme.h"
 #include "base/clamp.h"
@@ -37,10 +40,14 @@
 #include "base/version.h"
 #include "doc/image.h"
 #include "fmt/format.h"
-#include "os/display.h"
 #include "os/system.h"
+#include "os/window.h"
 #include "render/render.h"
 #include "ui/ui.h"
+
+#if ENABLE_SENTRY
+#include "app/sentry_wrapper.h"
+#endif
 
 #include "options.xml.h"
 
@@ -98,22 +105,24 @@ class OptionsWindow : public app::gen::Options {
 
   class ColorSpaceItem : public ListItem {
   public:
-    ColorSpaceItem(const os::ColorSpacePtr& cs)
+    ColorSpaceItem(const os::ColorSpaceRef& cs)
       : ListItem(cs->gfxColorSpace()->name()),
         m_cs(cs) {
     }
-    os::ColorSpacePtr cs() const { return m_cs; }
+    os::ColorSpaceRef cs() const { return m_cs; }
   private:
-    os::ColorSpacePtr m_cs;
+    os::ColorSpaceRef m_cs;
   };
 
   class ThemeItem : public ListItem {
   public:
-    ThemeItem(const std::string& path,
-              const std::string& name)
-      : ListItem(name.empty() ? "-- " + path + " --": name),
+    ThemeItem(const std::string& id,
+              const std::string& path,
+              const std::string& displayName = std::string(),
+              const std::string& variant = std::string())
+      : ListItem(createLabel(path, id, displayName, variant)),
         m_path(path),
-        m_name(name) {
+        m_name(id) {
     }
 
     const std::string& themePath() const { return m_path; }
@@ -128,6 +137,30 @@ class OptionsWindow : public app::gen::Options {
     }
 
   private:
+    static std::string createLabel(const std::string& path,
+                                   const std::string& id,
+                                   const std::string& displayName,
+                                   const std::string& variant) {
+      if (displayName.empty()) {
+        if (id.empty())
+          return fmt::format("-- {} --", path);
+        else
+          return id;
+      }
+      else if (id == displayName) {
+        if (variant.empty())
+          return id;
+        else
+          return fmt::format("{} - {}", id, variant);
+      }
+      else {
+        if (variant.empty())
+          return displayName;
+        else
+          return fmt::format("{} - {}", displayName, variant);
+      }
+    }
+
     std::string m_path;
     std::string m_name;
   };
@@ -176,7 +209,8 @@ class OptionsWindow : public app::gen::Options {
     void uninstall() {
       ASSERT(m_extension);
       ASSERT(canBeUninstalled());
-      App::instance()->extensions().uninstallExtension(m_extension);
+      App::instance()->extensions().uninstallExtension(m_extension,
+                                                       DeletePluginPref::kYes);
       m_extension = nullptr;
     }
 
@@ -187,6 +221,25 @@ class OptionsWindow : public app::gen::Options {
 
   private:
     Extension* m_extension;
+  };
+
+  class ThemeVariantItem : public ButtonSet::Item {
+  public:
+    ThemeVariantItem(OptionsWindow* options,
+                     const std::string& id,
+                     const std::string& variant)
+      : m_options(options)
+      , m_themeId(id) {
+      setText(variant);
+    }
+  private:
+    void onClick() override {
+      m_options->setUITheme(m_themeId,
+                            false,  // Don't adjust scale
+                            false); // Don't recreate variants
+    }
+    OptionsWindow* m_options;
+    std::string m_themeId;
   };
 
 public:
@@ -202,6 +255,9 @@ public:
     , m_restoreUIScaling(m_pref.general.uiScale())
   {
     sectionListbox()->Change.connect([this]{ onChangeSection(); });
+
+    // Theme variants
+    fillThemeVariants();
 
     // Default extension to save files
     fillExtensionsCombobox(defaultExtension(), m_pref.saveFile.defaultExtension());
@@ -331,7 +387,7 @@ public:
 
     // If the platform supports native cursors...
     if ((int(os::instance()->capabilities()) &
-         int(os::Capabilities::CustomNativeMouseCursor)) != 0) {
+         int(os::Capabilities::CustomMouseCursor)) != 0) {
       if (m_pref.cursor.useNativeCursor())
         nativeCursor()->setSelected(true);
       nativeCursor()->Click.connect([this]{ onNativeCursorChange(); });
@@ -400,6 +456,10 @@ public:
 
     nonactiveLayersOpacity()->setValue(m_pref.experimental.nonactiveLayersOpacity());
 
+    rgbmapAlgorithmPlaceholder()->addChild(&m_rgbmapAlgorithmSelector);
+    m_rgbmapAlgorithmSelector.setExpansive(true);
+    m_rgbmapAlgorithmSelector.algorithm(m_pref.quantization.rgbmapAlgorithm());
+
     if (m_pref.editor.showScrollbars())
       showScrollbars()->setSelected(true);
 
@@ -427,11 +487,14 @@ public:
 
     selectScalingItems();
 
-    if ((int(os::instance()->capabilities()) &
-         int(os::Capabilities::GpuAccelerationSwitch)) == int(os::Capabilities::GpuAccelerationSwitch)) {
+#ifdef _DEBUG // TODO enable this on Release when Aseprite supports
+              //      GPU-acceleration properly
+    if (os::instance()->hasCapability(os::Capabilities::GpuAccelerationSwitch)) {
       gpuAcceleration()->setSelected(m_pref.general.gpuAcceleration());
     }
-    else {
+    else
+#endif
+    {
       gpuAcceleration()->setVisible(false);
     }
 
@@ -444,8 +507,18 @@ public:
 
     showHome()->setSelected(m_pref.general.showHome());
 
-    // Right-click
+    // Editor sampling
+    samplingPlaceholder()->addChild(
+      m_samplingSelector = new SamplingSelector(
+        SamplingSelector::Behavior::ChangeOnSave));
 
+    m_samplingSelector->setEnabled(newRenderEngine()->isSelected());
+    newRenderEngine()->Click.connect(
+      [this]{
+        m_samplingSelector->setEnabled(newRenderEngine()->isSelected());
+      });
+
+    // Right-click
     static_assert(int(app::gen::RightClickMode::PAINT_BGCOLOR) == 0, "");
     static_assert(int(app::gen::RightClickMode::PICK_FGCOLOR) == 1, "");
     static_assert(int(app::gen::RightClickMode::ERASE) == 2, "");
@@ -489,6 +562,13 @@ public:
       locateCrashFolder()->Click.connect([this]{ onLocateCrashFolder(); });
     else
       locateCrashFolder()->setVisible(false);
+
+    // Share crashdb
+#if ENABLE_SENTRY
+    shareCrashdb()->setSelected(Sentry::consentGiven());
+#else
+    shareCrashdb()->setVisible(false);
+#endif
 
     // Undo preferences
     limitUndo()->Click.connect([this]{ onLimitUndoCheck(); });
@@ -536,10 +616,19 @@ public:
   void saveConfig() {
     // Save preferences in widgets that are bound to options automatically
     {
-      Message* msg = new Message(kSavePreferencesMessage);
-      msg->setPropagateToChildren(msg);
-      sendMessage(msg);
+      Message msg(kSavePreferencesMessage);
+      msg.setPropagateToChildren(true);
+      sendMessage(&msg);
     }
+
+    // Share crashdb
+#if ENABLE_SENTRY
+    if (shareCrashdb()->isSelected())
+      Sentry::giveConsent();
+    else
+      Sentry::revokeConsent();
+    App::instance()->mainWindow()->updateConsentCheckbox();
+#endif
 
     // Update language
     Strings::instance()->setCurrentLanguage(
@@ -597,6 +686,8 @@ public:
     m_pref.editor.straightLinePreview(straightLinePreview()->isSelected());
     m_pref.eyedropper.discardBrush(discardBrush()->isSelected());
     m_pref.editor.rightClickMode(static_cast<app::gen::RightClickMode>(rightClickBehavior()->getSelectedItemIndex()));
+    if (m_samplingSelector)
+      m_samplingSelector->save();
     m_pref.cursor.paintingCursorType(static_cast<app::gen::PaintingCursorType>(paintingCursorType()->getSelectedItemIndex()));
     m_pref.cursor.cursorColor(cursorColor()->getColor());
     m_pref.cursor.brushPreview(static_cast<app::gen::BrushPreview>(brushPreview()->getSelectedItemIndex()));
@@ -641,7 +732,6 @@ public:
 
           if (j == winCs) {
             name = gfxCs->name();
-            os::instance()->setDisplaysColorSpace(cs);
             break;
           }
           ++j;
@@ -651,7 +741,7 @@ public:
         break;
       }
     }
-    update_displays_color_profile_from_preferences();
+    update_windows_color_profile_from_preferences();
 
     // Change sprite grid bounds
     if (m_context && m_context->activeDocument()) {
@@ -698,6 +788,7 @@ public:
     m_pref.experimental.useNativeFileDialog(nativeFileDialog()->isSelected());
     m_pref.experimental.flashLayer(flashLayer()->isSelected());
     m_pref.experimental.nonactiveLayersOpacity(nonactiveLayersOpacity()->getValue());
+    m_pref.quantization.rgbmapAlgorithm(m_rgbmapAlgorithmSelector.algorithm());
 
 #ifdef _WIN32
     {
@@ -723,7 +814,7 @@ public:
       m_pref.tablet.api(tabletStr);
       m_pref.experimental.loadWintabDriver(wintabState);
 
-      manager()->getDisplay()
+      manager()->display()->nativeWindow()
         ->setInterpretOneFingerGestureAsMouseMovement(
           oneFingerAsMouseMovement()->isSelected());
 
@@ -772,6 +863,10 @@ public:
                     warnings));
     }
 
+    // Probably it's safe to switch this flag in runtime
+    if (m_pref.experimental.multipleWindows() != ui::get_multiple_displays())
+      ui::set_multiple_displays(m_pref.experimental.multipleWindows());
+
     if (reset_screen)
       updateScreenScaling();
   }
@@ -814,6 +909,42 @@ public:
 
 private:
 
+  void fillThemeVariants() {
+    ButtonSet* list = nullptr;
+    for (Extension* ext : App::instance()->extensions()) {
+      if (ext->isCurrentTheme()) {
+        // Number of variants
+        int c = 0;
+        for (auto it : ext->themes()) {
+          if (!it.second.variant.empty())
+            ++c;
+        }
+
+        if (c >= 2) {
+          list = new ButtonSet(c);
+          for (auto it : ext->themes()) {
+            if (!it.second.variant.empty()) {
+              auto item = list->addItem(
+                new ThemeVariantItem(this, it.first, it.second.variant));
+
+              if (it.first == Preferences::instance().theme.selected())
+                list->setSelectedItem(item, false);
+            }
+          }
+        }
+        break;
+      }
+    }
+    if (list) {
+      themeVariants()->addChild(list);
+    }
+    if (m_themeVars) {
+      themeVariants()->removeChild(m_themeVars);
+      m_themeVars->deferDelete();
+    }
+    m_themeVars = list;
+  }
+
   void fillExtensionsCombobox(ui::ComboBox* combobox,
                               const std::string& defExt) {
     base::paths exts = get_writable_extensions();
@@ -843,10 +974,8 @@ private:
 
   void updateScreenScaling() {
     ui::Manager* manager = ui::Manager::getDefault();
-    os::Display* display = manager->getDisplay();
     os::instance()->setGpuAcceleration(m_pref.general.gpuAcceleration());
-    display->setScale(m_pref.general.screenScale());
-    manager->setDisplay(display);
+    manager->updateAllDisplaysWithNewScale(m_pref.general.screenScale());
   }
 
   void onApply() {
@@ -858,9 +987,9 @@ private:
 
   void onNativeCursorChange() {
     bool state =
-      // If the platform supports native cursors...
+      // If the platform supports custom cursors...
       (((int(os::instance()->capabilities()) &
-         int(os::Capabilities::CustomNativeMouseCursor)) != 0) &&
+         int(os::Capabilities::CustomMouseCursor)) != 0) &&
        // If the native cursor option is not selec
        !nativeCursor()->isSelected());
 
@@ -1150,8 +1279,8 @@ private:
   }
 
   void reloadThemes() {
-    while (themeList()->firstChild())
-      delete themeList()->lastChild();
+    while (auto child = themeList()->lastChild())
+      delete child;
 
     loadThemes();
   }
@@ -1161,7 +1290,7 @@ private:
     if (themeList()->getItemsCount() > 0)
       return;
 
-    auto theme = skin::SkinTheme::instance();
+    auto theme = skin::SkinTheme::get(this);
     auto userFolder = userThemeFolder();
     auto folders = themeFolders();
     std::sort(folders.begin(), folders.end());
@@ -1189,7 +1318,7 @@ private:
             new SeparatorInView(base::normalize_path(path), HORIZONTAL));
         }
 
-        ThemeItem* item = new ThemeItem(fullPath, fn);
+        ThemeItem* item = new ThemeItem(fn, fullPath);
         themeList()->addChild(item);
 
         // Selected theme
@@ -1214,11 +1343,14 @@ private:
       }
 
       for (auto it : ext->themes()) {
-        ThemeItem* item = new ThemeItem(it.second, it.first);
+        ThemeItem* item = new ThemeItem(it.first,
+                                        it.second.path,
+                                        ext->displayName(),
+                                        it.second.variant);
         themeList()->addChild(item);
 
         // Selected theme
-        if (it.second == selectedPath)
+        if (it.second.path == selectedPath)
           themeList()->selectChild(item);
       }
     }
@@ -1245,6 +1377,10 @@ private:
     // Extensions already loaded
     if (extensionsList()->getItemsCount() > 0)
       return;
+
+    loadExtensionsByCategory(
+      Extension::Category::Keys,
+      Strings::options_keys_extensions());
 
     loadExtensionsByCategory(
       Extension::Category::Languages,
@@ -1289,10 +1425,11 @@ private:
   }
 
   void setUITheme(const std::string& themeName,
-                  const bool updateScaling) {
+                  const bool updateScaling,
+                  const bool recreateVariantsFields = true) {
     try {
       if (themeName != m_pref.theme.selected()) {
-        auto theme = static_cast<skin::SkinTheme*>(ui::get_theme());
+        auto theme = skin::SkinTheme::get(this);
 
         // Change theme name from preferences
         m_pref.theme.selected(themeName);
@@ -1336,6 +1473,9 @@ private:
             selectScalingItems();
           }
         }
+
+        if (recreateVariantsFields)
+          fillThemeVariants();
       }
     }
     catch (const std::exception& ex) {
@@ -1410,7 +1550,7 @@ private:
 
         // Uninstall old version
         if (ext->canBeUninstalled()) {
-          exts.uninstallExtension(ext);
+          exts.uninstallExtension(ext, DeletePluginPref::kNo);
 
           ExtensionItem* item = getItemByExtension(ext);
           if (item)
@@ -1608,8 +1748,11 @@ private:
   std::string m_restoreThisTheme;
   int m_restoreScreenScaling;
   int m_restoreUIScaling;
-  std::vector<os::ColorSpacePtr> m_colorSpaces;
+  std::vector<os::ColorSpaceRef> m_colorSpaces;
   std::string m_templateTextForDisplayCS;
+  RgbMapAlgorithmSelector m_rgbmapAlgorithmSelector;
+  ButtonSet* m_themeVars = nullptr;
+  SamplingSelector* m_samplingSelector = nullptr;
 };
 
 class OptionsCommand : public Command {
@@ -1643,12 +1786,20 @@ void OptionsCommand::onExecute(Context* context)
   static int curSection = 0;
 
   OptionsWindow window(context, curSection);
-  window.openWindow();
 
-  if (!m_installExtensionFilename.empty()) {
-    if (!window.showDialogToInstallExtension(m_installExtensionFilename))
-      return;
-  }
+  // As showDialogToInstallExtension() will show an ui::Alert, we need
+  // to call this function after window.openWindowInForeground(), so
+  // the parent window of the alert will be our OptionsWindow (and not
+  // the main window).
+  window.Open.connect(
+    [&]() {
+      if (!m_installExtensionFilename.empty()) {
+        if (!window.showDialogToInstallExtension(this->m_installExtensionFilename)) {
+          window.closeWindow(&window);
+          return;
+        }
+      }
+    });
 
   window.openWindowInForeground();
   if (window.ok())

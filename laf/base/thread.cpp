@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,21 +11,19 @@
 
 #include "base/thread.h"
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include <windows.h>
   #include <process.h>
 #else
-  #include <pthread.h>          // Use pthread library in Unix-like systems
-#endif
+  #include <pthread.h>     // Use pthread library in Unix-like systems
 
-#if !defined(_WIN32)
   #include <unistd.h>
   #include <sys/time.h>
 #endif
 
 namespace {
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   DWORD WINAPI win32_thread_proxy(LPVOID data)
   {
@@ -49,7 +47,7 @@ namespace base {
 
 thread::thread()
   : m_native_handle((native_handle_type)0)
-#ifdef _WIN32
+#if LAF_WINDOWS
   , m_native_id((native_id_type)0)
 #endif
 {
@@ -69,7 +67,7 @@ bool thread::joinable() const
 void thread::join()
 {
   if (joinable()) {
-#ifdef _WIN32
+#if LAF_WINDOWS
     ::WaitForSingleObject(m_native_handle, INFINITE);
 #else
     ::pthread_join((pthread_t)m_native_handle, NULL);
@@ -81,7 +79,7 @@ void thread::join()
 void thread::detach()
 {
   if (joinable()) {
-#ifdef _WIN32
+#if LAF_WINDOWS
     ::CloseHandle(m_native_handle);
     m_native_handle = (native_handle_type)0;
 #else
@@ -92,7 +90,7 @@ void thread::detach()
 
 thread::native_id_type thread::native_id() const
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   return m_native_id;
 
@@ -107,7 +105,7 @@ void thread::launch_thread(func_wrapper* f)
 {
   m_native_handle = (native_handle_type)0;
 
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   static_assert(sizeof(DWORD) == sizeof(native_id_type),
                 "native_id_type must match DWORD size on Windows");
@@ -138,7 +136,7 @@ void thread::details::thread_proxy(void* data)
 
 void this_thread::yield()
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   ::Sleep(0);
 
@@ -148,17 +146,17 @@ void this_thread::yield()
 
 #else
 
-  struct timeval timeout;
+  timeval timeout;
   timeout.tv_sec = 0;
   timeout.tv_usec = 0;
-  select(0, NULL, NULL, NULL, &timeout);
+  select(0, nullptr, nullptr, nullptr, &timeout);
 
 #endif
 }
 
 void this_thread::sleep_for(double seconds)
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   ::Sleep(DWORD(seconds * 1000.0));
 
@@ -171,7 +169,7 @@ void this_thread::sleep_for(double seconds)
 
 thread::native_id_type this_thread::native_id()
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   return (thread::native_id_type)GetCurrentThreadId();
 

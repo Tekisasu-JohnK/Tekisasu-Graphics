@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2019-2020  Igara Studio S.A.
+// Copyright (c) 2019-2021  Igara Studio S.A.
 // Copyright (c) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -22,10 +22,16 @@ namespace base {
     explicit Version(const std::string& from);
     Version(int major, int minor, int patch, int build);
 
+    int major() const { return (m_numbers.size() > 0 ? m_numbers[0]: 0); }
+    int minor() const { return (m_numbers.size() > 1 ? m_numbers[1]: 0); }
+    int patch() const { return (m_numbers.size() > 2 ? m_numbers[2]: 0); }
+    int build() const { return (m_numbers.size() > 3 ? m_numbers[3]: 0); }
+
     bool operator<(const Version& other) const;
     bool operator==(const Version& other) const;
     bool operator!=(const Version& other) const { return !operator==(other); }
 
+    bool empty() const { return m_numbers.empty(); }
     const Numbers& numbers() const { return m_numbers; }
     const std::string& prereleaseLabel() const { return m_prereleaseLabel; }
     const int prereleaseNumber() const { return m_prereleaseNumber; }

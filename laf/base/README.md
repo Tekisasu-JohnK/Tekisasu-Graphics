@@ -1,7 +1,4 @@
 # LAF Base Library
-*Copyright (C) 2001-2017 David Capello*
-
-> Distributed under [MIT license](../LICENSE.txt)
 
 Cross-platform core functionality to do basic tasks:
 
@@ -11,7 +8,7 @@ Cross-platform core functionality to do basic tasks:
 * Logging functions ([LOG()](log.h))
 * Manage DLLs ([load/unload_dll()](dll.h))
 * Multi-threading ([thread](thread.h), [mutex](mutex.h), [ScopedLock](scoped_lock.h))
-* Smart pointers ([SharedPtr](shared_ptr.h))
+* Smart pointers ([RefCount/Ref](ref.h))
 * String/UTF8 utilities ([string](string.h), [split_string](split_string.h), [trim_string](trim_string.h))
 * Timing ([Chrono](chrono.h))
 * Type conversion ([convert_to](convert_to.h))

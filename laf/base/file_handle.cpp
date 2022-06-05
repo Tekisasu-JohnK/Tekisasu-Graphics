@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2020-2021 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -14,7 +15,7 @@
 
 #include <stdexcept>
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include <windows.h>
   #include <io.h>
 #endif
@@ -31,6 +32,12 @@ using namespace std;
 
 namespace base {
 
+static void fclose_if_valid(FILE* f)
+{
+  if (f)
+    fclose(f);
+}
+
 static void throw_cannot_open_exception(const string& filename, const string& mode)
 {
   if (mode.find('w') != string::npos)
@@ -41,7 +48,7 @@ static void throw_cannot_open_exception(const string& filename, const string& mo
 
 FILE* open_file_raw(const string& filename, const string& mode)
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
   return _wfopen(from_utf8(filename).c_str(),
                  from_utf8(mode).c_str());
 #else
@@ -51,12 +58,12 @@ FILE* open_file_raw(const string& filename, const string& mode)
 
 FileHandle open_file(const string& filename, const string& mode)
 {
-  return FileHandle(open_file_raw(filename, mode), fclose);
+  return FileHandle(open_file_raw(filename, mode), fclose_if_valid);
 }
 
 FileHandle open_file_with_exception(const string& filename, const string& mode)
 {
-  FileHandle f(open_file_raw(filename, mode), fclose);
+  FileHandle f(open_file_raw(filename, mode), fclose_if_valid);
   if (!f)
     throw_cannot_open_exception(filename, mode);
   return f;
@@ -78,7 +85,7 @@ int open_file_descriptor_with_exception(const string& filename, const string& mo
   if (mode.find('b') != string::npos) flags |= O_BINARY;
 
   int fd;
-#ifdef _WIN32
+#if LAF_WINDOWS
   fd = _wopen(from_utf8(filename).c_str(), flags, _S_IREAD | _S_IWRITE);
 #else
   fd = open(filename.c_str(), flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
@@ -92,7 +99,7 @@ int open_file_descriptor_with_exception(const string& filename, const string& mo
 
 void sync_file_descriptor(int fd)
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
   HANDLE handle = (HANDLE)_get_osfhandle(fd);
   if (handle)
     FlushFileBuffers(handle);
@@ -101,8 +108,11 @@ void sync_file_descriptor(int fd)
 
 void close_file_and_sync(FILE* file)
 {
+  if (!file)
+    return;
+
   fflush(file);
-#ifdef _WIN32
+#if LAF_WINDOWS
   int fd = _fileno(file);
   if (fd)
     sync_file_descriptor(fd);

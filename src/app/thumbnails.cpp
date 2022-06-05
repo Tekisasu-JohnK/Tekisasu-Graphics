@@ -22,8 +22,8 @@
 namespace app {
 namespace thumb {
 
-os::Surface* get_cel_thumbnail(const doc::Cel* cel,
-                               const gfx::Size& fitInSize)
+os::SurfaceRef get_cel_thumbnail(const doc::Cel* cel,
+                                 const gfx::Size& fitInSize)
 {
   gfx::Size newSize;
 
@@ -43,12 +43,13 @@ os::Surface* get_cel_thumbnail(const doc::Cel* cel,
 
   render::Render render;
   render::Projection proj(cel->sprite()->pixelRatio(),
-                          render::Zoom(newSize.w, cel->image()->width()));
+                          render::Zoom(newSize.w, cel->bounds().w));
   render.setProjection(proj);
 
   const doc::Palette* palette = cel->sprite()->palette(cel->frame());
   render.renderCel(
     thumbnailImage.get(),
+    cel,
     cel->sprite(),
     cel->image(),
     cel->layer(),
@@ -57,11 +58,11 @@ os::Surface* get_cel_thumbnail(const doc::Cel* cel,
     gfx::Clip(gfx::Rect(gfx::Point(0, 0), newSize)),
     255, doc::BlendMode::NORMAL);
 
-  if (os::Surface* thumbnail = os::instance()->createRgbaSurface(
+  if (os::SurfaceRef thumbnail = os::instance()->makeRgbaSurface(
         thumbnailImage->width(),
         thumbnailImage->height())) {
     convert_image_to_surface(
-      thumbnailImage.get(), palette, thumbnail,
+      thumbnailImage.get(), palette, thumbnail.get(),
       0, 0, 0, 0, thumbnailImage->width(), thumbnailImage->height());
     return thumbnail;
   }

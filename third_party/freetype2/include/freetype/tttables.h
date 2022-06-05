@@ -5,7 +5,7 @@
  *   Basic SFNT/TrueType tables definitions and interface
  *   (specification only).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -21,8 +21,7 @@
 #define TTTABLES_H_
 
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -78,7 +77,9 @@ FT_BEGIN_HEADER
    *
    * @description:
    *   A structure to model a TrueType font header table.  All fields follow
-   *   the OpenType specification.
+   *   the OpenType specification.  The 64-bit timestamps are stored in
+   *   two-element arrays `Created` and `Modified`, first the upper then
+   *   the lower 32~bits.
    */
   typedef struct  TT_Header_
   {
@@ -91,8 +92,8 @@ FT_BEGIN_HEADER
     FT_UShort  Flags;
     FT_UShort  Units_Per_EM;
 
-    FT_Long    Created [2];
-    FT_Long    Modified[2];
+    FT_ULong   Created [2];
+    FT_ULong   Modified[2];
 
     FT_Short   xMin;
     FT_Short   yMin;
@@ -219,7 +220,7 @@ FT_BEGIN_HEADER
 
     /* The following fields are not defined by the OpenType specification */
     /* but they are used to connect the metrics header to the relevant    */
-    /* `hmtx' table.                                                      */
+    /* 'hmtx' table.                                                      */
 
     void*      long_metrics;
     void*      short_metrics;
@@ -311,7 +312,7 @@ FT_BEGIN_HEADER
    * @note:
    *   For an OpenType variation font, the values of the following fields can
    *   change after a call to @FT_Set_Var_Design_Coordinates (and friends) if
-   *   the font contains an 'MVAR' table: 'Ascender', 'Descender',
+   *   the font contains an 'MVAR' table: `Ascender`, `Descender`,
    *   `Line_Gap`, `caret_Slope_Rise`, `caret_Slope_Run`, and `caret_Offset`.
    */
   typedef struct  TT_VertHeader_
@@ -337,7 +338,7 @@ FT_BEGIN_HEADER
 
     /* The following fields are not defined by the OpenType specification */
     /* but they are used to connect the metrics header to the relevant    */
-    /* `vmtx' table.                                                      */
+    /* 'vmtx' table.                                                      */
 
     void*      long_metrics;
     void*      short_metrics;
@@ -355,7 +356,7 @@ FT_BEGIN_HEADER
    *   the OpenType specification.
    *
    *   Note that we now support old Mac fonts that do not include an 'OS/2'
-   *   table.  In this case, the 'version' field is always set to 0xFFFF.
+   *   table.  In this case, the `version` field is always set to 0xFFFF.
    *
    * @note:
    *   For an OpenType variation font, the values of the following fields can
@@ -458,7 +459,7 @@ FT_BEGIN_HEADER
     FT_ULong  minMemType1;
     FT_ULong  maxMemType1;
 
-    /* Glyph names follow in the `post' table, but we don't */
+    /* Glyph names follow in the 'post' table, but we don't */
     /* load them by default.                                */
 
   } TT_Postscript;
@@ -630,7 +631,7 @@ FT_BEGIN_HEADER
 
   } FT_Sfnt_Tag;
 
-  /* these constants are deprecated; use the corresponding `FT_Sfnt_Tag' */
+  /* these constants are deprecated; use the corresponding `FT_Sfnt_Tag` */
   /* values instead                                                      */
 #define ft_sfnt_head  FT_SFNT_HEAD
 #define ft_sfnt_maxp  FT_SFNT_MAXP
@@ -657,11 +658,11 @@ FT_BEGIN_HEADER
    *     The index of the SFNT table.
    *
    * @return:
-   *   A type-less pointer to the table.  This will be NULL in case of error,
-   *   or if the corresponding table was not found **OR** loaded from the
-   *   file.
+   *   A type-less pointer to the table.  This will be `NULL` in case of
+   *   error, or if the corresponding table was not found **OR** loaded from
+   *   the file.
    *
-   *   Use a typecast according to 'tag' to access the structure elements.
+   *   Use a typecast according to `tag` to access the structure elements.
    *
    * @note:
    *   The table is owned by the face object and disappears with it.
@@ -671,7 +672,7 @@ FT_BEGIN_HEADER
    *   list.
    *
    * @example:
-   *   Here an example how to access the 'vhea' table.
+   *   Here is an example demonstrating access to the 'vhea' table.
    *
    *   ```
    *     TT_VertHeader*  vert_header;
@@ -714,10 +715,10 @@ FT_BEGIN_HEADER
    *
    * @inout:
    *   length ::
-   *     If the 'length' parameter is NULL, try to load the whole table.
+   *     If the `length` parameter is `NULL`, try to load the whole table.
    *     Return an error code if it fails.
    *
-   *     Else, if '*length' is~0, exit immediately while returning the
+   *     Else, if `*length` is~0, exit immediately while returning the
    *     table's (or file) full size in it.
    *
    *     Else the number of bytes to read from the table or file, from the
@@ -728,7 +729,7 @@ FT_BEGIN_HEADER
    *
    * @note:
    *   If you need to determine the table's length you should first call this
-   *   function with '*length' set to~0, as in the following example:
+   *   function with `*length` set to~0, as in the following example:
    *
    *   ```
    *     FT_ULong  length = 0;
@@ -776,14 +777,14 @@ FT_BEGIN_HEADER
    *
    * @inout:
    *   tag ::
-   *     The name tag of the SFNT table.  If the value is NULL, `table_index`
-   *     is ignored, and 'length' returns the number of SFNT tables in the
-   *     font.
+   *     The name tag of the SFNT table.  If the value is `NULL`,
+   *     `table_index` is ignored, and `length` returns the number of SFNT
+   *     tables in the font.
    *
    * @output:
    *   length ::
    *     The length of the SFNT table (or the number of SFNT tables,
-   *     depending on 'tag').
+   *     depending on `tag`).
    *
    * @return:
    *   FreeType error code.  0~means success.
@@ -814,7 +815,7 @@ FT_BEGIN_HEADER
    *     The target charmap.
    *
    * @return:
-   *   The language ID of 'charmap'.  If 'charmap' doesn't belong to an SFNT
+   *   The language ID of `charmap`.  If `charmap` doesn't belong to an SFNT
    *   face, just return~0 as the default value.
    *
    *   For a format~14 cmap (to access Unicode IVS), the return value is
@@ -837,7 +838,7 @@ FT_BEGIN_HEADER
    *     The target charmap.
    *
    * @return:
-   *   The format of 'charmap'.  If 'charmap' doesn't belong to an SFNT face,
+   *   The format of `charmap`.  If `charmap` doesn't belong to an SFNT face,
    *   return -1.
    */
   FT_EXPORT( FT_Long )

@@ -1,14 +1,14 @@
 // LAF Library
-// Copyright (c) 2019  Igara Studio S.A.
+// Copyright (c) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
 #include "os/os.h"
 
-void draw_display(os::Display* display)
+void draw_window(os::Window* window)
 {
-  os::Surface* surface = display->getSurface();
+  os::Surface* surface = window->surface();
   os::SurfaceLock lock(surface);
   const gfx::Rect rc = surface->bounds();
 
@@ -24,21 +24,36 @@ void draw_display(os::Display* display)
   os::draw_text(surface, nullptr, "Hello World", rc.center(),
                 &p, os::TextAlign::Center);
 
-  // Invalidates the whole display to show it on the screen.
-  display->invalidateRegion(gfx::Region(rc));
+  if (window->isGpuAccelerated())
+    os::draw_text(surface, nullptr, "(GPU)", rc.center()+gfx::Point(0, 24),
+                  &p, os::TextAlign::Center);
+
+  // Invalidates the whole window to show it on the screen.
+  if (window->isVisible())
+    window->invalidateRegion(gfx::Region(rc));
+  else
+    window->setVisible(true);
+
+  window->swapBuffers();
 }
 
 int app_main(int argc, char* argv[])
 {
-  const int pixelScale = 2;
-
-  os::SystemHandle system(os::create_system());
+  os::SystemRef system = os::make_system();
   system->setAppMode(os::AppMode::GUI);
+  system->setGpuAcceleration(true);
 
-  os::DisplayHandle display(system->createDisplay(400, 300, pixelScale));
+  os::WindowRef window = system->makeWindow(400, 300);
 
-  display->setNativeMouseCursor(os::kArrowCursor);
-  display->setTitle("Hello World");
+  // Set the title bar caption of the native window.
+  window->setTitle("Hello World");
+
+  // We can change the cursor to use when the mouse is above this
+  // window, this line is not required because by default the native
+  // cursor to be shown in a window is the arrow.
+  window->setCursor(os::NativeCursor::Arrow);
+
+  system->handleWindowResize = draw_window;
 
   // On macOS: With finishLaunching() we start processing
   // NSApplicationDelegate events. After calling this we'll start
@@ -59,18 +74,19 @@ int app_main(int argc, char* argv[])
   while (running) {
     if (redraw) {
       redraw = false;
-      draw_display(display);
+      draw_window(window.get());
     }
     // Wait for an event in the queue, the "true" parameter indicates
     // that we'll wait for a new event, and the next line will not be
     // processed until we receive a new event. If we use "false" and
     // there is no events in the queue, we receive an "ev.type() == Event::None
     os::Event ev;
-    queue->getEvent(ev, true);
+    queue->getEvent(ev);
 
     switch (ev.type()) {
 
-      case os::Event::CloseDisplay:
+      case os::Event::CloseApp:
+      case os::Event::CloseWindow:
         running = false;
         break;
 
@@ -79,6 +95,13 @@ int app_main(int argc, char* argv[])
           case os::kKeyEsc:
             running = false;
             break;
+
+          case os::kKeyG:
+            system->setGpuAcceleration(!system->gpuAcceleration());
+            // TODO change window backend immediately
+            redraw = true;
+            break;
+
           case os::kKey1:
           case os::kKey2:
           case os::kKey3:
@@ -89,16 +112,22 @@ int app_main(int argc, char* argv[])
           case os::kKey8:
           case os::kKey9:
             // Set scale
-            display->setScale(1 + (int)(ev.scancode() - os::kKey1));
+            window->setScale(1 + (int)(ev.scancode() - os::kKey1));
             redraw = true;
             break;
+
+          case os::kKeyF:
+          case os::kKeyF11:
+            window->setFullscreen(!window->isFullscreen());
+            break;
+
           default:
             // Do nothing
             break;
         }
         break;
 
-      case os::Event::ResizeDisplay:
+      case os::Event::ResizeWindow:
         redraw = true;
         break;
 

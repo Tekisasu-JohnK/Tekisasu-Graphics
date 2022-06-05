@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2021  Igara Studio S.A.
 // Copyright (C) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,7 +10,7 @@
 #pragma once
 
 #include "gfx/rect.h"
-#include <iosfwd>
+#include <iostream>
 
 namespace gfx {
 

@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -31,9 +31,8 @@ thread_pool::~thread_pool()
 
 void thread_pool::execute(std::function<void()>&& func)
 {
-  ASSERT(m_running);
-
   std::unique_lock<std::mutex> lock(m_mutex);
+  ASSERT(m_running);
   m_work.push(std::move(func));
   m_cv.notify_one();
 }
@@ -50,7 +49,10 @@ void thread_pool::wait_all()
 
 void thread_pool::join_all()
 {
-  m_running = false;
+  {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_running = false;
+  }
   m_cv.notify_all();
 
   for (auto& j : m_threads) {
@@ -71,13 +73,19 @@ void thread_pool::join_all()
 
 void thread_pool::worker()
 {
-  while (m_running) {
+  bool running;
+  {
+    std::unique_lock<std::mutex> lock(m_mutex);
+    running = m_running;
+  }
+  while (running) {
     std::function<void()> func;
     {
       std::unique_lock<std::mutex> lock(m_mutex);
       m_cv.wait(lock, [this]() -> bool {
                         return !m_running || !m_work.empty();
                       });
+      running = m_running;
       if (m_running && !m_work.empty()) {
         func = std::move(m_work.front());
         ++m_doingWork;
@@ -98,7 +106,8 @@ void thread_pool::worker()
       ASSERT(false);
     }
 
-    {
+    // Decrement m_doingWork only if we've incremented it
+    if (func) {
       std::unique_lock<std::mutex> lock(m_mutex);
       --m_doingWork;
       m_cvWait.notify_all();

@@ -35,6 +35,7 @@ namespace doc {
   class Layer;
   class Mask;
   class Sprite;
+  class Tileset;
 }
 
 namespace gfx {
@@ -99,7 +100,7 @@ namespace app {
     color_t bgColor() const;
     color_t bgColor(Layer* layer) const;
 
-    os::ColorSpacePtr osColorSpace() const { return m_osColorSpace; }
+    os::ColorSpaceRef osColorSpace() const { return m_osColorSpace; }
 
     //////////////////////////////////////////////////////////////////////
     // Notifications
@@ -114,6 +115,7 @@ namespace app {
     void notifyCelCopied(Layer* fromLayer, frame_t fromFrame, Layer* toLayer, frame_t toFrame);
     void notifySelectionChanged();
     void notifySelectionBoundariesChanged();
+    void notifyTilesetChanged(Tileset* tileset);
 
     //////////////////////////////////////////////////////////////////////
     // File related properties
@@ -259,7 +261,7 @@ namespace app {
     gfx::Point m_lastDrawingPoint;
 
     // Last used color space to render a sprite.
-    os::ColorSpacePtr m_osColorSpace;
+    os::ColorSpaceRef m_osColorSpace;
 
     DISABLE_COPYING(Doc);
   };

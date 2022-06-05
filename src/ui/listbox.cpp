@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -13,6 +13,7 @@
 
 #include "base/clamp.h"
 #include "base/fs.h"
+#include "ui/display.h"
 #include "ui/listitem.h"
 #include "ui/message.h"
 #include "ui/resize_event.h"
@@ -70,27 +71,10 @@ int ListBox::getSelectedIndex()
   return -1;
 }
 
-int ListBox::getChildIndex(Widget* item)
-{
-  const WidgetsList& children = this->children();
-  auto it = std::find(children.begin(), children.end(), item);
-  if (it != children.end())
-    return it - children.begin();
-  else
-    return -1;
-}
-
-Widget* ListBox::getChildByIndex(int index)
-{
-  const WidgetsList& children = this->children();
-  if (index >= 0 && index < int(children.size()))
-    return children[index];
-  else
-    return nullptr;
-}
-
 void ListBox::selectChild(Widget* item, Message* msg)
 {
+  bool didChange = false;
+
   int itemIndex = getChildIndex(item);
   m_lastSelectedIndex = itemIndex;
 
@@ -107,7 +91,10 @@ void ListBox::selectChild(Widget* item, Message* msg)
         bool state = child->isSelected();
         if (msg && !msg->ctrlPressed() && !msg->cmdPressed())
           state = false;
-        m_states[i] = state;
+        if (m_states[i] != state) {
+          didChange = true;
+          m_states[i] = state;
+        }
         ++i;
       }
     }
@@ -130,8 +117,10 @@ void ListBox::selectChild(Widget* item, Message* msg)
       newState = (child == item);
     }
 
-    if (child->isSelected() != newState)
+    if (child->isSelected() != newState) {
+      didChange = true;
       child->setSelected(newState);
+    }
 
     ++i;
   }
@@ -139,12 +128,16 @@ void ListBox::selectChild(Widget* item, Message* msg)
   if (item)
     makeChildVisible(item);
 
-  onChange();
+  if (didChange)
+    onChange();
 }
 
 void ListBox::selectIndex(int index, Message* msg)
 {
-  Widget* child = getChildByIndex(index);
+  if (index < 0 || index >= int(children().size()))
+    return;
+
+  Widget* child = at(index);
   if (child)
     selectChild(child, msg);
 }
@@ -218,7 +211,8 @@ bool ListBox::onProcessMessage(Message* msg)
 
     case kMouseMoveMessage:
       if (hasCapture()) {
-        gfx::Point mousePos = static_cast<MouseMessage*>(msg)->position();
+        gfx::Point screenPos = msg->display()->nativeWindow()->pointToScreen(static_cast<MouseMessage*>(msg)->position());
+        gfx::Point mousePos = display()->nativeWindow()->pointFromScreen(screenPos);
         View* view = View::getView(this);
         bool pick_item = true;
 
@@ -251,18 +245,20 @@ bool ListBox::onProcessMessage(Message* msg)
             picked = pick(mousePos);
           }
 
+          if (dynamic_cast<ui::Separator*>(picked))
+            picked = nullptr;
+
           // If the picked widget is a child of the list, select it
           if (picked && hasChild(picked))
             selectChild(picked, msg);
         }
-
-        return true;
       }
-      break;
+      return true;
 
     case kMouseUpMessage:
-      releaseMouse();
-      break;
+      if (hasCapture())
+        releaseMouse();
+      return true;
 
     case kMouseWheelMessage: {
       View* view = View::getView(this);
@@ -448,8 +444,8 @@ int ListBox::advanceIndexThroughVisibleItems(
       index = 0-sgn;
       cycle = true;
     }
-    else {
-      Widget* item = getChildByIndex(index);
+    else if (index >= 0 && index < children().size()) {
+      Widget* item = at(index);
       if (item &&
           !item->hasFlags(HIDDEN) &&
           // We can completely ignore separators from navigation

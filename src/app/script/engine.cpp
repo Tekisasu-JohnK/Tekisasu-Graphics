@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -15,9 +15,12 @@
 #include "app/console.h"
 #include "app/doc_exporter.h"
 #include "app/doc_range.h"
+#include "app/pref/preferences.h"
 #include "app/script/luacpp.h"
 #include "app/script/security.h"
 #include "app/sprite_sheet_type.h"
+#include "app/tilemap_mode.h"
+#include "app/tileset_mode.h"
 #include "app/tools/ink_type.h"
 #include "base/chrono.h"
 #include "base/file_handle.h"
@@ -44,6 +47,9 @@ base::Chrono luaClock;
 
 // Stack of script filenames that are being executed.
 std::stack<std::string> current_script_dirs;
+
+// Just one debugger delegate is possible.
+DebuggerDelegate* g_debuggerDelegate = nullptr;
 
 class AddScriptFilename {
 public:
@@ -154,8 +160,10 @@ void register_color_space_class(lua_State* L);
 #ifdef ENABLE_UI
 void register_dialog_class(lua_State* L);
 #endif
+void register_events_class(lua_State* L);
 void register_frame_class(lua_State* L);
 void register_frames_class(lua_State* L);
+void register_grid_class(lua_State* L);
 void register_image_class(lua_State* L);
 void register_image_iterator_class(lua_State* L);
 void register_image_spec_class(lua_State* L);
@@ -177,8 +185,11 @@ void register_sprite_class(lua_State* L);
 void register_sprites_class(lua_State* L);
 void register_tag_class(lua_State* L);
 void register_tags_class(lua_State* L);
+void register_tileset_class(lua_State* L);
+void register_tilesets_class(lua_State* L);
 void register_tool_class(lua_State* L);
 void register_version_class(lua_State* L);
+void register_websocket_class(lua_State* L);
 
 void set_app_params(lua_State* L, const Params& params);
 
@@ -255,6 +266,7 @@ Engine::Engine()
   setfield_integer(L, "GRAY", doc::ColorMode::GRAYSCALE);
   setfield_integer(L, "GRAYSCALE", doc::ColorMode::GRAYSCALE);
   setfield_integer(L, "INDEXED", doc::ColorMode::INDEXED);
+  setfield_integer(L, "TILEMAP", doc::ColorMode::TILEMAP);
   lua_pop(L, 1);
 
   lua_newtable(L);
@@ -367,6 +379,30 @@ Engine::Engine()
   setfield_integer(L, "X2",     (int)ui::kButtonX2);
   lua_pop(L, 1);
 
+  lua_newtable(L);
+  lua_pushvalue(L, -1);
+  lua_setglobal(L, "TilemapMode");
+  setfield_integer(L, "PIXELS", TilemapMode::Pixels);
+  setfield_integer(L, "TILES", TilemapMode::Tiles);
+  lua_pop(L, 1);
+
+  lua_newtable(L);
+  lua_pushvalue(L, -1);
+  lua_setglobal(L, "TilesetMode");
+  setfield_integer(L, "MANUAL", TilesetMode::Manual);
+  setfield_integer(L, "AUTO", TilesetMode::Auto);
+  setfield_integer(L, "STACK", TilesetMode::Stack);
+  lua_pop(L, 1);
+
+  lua_newtable(L);
+  lua_pushvalue(L, -1);
+  lua_setglobal(L, "SelectionMode");
+  setfield_integer(L, "REPLACE",   (int)gen::SelectionMode::REPLACE);
+  setfield_integer(L, "ADD",       (int)gen::SelectionMode::ADD);
+  setfield_integer(L, "SUBTRACT",  (int)gen::SelectionMode::SUBTRACT);
+  setfield_integer(L, "INTERSECT", (int)gen::SelectionMode::INTERSECT);
+  lua_pop(L, 1);
+
   // Register classes/prototypes
   register_brush_class(L);
   register_cel_class(L);
@@ -376,8 +412,10 @@ Engine::Engine()
 #ifdef ENABLE_UI
   register_dialog_class(L);
 #endif
+  register_events_class(L);
   register_frame_class(L);
   register_frames_class(L);
+  register_grid_class(L);
   register_image_class(L);
   register_image_iterator_class(L);
   register_image_spec_class(L);
@@ -399,8 +437,13 @@ Engine::Engine()
   register_sprites_class(L);
   register_tag_class(L);
   register_tags_class(L);
+  register_tileset_class(L);
+  register_tilesets_class(L);
   register_tool_class(L);
   register_version_class(L);
+#if ENABLE_WEBSOCKET
+  register_websocket_class(L);
+ #endif
 
   // Check that we have a clean start (without dirty in the stack)
   ASSERT(lua_gettop(L) == top);
@@ -408,10 +451,16 @@ Engine::Engine()
 
 Engine::~Engine()
 {
+  ASSERT(L == nullptr);
+}
+
+void Engine::destroy()
+{
 #ifdef ENABLE_UI
   close_all_dialogs();
 #endif
   lua_close(L);
+  L = nullptr;
 }
 
 void Engine::printLastResult()
@@ -428,7 +477,7 @@ bool Engine::evalCode(const std::string& code,
         lua_pcall(L, 0, 1, 0)) {
       const char* s = lua_tostring(L, -1);
       if (s)
-        onConsolePrint(s);
+        onConsoleError(s);
       ok = false;
       m_returnCode = -1;
     }
@@ -451,7 +500,7 @@ bool Engine::evalCode(const std::string& code,
     lua_pop(L, 1);
   }
   catch (const std::exception& ex) {
-    onConsolePrint(ex.what());
+    onConsoleError(ex.what());
     ok = false;
     m_returnCode = -1;
   }
@@ -476,7 +525,44 @@ bool Engine::evalFile(const std::string& filename,
 
   AddScriptFilename add(absFilename);
   set_app_params(L, params);
-  return evalCode(buf.str(), "@" + absFilename);
+
+  if (g_debuggerDelegate)
+    g_debuggerDelegate->startFile(absFilename, buf.str());
+
+  bool result = evalCode(buf.str(), "@" + absFilename);
+
+  if (g_debuggerDelegate)
+    g_debuggerDelegate->endFile(absFilename);
+
+  return result;
+}
+
+void Engine::startDebugger(DebuggerDelegate* debuggerDelegate)
+{
+  g_debuggerDelegate = debuggerDelegate;
+
+  lua_Hook hook = [](lua_State* L, lua_Debug* ar) {
+    int ret = lua_getinfo(L, "l", ar);
+    if (ret == 0 || ar->currentline < 0)
+      return;
+
+    g_debuggerDelegate->hook(L, ar);
+  };
+
+  lua_sethook(L, hook, LUA_MASKCALL | LUA_MASKRET | LUA_MASKLINE | LUA_MASKCOUNT, 1);
+}
+
+void Engine::stopDebugger()
+{
+  lua_sethook(L, nullptr, 0, 0);
+}
+
+void Engine::onConsoleError(const char* text)
+{
+  if (text && m_delegate)
+    m_delegate->onConsoleError(text);
+  else
+    onConsolePrint(text);
 }
 
 void Engine::onConsolePrint(const char* text)

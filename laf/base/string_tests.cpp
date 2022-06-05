@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2022 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -7,13 +8,20 @@
 #include <gtest/gtest.h>
 
 #include "base/string.h"
+#include "base/utf8_decode.h"
 
 #include <algorithm>
 #include <clocale>
 
 using namespace base;
 
-bool all(int) { return true; }
+int count_utf8_codepoints(const std::string& str) {
+  int count = 0;
+  utf8_decode dec(str);
+  while (dec.next())
+    ++count;
+  return count;
+}
 
 TEST(String, Utf8Conversion)
 {
@@ -29,21 +37,24 @@ TEST(String, Utf8Conversion)
   ASSERT_EQ(a, c);
 }
 
-TEST(String, Utf8Wrapper)
+TEST(String, Utf8Decode)
 {
   std::string a, b = "abc";
-  for (int ch : utf8(b))
+  utf8_decode dec(b);
+  while (const int ch = dec.next())
     a.push_back(ch);
   EXPECT_EQ("abc", a);
 
   std::string c, d = "def";
-  for (int ch : utf8_const(d))  // TODO we should be able to specify a string-literal here
+  dec = utf8_decode(d);
+  while (const int ch = dec.next())
     c.push_back(ch);
   EXPECT_EQ("def", c);
 
   int i = 0;
   d = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
-  for (int ch : utf8_const(d)) { // 日本語
+  dec = utf8_decode(d);
+  while (const int ch = dec.next()) { // 日本語
     switch (i++) {
       case 0: EXPECT_EQ(ch, 0x65E5); break;
       case 1: EXPECT_EQ(ch, 0x672C); break;
@@ -51,44 +62,40 @@ TEST(String, Utf8Wrapper)
       default: EXPECT_FALSE(true); break;
     }
   }
-}
 
-TEST(String, Utf8Iterator)
-{
-  std::string a = "Hello";
-  int value = std::count_if(utf8_iterator(a.begin()),
-                            utf8_iterator(a.end()), all);
-  ASSERT_EQ(5, value);
-  ASSERT_EQ('H', *(utf8_iterator(a.begin())));
-  ASSERT_EQ('e', *(utf8_iterator(a.begin())+1));
-  ASSERT_EQ('l', *(utf8_iterator(a.begin())+2));
-  ASSERT_EQ('l', *(utf8_iterator(a.begin())+3));
-  ASSERT_EQ('o', *(utf8_iterator(a.begin())+4));
+  std::string e = "Hello";
+  utf8_decode e_dec(e);
+  ASSERT_EQ(5, count_utf8_codepoints(e));
+  ASSERT_EQ('H', e_dec.next());
+  ASSERT_EQ('e', e_dec.next());
+  ASSERT_EQ('l', e_dec.next());
+  ASSERT_EQ('l', e_dec.next());
+  ASSERT_EQ('o', e_dec.next());
+  ASSERT_EQ(0, e_dec.next());
 
-  std::string b = "Copyright \xC2\xA9";
-  value = std::count_if(utf8_iterator(b.begin()),
-                        utf8_iterator(b.end()), all);
-  ASSERT_EQ(11, value);
-  ASSERT_EQ('C', *(utf8_iterator(b.begin())));
-  ASSERT_EQ('o', *(utf8_iterator(b.begin())+1));
-  ASSERT_EQ(0xA9, *(utf8_iterator(b.begin())+10));
-  ASSERT_TRUE((utf8_iterator(b.begin())+11) == utf8_iterator(b.end()));
+  std::string f = "Copyright \xC2\xA9";
+  utf8_decode f_dec(f);
+  ASSERT_EQ(11, count_utf8_codepoints(f));
+  ASSERT_EQ('C', f_dec.next());
+  ASSERT_EQ('o', f_dec.next());
+  for (int i=0; i<8; ++i)       // Skip 8 chars
+    f_dec.next();
+  ASSERT_EQ(0xA9, f_dec.next());
+  ASSERT_EQ(0, f_dec.next());
 
-  std::string c = "\xf0\x90\x8d\x86\xe6\x97\xa5\xd1\x88";
-  value = std::count_if(utf8_iterator(c.begin()),
-                        utf8_iterator(c.end()), all);
-  ASSERT_EQ(3, value);
-  ASSERT_EQ(0x10346, *(utf8_iterator(c.begin())));
-  ASSERT_EQ(0x65E5, *(utf8_iterator(c.begin())+1));
-  ASSERT_EQ(0x448, *(utf8_iterator(c.begin())+2));
-  ASSERT_TRUE((utf8_iterator(c.begin())+3) == utf8_iterator(c.end()));
+  std::string g = "\xf0\x90\x8d\x86\xe6\x97\xa5\xd1\x88";
+  utf8_decode g_dec(g);
+  ASSERT_EQ(3, count_utf8_codepoints(g));
+  ASSERT_EQ(0x10346, g_dec.next());
+  ASSERT_EQ(0x65E5, g_dec.next());
+  ASSERT_EQ(0x448, g_dec.next());
+  ASSERT_EQ(0, g_dec.next());
 
-  std::string d = "\xf0\xa4\xad\xa2";
-  value = std::count_if(utf8_iterator(d.begin()),
-                        utf8_iterator(d.end()), all);
-  ASSERT_EQ(1, value);
-  ASSERT_EQ(0x24B62, *(utf8_iterator(d.begin())));
-  ASSERT_TRUE((utf8_iterator(d.begin())+1) == utf8_iterator(d.end()));
+  std::string h = "\xf0\xa4\xad\xa2";
+  utf8_decode h_dec(h);
+  ASSERT_EQ(1, count_utf8_codepoints(h));
+  ASSERT_EQ(0x24B62, h_dec.next());
+  ASSERT_EQ(0, h_dec.next());
 }
 
 TEST(String, Utf8ICmp)
@@ -133,11 +140,46 @@ TEST(String, StringToLowerByUnicodeCharIssue1065)
   ASSERT_EQ(c, d);
   ASSERT_EQ(1, utf8_length(d));
 
-  auto it = utf8_iterator(d.begin());
-  auto end = utf8_iterator(d.end());
+  utf8_decode d_dec(d);
   int i = 0;
-  for (; it != end; ++it) {
-    ASSERT_EQ(b[i++], *it);
+  while (const int chr = d_dec.next()) {
+    ASSERT_EQ(b[i++], chr);
+  }
+}
+
+// Decoding invalid utf-8 strings shouldn't crash (just mark the
+// decoding state as invalid).
+TEST(String, Utf8DecodeDontCrash)
+{
+  auto decodeAllChars =
+    [](const std::string& str, bool shouldBeValid) -> int {
+      utf8_decode decode(str);
+      int chrs = 0;
+      while (int chr = decode.next()) {
+        ++chrs;
+      }
+      if (shouldBeValid)
+        EXPECT_TRUE(decode.is_valid());
+      else
+        EXPECT_FALSE(decode.is_valid());
+      return chrs;
+    };
+
+  std::string str = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E"; // 日本語
+  ASSERT_EQ(9, str.size());
+  bool valid_decoding[10] = { true, // Empty string is decoded correctly
+                              false, false, true,
+                              false, false, true,
+                              false, false, true };
+  int decoded_chars[10] = { 0,
+                            0, 0, 1,
+                            1, 1, 2,
+                            2, 2, 3 };
+
+  for (int n=0; n<=str.size(); ++n) {
+    int chrs = decodeAllChars(str.substr(0, n).c_str(),
+                              valid_decoding[n]);
+    EXPECT_EQ(decoded_chars[n], chrs);
   }
 }
 

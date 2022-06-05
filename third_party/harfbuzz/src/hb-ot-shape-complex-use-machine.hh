@@ -31,311 +31,427 @@
 #ifndef HB_OT_SHAPE_COMPLEX_USE_MACHINE_HH
 #define HB_OT_SHAPE_COMPLEX_USE_MACHINE_HH
 
-#include "hb-private.hh"
+#include "hb.hh"
+
+#include "hb-ot-shape-complex-syllabic.hh"
+
+/* buffer var allocations */
+#define use_category() complex_var_u8_category()
+
+#define USE(Cat) use_syllable_machine_ex_##Cat
+
+enum use_syllable_type_t {
+  use_virama_terminated_cluster,
+  use_sakot_terminated_cluster,
+  use_standard_cluster,
+  use_number_joiner_terminated_cluster,
+  use_numeral_cluster,
+  use_symbol_cluster,
+  use_hieroglyph_cluster,
+  use_broken_cluster,
+  use_non_cluster,
+};
 
 
-#line 38 "hb-ot-shape-complex-use-machine.hh"
+#line 57 "hb-ot-shape-complex-use-machine.hh"
+#define use_syllable_machine_ex_B 1u
+#define use_syllable_machine_ex_CGJ 6u
+#define use_syllable_machine_ex_CMAbv 31u
+#define use_syllable_machine_ex_CMBlw 32u
+#define use_syllable_machine_ex_CS 43u
+#define use_syllable_machine_ex_FAbv 24u
+#define use_syllable_machine_ex_FBlw 25u
+#define use_syllable_machine_ex_FMAbv 45u
+#define use_syllable_machine_ex_FMBlw 46u
+#define use_syllable_machine_ex_FMPst 47u
+#define use_syllable_machine_ex_FPst 26u
+#define use_syllable_machine_ex_G 49u
+#define use_syllable_machine_ex_GB 5u
+#define use_syllable_machine_ex_H 12u
+#define use_syllable_machine_ex_HN 13u
+#define use_syllable_machine_ex_HVM 44u
+#define use_syllable_machine_ex_J 50u
+#define use_syllable_machine_ex_MAbv 27u
+#define use_syllable_machine_ex_MBlw 28u
+#define use_syllable_machine_ex_MPre 30u
+#define use_syllable_machine_ex_MPst 29u
+#define use_syllable_machine_ex_N 4u
+#define use_syllable_machine_ex_O 0u
+#define use_syllable_machine_ex_R 18u
+#define use_syllable_machine_ex_SB 51u
+#define use_syllable_machine_ex_SE 52u
+#define use_syllable_machine_ex_SMAbv 41u
+#define use_syllable_machine_ex_SMBlw 42u
+#define use_syllable_machine_ex_SUB 11u
+#define use_syllable_machine_ex_Sk 48u
+#define use_syllable_machine_ex_VAbv 33u
+#define use_syllable_machine_ex_VBlw 34u
+#define use_syllable_machine_ex_VMAbv 37u
+#define use_syllable_machine_ex_VMBlw 38u
+#define use_syllable_machine_ex_VMPre 23u
+#define use_syllable_machine_ex_VMPst 39u
+#define use_syllable_machine_ex_VPre 22u
+#define use_syllable_machine_ex_VPst 35u
+#define use_syllable_machine_ex_ZWNJ 14u
+
+
+#line 99 "hb-ot-shape-complex-use-machine.hh"
 static const unsigned char _use_syllable_machine_trans_keys[] = {
-	12u, 12u, 1u, 15u, 1u, 1u, 12u, 12u, 0u, 43u, 21u, 21u, 8u, 39u, 8u, 39u, 
-	1u, 15u, 1u, 1u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 26u, 8u, 26u, 8u, 26u, 
-	8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 
-	8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 13u, 21u, 4u, 4u, 13u, 13u, 8u, 39u, 
-	8u, 39u, 8u, 39u, 8u, 39u, 8u, 26u, 8u, 26u, 8u, 26u, 8u, 39u, 8u, 39u, 
-	8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 8u, 39u, 
-	8u, 39u, 1u, 15u, 12u, 12u, 1u, 39u, 8u, 39u, 21u, 42u, 41u, 42u, 42u, 42u, 
-	1u, 5u, 0
+	0u, 51u, 41u, 42u, 42u, 42u, 11u, 48u, 11u, 48u, 1u, 1u, 22u, 48u, 23u, 48u, 
+	24u, 47u, 25u, 47u, 26u, 47u, 45u, 46u, 46u, 46u, 24u, 48u, 24u, 48u, 24u, 48u, 
+	1u, 1u, 24u, 48u, 23u, 48u, 23u, 48u, 23u, 48u, 22u, 48u, 22u, 48u, 22u, 48u, 
+	11u, 48u, 1u, 48u, 13u, 13u, 4u, 4u, 11u, 48u, 11u, 48u, 1u, 1u, 22u, 48u, 
+	23u, 48u, 24u, 47u, 25u, 47u, 26u, 47u, 45u, 46u, 46u, 46u, 24u, 48u, 24u, 48u, 
+	24u, 48u, 1u, 1u, 24u, 48u, 23u, 48u, 23u, 48u, 23u, 48u, 22u, 48u, 22u, 48u, 
+	22u, 48u, 11u, 48u, 1u, 48u, 4u, 4u, 13u, 13u, 1u, 48u, 11u, 48u, 41u, 42u, 
+	42u, 42u, 1u, 5u, 50u, 52u, 49u, 52u, 49u, 51u, 0
 };
 
 static const char _use_syllable_machine_key_spans[] = {
-	1, 15, 1, 1, 44, 1, 32, 32, 
-	15, 1, 32, 32, 32, 19, 19, 19, 
-	32, 32, 32, 32, 32, 32, 32, 32, 
-	32, 32, 32, 32, 9, 1, 1, 32, 
-	32, 32, 32, 19, 19, 19, 32, 32, 
-	32, 32, 32, 32, 32, 32, 32, 32, 
-	32, 15, 1, 39, 32, 22, 2, 1, 
-	5
+	52, 2, 1, 38, 38, 1, 27, 26, 
+	24, 23, 22, 2, 1, 25, 25, 25, 
+	1, 25, 26, 26, 26, 27, 27, 27, 
+	38, 48, 1, 1, 38, 38, 1, 27, 
+	26, 24, 23, 22, 2, 1, 25, 25, 
+	25, 1, 25, 26, 26, 26, 27, 27, 
+	27, 38, 48, 1, 1, 48, 38, 2, 
+	1, 5, 3, 4, 3
 };
 
 static const short _use_syllable_machine_index_offsets[] = {
-	0, 2, 18, 20, 22, 67, 69, 102, 
-	135, 151, 153, 186, 219, 252, 272, 292, 
-	312, 345, 378, 411, 444, 477, 510, 543, 
-	576, 609, 642, 675, 708, 718, 720, 722, 
-	755, 788, 821, 854, 874, 894, 914, 947, 
-	980, 1013, 1046, 1079, 1112, 1145, 1178, 1211, 
-	1244, 1277, 1293, 1295, 1335, 1368, 1391, 1394, 
-	1396
+	0, 53, 56, 58, 97, 136, 138, 166, 
+	193, 218, 242, 265, 268, 270, 296, 322, 
+	348, 350, 376, 403, 430, 457, 485, 513, 
+	541, 580, 629, 631, 633, 672, 711, 713, 
+	741, 768, 793, 817, 840, 843, 845, 871, 
+	897, 923, 925, 951, 978, 1005, 1032, 1060, 
+	1088, 1116, 1155, 1204, 1206, 1208, 1257, 1296, 
+	1299, 1301, 1307, 1311, 1316
 };
 
 static const char _use_syllable_machine_indicies[] = {
-	1, 0, 3, 2, 2, 2, 2, 2, 
-	2, 2, 2, 2, 2, 2, 2, 2, 
-	4, 2, 3, 2, 6, 5, 7, 8, 
-	9, 7, 10, 8, 9, 9, 11, 9, 
-	9, 3, 12, 9, 9, 13, 7, 7, 
-	14, 15, 9, 9, 16, 17, 18, 19, 
-	20, 21, 22, 16, 23, 24, 25, 26, 
-	27, 28, 9, 29, 30, 31, 9, 9, 
-	9, 32, 9, 34, 33, 36, 35, 35, 
-	37, 1, 35, 35, 38, 35, 35, 35, 
-	35, 35, 39, 40, 41, 42, 43, 44, 
-	45, 46, 40, 47, 39, 48, 49, 50, 
-	51, 35, 52, 53, 54, 35, 36, 35, 
-	35, 37, 1, 35, 35, 38, 35, 35, 
-	35, 35, 35, 55, 40, 41, 42, 43, 
-	44, 45, 46, 40, 47, 48, 48, 49, 
-	50, 51, 35, 52, 53, 54, 35, 37, 
-	56, 56, 56, 56, 56, 56, 56, 56, 
-	56, 56, 56, 56, 56, 57, 56, 37, 
-	56, 36, 35, 35, 37, 1, 35, 35, 
-	38, 35, 35, 35, 35, 35, 35, 40, 
-	41, 42, 43, 44, 45, 46, 40, 47, 
-	48, 48, 49, 50, 51, 35, 52, 53, 
-	54, 35, 36, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	40, 41, 42, 43, 44, 35, 35, 35, 
-	35, 35, 35, 49, 50, 51, 35, 52, 
-	53, 54, 35, 36, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 41, 42, 43, 44, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	52, 53, 54, 35, 36, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 42, 43, 44, 35, 
-	36, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 43, 44, 35, 36, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 44, 35, 
-	36, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	42, 43, 44, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 52, 53, 54, 
-	35, 36, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 42, 43, 44, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 53, 
-	54, 35, 36, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 42, 43, 44, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 54, 35, 36, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 41, 42, 43, 44, 35, 35, 
-	35, 35, 35, 35, 49, 50, 51, 35, 
-	52, 53, 54, 35, 36, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 41, 42, 43, 44, 35, 
-	35, 35, 35, 35, 35, 35, 50, 51, 
-	35, 52, 53, 54, 35, 36, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 41, 42, 43, 44, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	51, 35, 52, 53, 54, 35, 36, 35, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 40, 41, 42, 43, 
-	44, 35, 46, 40, 35, 35, 35, 49, 
-	50, 51, 35, 52, 53, 54, 35, 36, 
-	35, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 40, 41, 42, 
-	43, 44, 35, 58, 40, 35, 35, 35, 
-	49, 50, 51, 35, 52, 53, 54, 35, 
-	36, 35, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 40, 41, 
-	42, 43, 44, 35, 35, 40, 35, 35, 
-	35, 49, 50, 51, 35, 52, 53, 54, 
-	35, 36, 35, 35, 35, 35, 35, 35, 
-	35, 35, 35, 35, 35, 35, 35, 40, 
-	41, 42, 43, 44, 45, 46, 40, 35, 
-	35, 35, 49, 50, 51, 35, 52, 53, 
-	54, 35, 36, 35, 35, 37, 1, 35, 
-	35, 38, 35, 35, 35, 35, 35, 35, 
-	40, 41, 42, 43, 44, 45, 46, 40, 
-	47, 35, 48, 49, 50, 51, 35, 52, 
-	53, 54, 35, 36, 35, 35, 37, 1, 
-	35, 35, 38, 35, 35, 35, 35, 35, 
-	35, 40, 41, 42, 43, 44, 45, 46, 
-	40, 47, 39, 48, 49, 50, 51, 35, 
-	52, 53, 54, 35, 60, 59, 59, 59, 
-	59, 59, 59, 59, 61, 59, 10, 62, 
-	60, 59, 11, 63, 63, 3, 6, 63, 
-	63, 64, 63, 63, 63, 63, 63, 65, 
-	16, 17, 18, 19, 20, 21, 22, 16, 
-	23, 25, 25, 26, 27, 28, 63, 29, 
-	30, 31, 63, 11, 63, 63, 3, 6, 
-	63, 63, 64, 63, 63, 63, 63, 63, 
-	63, 16, 17, 18, 19, 20, 21, 22, 
-	16, 23, 25, 25, 26, 27, 28, 63, 
-	29, 30, 31, 63, 11, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 16, 17, 18, 19, 20, 63, 
-	63, 63, 63, 63, 63, 26, 27, 28, 
-	63, 29, 30, 31, 63, 11, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 17, 18, 19, 20, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 29, 30, 31, 63, 11, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 18, 19, 
-	20, 63, 11, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 19, 20, 63, 11, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	20, 63, 11, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 18, 19, 20, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 29, 
-	30, 31, 63, 11, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 18, 19, 20, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 30, 31, 63, 11, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 18, 19, 20, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 31, 63, 11, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 17, 18, 19, 20, 
-	63, 63, 63, 63, 63, 63, 26, 27, 
-	28, 63, 29, 30, 31, 63, 11, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 17, 18, 19, 
-	20, 63, 63, 63, 63, 63, 63, 63, 
-	27, 28, 63, 29, 30, 31, 63, 11, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 17, 18, 
-	19, 20, 63, 63, 63, 63, 63, 63, 
-	63, 63, 28, 63, 29, 30, 31, 63, 
-	11, 63, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 16, 17, 
-	18, 19, 20, 63, 22, 16, 63, 63, 
-	63, 26, 27, 28, 63, 29, 30, 31, 
-	63, 11, 63, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 16, 
-	17, 18, 19, 20, 63, 66, 16, 63, 
-	63, 63, 26, 27, 28, 63, 29, 30, 
-	31, 63, 11, 63, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	16, 17, 18, 19, 20, 63, 63, 16, 
-	63, 63, 63, 26, 27, 28, 63, 29, 
-	30, 31, 63, 11, 63, 63, 63, 63, 
-	63, 63, 63, 63, 63, 63, 63, 63, 
-	63, 16, 17, 18, 19, 20, 21, 22, 
-	16, 63, 63, 63, 26, 27, 28, 63, 
-	29, 30, 31, 63, 11, 63, 63, 3, 
-	6, 63, 63, 64, 63, 63, 63, 63, 
-	63, 63, 16, 17, 18, 19, 20, 21, 
-	22, 16, 23, 63, 25, 26, 27, 28, 
-	63, 29, 30, 31, 63, 3, 67, 67, 
-	67, 67, 67, 67, 67, 67, 67, 67, 
-	67, 67, 67, 4, 67, 6, 67, 8, 
-	63, 63, 63, 8, 63, 63, 11, 63, 
-	63, 3, 6, 63, 63, 64, 63, 63, 
-	63, 63, 63, 63, 16, 17, 18, 19, 
-	20, 21, 22, 16, 23, 24, 25, 26, 
-	27, 28, 63, 29, 30, 31, 63, 11, 
-	63, 63, 3, 6, 63, 63, 64, 63, 
-	63, 63, 63, 63, 63, 16, 17, 18, 
-	19, 20, 21, 22, 16, 23, 24, 25, 
-	26, 27, 28, 63, 29, 30, 31, 63, 
-	69, 68, 68, 68, 68, 68, 68, 68, 
-	68, 68, 68, 68, 68, 68, 68, 68, 
-	68, 68, 68, 68, 69, 70, 68, 69, 
-	70, 68, 70, 68, 8, 67, 67, 67, 
-	8, 67, 0
+	0, 1, 2, 2, 3, 4, 2, 2, 
+	2, 2, 2, 5, 6, 7, 2, 2, 
+	2, 2, 8, 2, 2, 2, 9, 10, 
+	11, 12, 13, 14, 15, 9, 16, 17, 
+	18, 19, 20, 21, 2, 22, 23, 24, 
+	2, 25, 26, 27, 28, 29, 30, 31, 
+	6, 32, 2, 33, 2, 0, 35, 34, 
+	35, 34, 37, 38, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 39, 40, 41, 
+	42, 43, 44, 45, 39, 46, 1, 47, 
+	48, 49, 50, 36, 51, 52, 53, 36, 
+	36, 36, 36, 54, 55, 56, 57, 38, 
+	36, 37, 38, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 39, 40, 41, 42, 
+	43, 44, 45, 39, 46, 47, 47, 48, 
+	49, 50, 36, 51, 52, 53, 36, 36, 
+	36, 36, 54, 55, 56, 57, 38, 36, 
+	37, 58, 39, 40, 41, 42, 43, 36, 
+	36, 36, 36, 36, 36, 48, 49, 50, 
+	36, 51, 52, 53, 36, 36, 36, 36, 
+	40, 55, 56, 57, 59, 36, 40, 41, 
+	42, 43, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 51, 52, 53, 36, 
+	36, 36, 36, 36, 55, 56, 57, 59, 
+	36, 41, 42, 43, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 55, 56, 
+	57, 36, 42, 43, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 55, 56, 
+	57, 36, 43, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 55, 56, 57, 
+	36, 55, 56, 36, 56, 36, 41, 42, 
+	43, 36, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 51, 52, 53, 36, 36, 
+	36, 36, 36, 55, 56, 57, 59, 36, 
+	41, 42, 43, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 52, 53, 
+	36, 36, 36, 36, 36, 55, 56, 57, 
+	59, 36, 41, 42, 43, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 36, 36, 
+	36, 53, 36, 36, 36, 36, 36, 55, 
+	56, 57, 59, 36, 61, 60, 41, 42, 
+	43, 36, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 36, 36, 36, 36, 
+	36, 36, 36, 55, 56, 57, 59, 36, 
+	40, 41, 42, 43, 36, 36, 36, 36, 
+	36, 36, 48, 49, 50, 36, 51, 52, 
+	53, 36, 36, 36, 36, 40, 55, 56, 
+	57, 59, 36, 40, 41, 42, 43, 36, 
+	36, 36, 36, 36, 36, 36, 49, 50, 
+	36, 51, 52, 53, 36, 36, 36, 36, 
+	40, 55, 56, 57, 59, 36, 40, 41, 
+	42, 43, 36, 36, 36, 36, 36, 36, 
+	36, 36, 50, 36, 51, 52, 53, 36, 
+	36, 36, 36, 40, 55, 56, 57, 59, 
+	36, 39, 40, 41, 42, 43, 36, 45, 
+	39, 36, 36, 36, 48, 49, 50, 36, 
+	51, 52, 53, 36, 36, 36, 36, 40, 
+	55, 56, 57, 59, 36, 39, 40, 41, 
+	42, 43, 36, 36, 39, 36, 36, 36, 
+	48, 49, 50, 36, 51, 52, 53, 36, 
+	36, 36, 36, 40, 55, 56, 57, 59, 
+	36, 39, 40, 41, 42, 43, 44, 45, 
+	39, 36, 36, 36, 48, 49, 50, 36, 
+	51, 52, 53, 36, 36, 36, 36, 40, 
+	55, 56, 57, 59, 36, 37, 38, 36, 
+	36, 36, 36, 36, 36, 36, 36, 36, 
+	39, 40, 41, 42, 43, 44, 45, 39, 
+	46, 36, 47, 48, 49, 50, 36, 51, 
+	52, 53, 36, 36, 36, 36, 54, 55, 
+	56, 57, 38, 36, 37, 58, 58, 58, 
+	58, 58, 58, 58, 58, 58, 58, 58, 
+	58, 58, 58, 58, 58, 58, 58, 58, 
+	58, 58, 40, 41, 42, 43, 58, 58, 
+	58, 58, 58, 58, 58, 58, 58, 58, 
+	51, 52, 53, 58, 58, 58, 58, 58, 
+	55, 56, 57, 59, 58, 63, 62, 3, 
+	64, 37, 38, 36, 36, 36, 36, 36, 
+	36, 36, 36, 36, 39, 40, 41, 42, 
+	43, 44, 45, 39, 46, 1, 47, 48, 
+	49, 50, 36, 51, 52, 53, 36, 0, 
+	35, 36, 54, 55, 56, 57, 38, 36, 
+	5, 6, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 9, 10, 11, 12, 13, 
+	14, 15, 9, 16, 18, 18, 19, 20, 
+	21, 65, 22, 23, 24, 65, 65, 65, 
+	65, 28, 29, 30, 31, 6, 65, 5, 
+	65, 9, 10, 11, 12, 13, 65, 65, 
+	65, 65, 65, 65, 19, 20, 21, 65, 
+	22, 23, 24, 65, 65, 65, 65, 10, 
+	29, 30, 31, 66, 65, 10, 11, 12, 
+	13, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 22, 23, 24, 65, 65, 
+	65, 65, 65, 29, 30, 31, 66, 65, 
+	11, 12, 13, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 29, 30, 31, 
+	65, 12, 13, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 29, 30, 31, 
+	65, 13, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 29, 30, 31, 65, 
+	29, 30, 65, 30, 65, 11, 12, 13, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 22, 23, 24, 65, 65, 65, 
+	65, 65, 29, 30, 31, 66, 65, 11, 
+	12, 13, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 23, 24, 65, 
+	65, 65, 65, 65, 29, 30, 31, 66, 
+	65, 11, 12, 13, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	24, 65, 65, 65, 65, 65, 29, 30, 
+	31, 66, 65, 67, 65, 11, 12, 13, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 29, 30, 31, 66, 65, 10, 
+	11, 12, 13, 65, 65, 65, 65, 65, 
+	65, 19, 20, 21, 65, 22, 23, 24, 
+	65, 65, 65, 65, 10, 29, 30, 31, 
+	66, 65, 10, 11, 12, 13, 65, 65, 
+	65, 65, 65, 65, 65, 20, 21, 65, 
+	22, 23, 24, 65, 65, 65, 65, 10, 
+	29, 30, 31, 66, 65, 10, 11, 12, 
+	13, 65, 65, 65, 65, 65, 65, 65, 
+	65, 21, 65, 22, 23, 24, 65, 65, 
+	65, 65, 10, 29, 30, 31, 66, 65, 
+	9, 10, 11, 12, 13, 65, 15, 9, 
+	65, 65, 65, 19, 20, 21, 65, 22, 
+	23, 24, 65, 65, 65, 65, 10, 29, 
+	30, 31, 66, 65, 9, 10, 11, 12, 
+	13, 65, 65, 9, 65, 65, 65, 19, 
+	20, 21, 65, 22, 23, 24, 65, 65, 
+	65, 65, 10, 29, 30, 31, 66, 65, 
+	9, 10, 11, 12, 13, 14, 15, 9, 
+	65, 65, 65, 19, 20, 21, 65, 22, 
+	23, 24, 65, 65, 65, 65, 10, 29, 
+	30, 31, 66, 65, 5, 6, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 9, 
+	10, 11, 12, 13, 14, 15, 9, 16, 
+	65, 18, 19, 20, 21, 65, 22, 23, 
+	24, 65, 65, 65, 65, 28, 29, 30, 
+	31, 6, 65, 5, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 65, 
+	65, 10, 11, 12, 13, 65, 65, 65, 
+	65, 65, 65, 65, 65, 65, 65, 22, 
+	23, 24, 65, 65, 65, 65, 65, 29, 
+	30, 31, 66, 65, 68, 65, 7, 65, 
+	1, 65, 65, 65, 1, 65, 65, 65, 
+	65, 65, 5, 6, 7, 65, 65, 65, 
+	65, 65, 65, 65, 65, 9, 10, 11, 
+	12, 13, 14, 15, 9, 16, 17, 18, 
+	19, 20, 21, 65, 22, 23, 24, 65, 
+	25, 26, 65, 28, 29, 30, 31, 6, 
+	65, 5, 6, 65, 65, 65, 65, 65, 
+	65, 65, 65, 65, 9, 10, 11, 12, 
+	13, 14, 15, 9, 16, 17, 18, 19, 
+	20, 21, 65, 22, 23, 24, 65, 65, 
+	65, 65, 28, 29, 30, 31, 6, 65, 
+	25, 26, 65, 26, 65, 1, 69, 69, 
+	69, 1, 69, 71, 70, 32, 70, 32, 
+	71, 70, 71, 70, 32, 70, 33, 70, 
+	0
 };
 
 static const char _use_syllable_machine_trans_targs[] = {
-	4, 8, 4, 31, 2, 4, 1, 5, 
-	6, 4, 28, 4, 49, 50, 51, 53, 
-	33, 34, 35, 36, 37, 44, 45, 47, 
-	52, 48, 41, 42, 43, 38, 39, 40, 
-	56, 4, 4, 4, 4, 7, 0, 27, 
-	11, 12, 13, 14, 15, 22, 23, 25, 
-	26, 19, 20, 21, 16, 17, 18, 10, 
-	4, 9, 24, 4, 29, 30, 4, 4, 
-	3, 32, 46, 4, 4, 54, 55
+	1, 3, 0, 26, 28, 29, 30, 51, 
+	53, 31, 32, 33, 34, 35, 46, 47, 
+	48, 54, 49, 43, 44, 45, 38, 39, 
+	40, 55, 56, 57, 50, 36, 37, 0, 
+	58, 60, 0, 2, 0, 4, 5, 6, 
+	7, 8, 9, 10, 21, 22, 23, 24, 
+	18, 19, 20, 13, 14, 15, 25, 11, 
+	12, 0, 0, 16, 0, 17, 0, 27, 
+	0, 0, 41, 42, 52, 0, 0, 59
 };
 
 static const char _use_syllable_machine_trans_actions[] = {
-	1, 0, 2, 3, 0, 4, 0, 0, 
-	7, 8, 0, 9, 10, 10, 3, 0, 
+	0, 0, 3, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	3, 3, 0, 0, 0, 0, 0, 0, 
-	0, 11, 12, 13, 14, 7, 0, 7, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	7, 0, 0, 0, 0, 0, 0, 7, 
-	15, 0, 0, 16, 0, 0, 17, 18, 
-	0, 3, 0, 19, 20, 0, 0
+	0, 0, 0, 0, 0, 0, 0, 4, 
+	0, 0, 5, 0, 6, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 7, 8, 0, 9, 0, 10, 0, 
+	11, 12, 0, 0, 0, 13, 14, 0
 };
 
 static const char _use_syllable_machine_to_state_actions[] = {
-	0, 0, 0, 0, 5, 0, 0, 0, 
+	1, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0
+	0, 0, 0, 0, 0
 };
 
 static const char _use_syllable_machine_from_state_actions[] = {
-	0, 0, 0, 0, 6, 0, 0, 0, 
+	2, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	0
+	0, 0, 0, 0, 0
 };
 
 static const short _use_syllable_machine_eof_trans[] = {
-	1, 3, 3, 6, 0, 34, 36, 36, 
-	57, 57, 36, 36, 36, 36, 36, 36, 
-	36, 36, 36, 36, 36, 36, 36, 36, 
-	36, 36, 36, 36, 60, 63, 60, 64, 
-	64, 64, 64, 64, 64, 64, 64, 64, 
-	64, 64, 64, 64, 64, 64, 64, 64, 
-	64, 68, 68, 64, 64, 69, 69, 69, 
-	68
+	0, 35, 35, 37, 37, 59, 37, 37, 
+	37, 37, 37, 37, 37, 37, 37, 37, 
+	61, 37, 37, 37, 37, 37, 37, 37, 
+	37, 59, 63, 65, 37, 66, 66, 66, 
+	66, 66, 66, 66, 66, 66, 66, 66, 
+	66, 66, 66, 66, 66, 66, 66, 66, 
+	66, 66, 66, 66, 66, 66, 66, 66, 
+	66, 70, 71, 71, 71
 };
 
-static const int use_syllable_machine_start = 4;
-static const int use_syllable_machine_first_final = 4;
+static const int use_syllable_machine_start = 0;
+static const int use_syllable_machine_first_final = 0;
 static const int use_syllable_machine_error = -1;
 
-static const int use_syllable_machine_en_main = 4;
+static const int use_syllable_machine_en_main = 0;
 
 
-#line 38 "hb-ot-shape-complex-use-machine.rl"
+#line 58 "hb-ot-shape-complex-use-machine.rl"
 
 
 
-#line 141 "hb-ot-shape-complex-use-machine.rl"
+#line 179 "hb-ot-shape-complex-use-machine.rl"
 
 
 #define found_syllable(syllable_type) \
   HB_STMT_START { \
-    if (0) fprintf (stderr, "syllable %d..%d %s\n", last, p+1, #syllable_type); \
-    for (unsigned int i = last; i < p+1; i++) \
+    if (0) fprintf (stderr, "syllable %d..%d %s\n", (*ts).second.first, (*te).second.first, #syllable_type); \
+    for (unsigned i = (*ts).second.first; i < (*te).second.first; ++i) \
       info[i].syllable() = (syllable_serial << 4) | syllable_type; \
-    last = p+1; \
     syllable_serial++; \
     if (unlikely (syllable_serial == 16)) syllable_serial = 1; \
   } HB_STMT_END
 
-static void
-find_syllables (hb_buffer_t *buffer)
+
+template <typename Iter>
+struct machine_index_t :
+  hb_iter_with_fallback_t<machine_index_t<Iter>,
+			  typename Iter::item_t>
 {
-  unsigned int p, pe, eof, ts HB_UNUSED, te HB_UNUSED, act HB_UNUSED;
-  int cs;
+  machine_index_t (const Iter& it) : it (it) {}
+  machine_index_t (const machine_index_t& o) : hb_iter_with_fallback_t<machine_index_t<Iter>,
+								       typename Iter::item_t> (),
+					       it (o.it) {}
+
+  static constexpr bool is_random_access_iterator = Iter::is_random_access_iterator;
+  static constexpr bool is_sorted_iterator = Iter::is_sorted_iterator;
+
+  typename Iter::item_t __item__ () const { return *it; }
+  typename Iter::item_t __item_at__ (unsigned i) const { return it[i]; }
+  unsigned __len__ () const { return it.len (); }
+  void __next__ () { ++it; }
+  void __forward__ (unsigned n) { it += n; }
+  void __prev__ () { --it; }
+  void __rewind__ (unsigned n) { it -= n; }
+  void operator = (unsigned n)
+  { unsigned index = (*it).first; if (index < n) it += n - index; else if (index > n) it -= index - n; }
+  void operator = (const machine_index_t& o) { *this = (*o.it).first; }
+  bool operator == (const machine_index_t& o) const { return (*it).first == (*o.it).first; }
+  bool operator != (const machine_index_t& o) const { return !(*this == o); }
+
+  private:
+  Iter it;
+};
+struct
+{
+  template <typename Iter,
+	    hb_requires (hb_is_iterable (Iter))>
+  machine_index_t<hb_iter_type<Iter>>
+  operator () (Iter&& it) const
+  { return machine_index_t<hb_iter_type<Iter>> (hb_iter (it)); }
+}
+HB_FUNCOBJ (machine_index);
+
+
+
+static bool
+not_ccs_default_ignorable (const hb_glyph_info_t &i)
+{ return !(i.use_category() == USE(CGJ) && _hb_glyph_info_is_default_ignorable (&i)); }
+
+static inline void
+find_syllables_use (hb_buffer_t *buffer)
+{
   hb_glyph_info_t *info = buffer->info;
+  auto p =
+    + hb_iter (info, buffer->len)
+    | hb_enumerate
+    | hb_filter ([] (const hb_glyph_info_t &i) { return not_ccs_default_ignorable (i); },
+		 hb_second)
+    | hb_filter ([&] (const hb_pair_t<unsigned, const hb_glyph_info_t &> p)
+		 {
+		   if (p.second.use_category() == USE(ZWNJ))
+		     for (unsigned i = p.first + 1; i < buffer->len; ++i)
+		       if (not_ccs_default_ignorable (info[i]))
+			 return !_hb_glyph_info_is_unicode_mark (&info[i]);
+		   return true;
+		 })
+    | hb_enumerate
+    | machine_index
+    ;
+  auto pe = p + p.len ();
+  auto eof = +pe;
+  auto ts = +p;
+  auto te = +p;
+  unsigned int act HB_UNUSED;
+  int cs;
   
-#line 339 "hb-ot-shape-complex-use-machine.hh"
+#line 453 "hb-ot-shape-complex-use-machine.hh"
 	{
 	cs = use_syllable_machine_start;
 	ts = 0;
@@ -343,16 +459,12 @@ find_syllables (hb_buffer_t *buffer)
 	act = 0;
 	}
 
-#line 162 "hb-ot-shape-complex-use-machine.rl"
+#line 263 "hb-ot-shape-complex-use-machine.rl"
 
 
-  p = 0;
-  pe = eof = buffer->len;
-
-  unsigned int last = 0;
   unsigned int syllable_serial = 1;
   
-#line 356 "hb-ot-shape-complex-use-machine.hh"
+#line 466 "hb-ot-shape-complex-use-machine.hh"
 	{
 	int _slen;
 	int _trans;
@@ -362,20 +474,20 @@ find_syllables (hb_buffer_t *buffer)
 		goto _test_eof;
 _resume:
 	switch ( _use_syllable_machine_from_state_actions[cs] ) {
-	case 6:
+	case 2:
 #line 1 "NONE"
 	{ts = p;}
 	break;
-#line 370 "hb-ot-shape-complex-use-machine.hh"
+#line 480 "hb-ot-shape-complex-use-machine.hh"
 	}
 
 	_keys = _use_syllable_machine_trans_keys + (cs<<1);
 	_inds = _use_syllable_machine_indicies + _use_syllable_machine_index_offsets[cs];
 
 	_slen = _use_syllable_machine_key_spans[cs];
-	_trans = _inds[ _slen > 0 && _keys[0] <=( info[p].use_category()) &&
-		( info[p].use_category()) <= _keys[1] ?
-		( info[p].use_category()) - _keys[0] : _slen ];
+	_trans = _inds[ _slen > 0 && _keys[0] <=( (*p).second.second.use_category()) &&
+		( (*p).second.second.use_category()) <= _keys[1] ?
+		( (*p).second.second.use_category()) - _keys[0] : _slen ];
 
 _eof_trans:
 	cs = _use_syllable_machine_trans_targs[_trans];
@@ -385,99 +497,63 @@ _eof_trans:
 
 	switch ( _use_syllable_machine_trans_actions[_trans] ) {
 	case 7:
-#line 1 "NONE"
-	{te = p+1;}
-	break;
-	case 12:
-#line 130 "hb-ot-shape-complex-use-machine.rl"
-	{te = p+1;{ found_syllable (independent_cluster); }}
-	break;
-	case 14:
-#line 132 "hb-ot-shape-complex-use-machine.rl"
-	{te = p+1;{ found_syllable (standard_cluster); }}
-	break;
-	case 9:
-#line 136 "hb-ot-shape-complex-use-machine.rl"
-	{te = p+1;{ found_syllable (broken_cluster); }}
-	break;
-	case 8:
-#line 137 "hb-ot-shape-complex-use-machine.rl"
-	{te = p+1;{ found_syllable (non_cluster); }}
-	break;
-	case 11:
-#line 130 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (independent_cluster); }}
-	break;
-	case 15:
-#line 131 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (virama_terminated_cluster); }}
-	break;
-	case 13:
-#line 132 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (standard_cluster); }}
-	break;
-	case 17:
-#line 133 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (number_joiner_terminated_cluster); }}
-	break;
-	case 16:
-#line 134 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (numeral_cluster); }}
-	break;
-	case 20:
-#line 135 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (symbol_cluster); }}
-	break;
-	case 18:
-#line 136 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (broken_cluster); }}
-	break;
-	case 19:
-#line 137 "hb-ot-shape-complex-use-machine.rl"
-	{te = p;p--;{ found_syllable (non_cluster); }}
-	break;
-	case 1:
-#line 132 "hb-ot-shape-complex-use-machine.rl"
-	{{p = ((te))-1;}{ found_syllable (standard_cluster); }}
+#line 169 "hb-ot-shape-complex-use-machine.rl"
+	{te = p+1;{ found_syllable (use_standard_cluster); }}
 	break;
 	case 4:
-#line 136 "hb-ot-shape-complex-use-machine.rl"
-	{{p = ((te))-1;}{ found_syllable (broken_cluster); }}
-	break;
-	case 2:
-#line 1 "NONE"
-	{	switch( act ) {
-	case 7:
-	{{p = ((te))-1;} found_syllable (broken_cluster); }
-	break;
-	case 8:
-	{{p = ((te))-1;} found_syllable (non_cluster); }
-	break;
-	}
-	}
+#line 174 "hb-ot-shape-complex-use-machine.rl"
+	{te = p+1;{ found_syllable (use_broken_cluster); }}
 	break;
 	case 3:
-#line 1 "NONE"
-	{te = p+1;}
-#line 136 "hb-ot-shape-complex-use-machine.rl"
-	{act = 7;}
+#line 175 "hb-ot-shape-complex-use-machine.rl"
+	{te = p+1;{ found_syllable (use_non_cluster); }}
+	break;
+	case 8:
+#line 167 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_virama_terminated_cluster); }}
+	break;
+	case 9:
+#line 168 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_sakot_terminated_cluster); }}
+	break;
+	case 6:
+#line 169 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_standard_cluster); }}
+	break;
+	case 11:
+#line 170 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_number_joiner_terminated_cluster); }}
 	break;
 	case 10:
-#line 1 "NONE"
-	{te = p+1;}
-#line 137 "hb-ot-shape-complex-use-machine.rl"
-	{act = 8;}
+#line 171 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_numeral_cluster); }}
 	break;
-#line 472 "hb-ot-shape-complex-use-machine.hh"
+	case 5:
+#line 172 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_symbol_cluster); }}
+	break;
+	case 14:
+#line 173 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_hieroglyph_cluster); }}
+	break;
+	case 12:
+#line 174 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_broken_cluster); }}
+	break;
+	case 13:
+#line 175 "hb-ot-shape-complex-use-machine.rl"
+	{te = p;p--;{ found_syllable (use_non_cluster); }}
+	break;
+#line 546 "hb-ot-shape-complex-use-machine.hh"
 	}
 
 _again:
 	switch ( _use_syllable_machine_to_state_actions[cs] ) {
-	case 5:
+	case 1:
 #line 1 "NONE"
 	{ts = 0;}
 	break;
-#line 481 "hb-ot-shape-complex-use-machine.hh"
+#line 555 "hb-ot-shape-complex-use-machine.hh"
 	}
 
 	if ( ++p != pe )
@@ -493,7 +569,7 @@ _again:
 
 	}
 
-#line 171 "hb-ot-shape-complex-use-machine.rl"
+#line 268 "hb-ot-shape-complex-use-machine.rl"
 
 }
 

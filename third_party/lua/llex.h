@@ -1,5 +1,5 @@
 /*
-** $Id: llex.h,v 1.81 2018/03/07 15:55:38 roberto Exp roberto $
+** $Id: llex.h $
 ** Lexical Analyzer
 ** See Copyright Notice in lua.h
 */
@@ -7,11 +7,17 @@
 #ifndef llex_h
 #define llex_h
 
+#include <limits.h>
+
 #include "lobject.h"
 #include "lzio.h"
 
 
-#define FIRST_RESERVED	257
+/*
+** Single-char tokens (terminal symbols) are represented by their own
+** numeric code. Other tokens start at the following value.
+*/
+#define FIRST_RESERVED	(UCHAR_MAX + 1)
 
 
 #if !defined(LUA_ENV)

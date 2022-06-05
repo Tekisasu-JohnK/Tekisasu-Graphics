@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Aseprite -->
-<!-- Copyright (C) 2018-2021  Igara Studio S.A. -->
+<!-- Copyright (C) 2018-2022  Igara Studio S.A. -->
 <!-- Copyright (C) 2014-2018  David Capello -->
 <preferences>
 
@@ -73,6 +73,7 @@
     </enum>
     <enum id="SelectionMode">
       <value id="DEFAULT" value="0" />
+      <value id="REPLACE" value="0" />
       <value id="ADD" value="1" />
       <value id="SUBTRACT" value="2" />
       <value id="INTERSECT" value="3" />
@@ -126,6 +127,12 @@
       <value id="YES" value="1" />
       <value id="NO" value="2" />
     </enum>
+    <enum id="Downsampling">
+      <value id="NEAREST" value="0" />
+      <value id="BILINEAR" value="1" />
+      <value id="BILINEAR_MIPMAP" value="2" />
+      <value id="TRILINEAR_MIPMAP" value="3" />
+    </enum>
   </types>
 
   <global>
@@ -151,6 +158,7 @@
       <option id="show_menu_bar" type="bool" default="true" />
       <option id="recent_items" type="int" default="16" />
       <option id="osx_async_view" type="bool" default="true" />
+      <option id="x11_stylus_id" type="std::string" />
     </section>
     <section id="undo" text="Undo">
       <option id="size_limit" type="int" default="0" />
@@ -163,6 +171,7 @@
       <option id="zoom_with_slide" type="bool" default="false" />
       <option id="zoom_from_center_with_wheel" type="bool" default="false" />
       <option id="zoom_from_center_with_keys" type="bool" default="false" />
+      <option id="invert_brush_size_wheel" type="bool" default="false" />
       <option id="show_scrollbars" type="bool" default="true" />
       <option id="auto_scroll" type="bool" default="true" />
       <option id="right_click_mode" type="RightClickMode" default="RightClickMode::PAINT_BGCOLOR" />
@@ -175,6 +184,19 @@
            some performance issue rendering huge sprites with small
            zoom levels -->
       <option id="auto_fit" type="bool" default="false" />
+      <option id="downsampling" type="Downsampling" default="Downsampling::BILINEAR_MIPMAP" />
+    </section>
+    <section id="cels">
+      <option id="user_data_visibility" type="bool" default="false" />
+    </section>
+    <section id="layers">
+      <option id="user_data_visibility" type="bool" default="false" />
+    </section>
+    <section id="sprite">
+      <option id="user_data_visibility" type="bool" default="false" />
+    </section>
+    <section id="tags">
+      <option id="user_data_visibility" type="bool" default="false" />
     </section>
     <section id="timeline">
       <option id="keep_selection" type="bool" default="false" />
@@ -199,12 +221,14 @@
       <option id="api" type="std::string" />
     </section>
     <section id="experimental" text="Experimental">
+      <option id="multiple_windows" type="bool" default="true" />
       <option id="new_render_engine" type="bool" default="true" />
       <option id="new_blend" type="bool" default="true" />
       <option id="use_native_clipboard" type="bool" default="true" />
       <option id="use_native_file_dialog" type="bool" default="false" />
+      <option id="use_shaders_for_color_selectors" type="bool" default="true" />
       <option id="one_finger_as_mouse_movement" type="bool" default="true" />
-      <option id="load_wintab_driver" type="bool" default="true" />
+      <option id="load_wintab_driver" type="bool" default="false" />
       <option id="flash_layer" type="bool" default="false" />
       <option id="nonactive_layers_opacity" type="int" default="255" />
     </section>
@@ -216,14 +240,18 @@
     </section>
     <section id="color_bar">
       <option id="box_size" type="int" default="11" />
+      <option id="tiles_box_size" type="int" default="16" />
       <option id="fg_color" type="app::Color" default="app::Color::fromRgb(255, 255, 255)" />
       <option id="bg_color" type="app::Color" default="app::Color::fromRgb(0, 0, 0)" />
+      <option id="fg_tile" type="doc::tile_t" default="doc::notile" />
+      <option id="bg_tile" type="doc::tile_t" default="doc::notile" />
       <option id="selector" type="app::ColorBar::ColorSelector" default="app::ColorBar::ColorSelector::TINT_SHADE_TONE" />
       <option id="discrete_wheel" type="bool" default="false" />
       <option id="wheel_model" type="int" default="0" />
       <option id="harmony" type="int" default="0" />
       <option id="show_invalid_fg_bg_color_alert" type="bool" default="true" />
       <option id="entries_separator" type="bool" default="true" />
+      <option id="show_color_and_tiles" type="bool" default="true" />
     </section>
     <section id="updater">
       <option id="inits" type="int" default="0" />
@@ -275,6 +303,8 @@
       <option id="dithering_algorithm" type="std::string" />
       <option id="dithering_factor" type="int" default="100" />
       <option id="to_gray" type="ToGrayAlgorithm" default="ToGrayAlgorithm::DEFAULT" />
+      <option id="advanced" type="bool" default="false" />
+      <option id="rgbmap_algorithm" type="doc::RgbMapAlgorithm" default="doc::RgbMapAlgorithm::DEFAULT" />
     </section>
     <section id="eyedropper" text="Editor">
       <option id="channel" type="EyedropperChannel" default="EyedropperChannel::COLOR_ALPHA" />
@@ -314,6 +344,7 @@
     </section>
     <section id="slices">
       <option id="default_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255)" />
+      <option id="user_data_visibility" type="bool" default="false" />
     </section>
     <section id="advanced_mode">
       <option id="show_alert" type="bool" default="true" />
@@ -341,6 +372,7 @@
       <option id="show_alert" type="bool" default="true" />
       <option id="interlaced" type="bool" default="false" />
       <option id="loop" type="bool" default="true" />
+      <option id="preserve_palette_order" type="bool" default="true" />
     </section>
     <section id="jpeg">
       <option id="show_alert" type="bool" default="true" />
@@ -527,6 +559,7 @@
       <option id="brush_preview" type="bool" default="true" />
       <option id="slices" type="bool" default="true" />
       <option id="auto_guides" type="bool" default="true" />
+      <option id="tile_numbers" type="bool" default="true" />
     </section>
   </document>
 

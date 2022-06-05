@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2020 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -8,14 +9,13 @@
 #define BASE_FILE_HANDLE_H_INCLUDED
 #pragma once
 
-#include "base/shared_ptr.h"
-
 #include <cstdio>
+#include <memory>
 #include <string>
 
 namespace base {
 
-  typedef base::SharedPtr<FILE> FileHandle;
+  using FileHandle = std::shared_ptr<FILE>;
 
   FILE* open_file_raw(const std::string& filename, const std::string& mode);
   FileHandle open_file(const std::string& filename, const std::string& mode);

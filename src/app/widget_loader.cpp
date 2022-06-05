@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -39,6 +39,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 
 namespace app {
 
@@ -134,8 +135,8 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
       widget = new Panel();
   }
   else if (elem_name == "box") {
-    bool horizontal  = bool_attr_is_true(elem, "horizontal");
-    bool vertical    = bool_attr_is_true(elem, "vertical");
+    bool horizontal  = bool_attr(elem, "horizontal", false);
+    bool vertical    = bool_attr(elem, "vertical", false);
     int align = (horizontal ? HORIZONTAL: vertical ? VERTICAL: 0);
 
     if (!widget)
@@ -172,11 +173,11 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
       }
     }
 
-    bool left   = bool_attr_is_true(elem, "left");
-    bool right  = bool_attr_is_true(elem, "right");
-    bool top    = bool_attr_is_true(elem, "top");
-    bool bottom = bool_attr_is_true(elem, "bottom");
-    bool closewindow = bool_attr_is_true(elem, "closewindow");
+    bool left   = bool_attr(elem, "left", false);
+    bool right  = bool_attr(elem, "right", false);
+    bool top    = bool_attr(elem, "top", false);
+    bool bottom = bool_attr(elem, "bottom", false);
+    bool closewindow = bool_attr(elem, "closewindow", false);
 
     widget->setAlign((left ? LEFT: (right ? RIGHT: CENTER)) |
       (top ? TOP: (bottom ? BOTTOM: MIDDLE)));
@@ -202,9 +203,10 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
       if (!widget) {
         // Automatic bind <check> widget with bool preference option
         if (pref) {
-          auto prefWidget = new BoolPrefWidget<CheckBox>("");
+          std::unique_ptr<BoolPrefWidget<CheckBox>> prefWidget(
+            new BoolPrefWidget<CheckBox>(""));
           prefWidget->setPref(pref);
-          widget = prefWidget;
+          widget = prefWidget.release();
         }
         else {
           widget = new CheckBox("");
@@ -212,10 +214,10 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
       }
     }
 
-    bool center = bool_attr_is_true(elem, "center");
-    bool right  = bool_attr_is_true(elem, "right");
-    bool top    = bool_attr_is_true(elem, "top");
-    bool bottom = bool_attr_is_true(elem, "bottom");
+    bool center = bool_attr(elem, "center", false);
+    bool right  = bool_attr(elem, "right", false);
+    bool top    = bool_attr(elem, "top", false);
+    bool bottom = bool_attr(elem, "bottom", false);
 
     widget->setAlign((center ? CENTER:
         (right ? RIGHT: LEFT)) |
@@ -226,7 +228,7 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
     if (!widget)
       widget = new ComboBox();
 
-    bool editable = bool_attr_is_true(elem, "editable");
+    bool editable = bool_attr(elem, "editable", false);
     if (editable)
       ((ComboBox*)widget)->setEditable(true);
   }
@@ -238,7 +240,7 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
 
     const char* suffix = elem->Attribute("suffix");
     const char* decimals = elem->Attribute("decimals");
-    const bool readonly = bool_attr_is_true(elem, "readonly");
+    const bool readonly = bool_attr(elem, "readonly", false);
 
     widget = (elem_name == "expr" ?
               new ExprEntry:
@@ -255,21 +257,21 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
   }
   else if (elem_name == "grid") {
     const char *columns = elem->Attribute("columns");
-    bool same_width_columns = bool_attr_is_true(elem, "same_width_columns");
+    bool same_width_columns = bool_attr(elem, "same_width_columns", false);
 
     if (columns != NULL) {
-      widget = new Grid(strtol(columns, NULL, 10),
-                        same_width_columns);
+      widget = new ui::Grid(strtol(columns, NULL, 10),
+                            same_width_columns);
     }
   }
   else if (elem_name == "label") {
     if (!widget)
       widget = new Label("");
 
-    bool center = bool_attr_is_true(elem, "center");
-    bool right  = bool_attr_is_true(elem, "right");
-    bool top    = bool_attr_is_true(elem, "top");
-    bool bottom = bool_attr_is_true(elem, "bottom");
+    bool center = bool_attr(elem, "center", false);
+    bool right  = bool_attr(elem, "right", false);
+    bool top    = bool_attr(elem, "top", false);
+    bool bottom = bool_attr(elem, "bottom", false);
 
     widget->setAlign((center ? CENTER:
         (right ? RIGHT: LEFT)) |
@@ -288,10 +290,10 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
         link->setUrl(url);
     }
 
-    bool center = bool_attr_is_true(elem, "center");
-    bool right  = bool_attr_is_true(elem, "right");
-    bool top    = bool_attr_is_true(elem, "top");
-    bool bottom = bool_attr_is_true(elem, "bottom");
+    bool center = bool_attr(elem, "center", false);
+    bool right  = bool_attr(elem, "right", false);
+    bool top    = bool_attr(elem, "top", false);
+    bool bottom = bool_attr(elem, "bottom", false);
 
     widget->setAlign(
       (center ? CENTER: (right ? RIGHT: LEFT)) |
@@ -301,7 +303,7 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
     if (!widget)
       widget = new ListBox();
 
-    bool multiselect = bool_attr_is_true(elem, "multiselect");
+    bool multiselect = bool_attr(elem, "multiselect", false);
     if (multiselect)
       static_cast<ListBox*>(widget)->setMultiselect(multiselect);
   }
@@ -321,8 +323,8 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
       listitem->setValue(value);
   }
   else if (elem_name == "splitter") {
-    bool horizontal = bool_attr_is_true(elem, "horizontal");
-    bool vertical = bool_attr_is_true(elem, "vertical");
+    bool horizontal = bool_attr(elem, "horizontal", false);
+    bool vertical = bool_attr(elem, "vertical", false);
     const char* by = elem->Attribute("by");
     const char* position = elem->Attribute("position");
     Splitter::Type type = (by && strcmp(by, "pixel") == 0 ?
@@ -359,10 +361,10 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
         radio->setRadioGroup(radio_group);
     }
 
-    bool center = bool_attr_is_true(elem, "center");
-    bool right  = bool_attr_is_true(elem, "right");
-    bool top    = bool_attr_is_true(elem, "top");
-    bool bottom = bool_attr_is_true(elem, "bottom");
+    bool center = bool_attr(elem, "center", false);
+    bool right  = bool_attr(elem, "right", false);
+    bool top    = bool_attr(elem, "top", false);
+    bool bottom = bool_attr(elem, "bottom", false);
 
     widget->setAlign(
       (center ? CENTER:
@@ -371,12 +373,12 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
         (bottom ? BOTTOM: MIDDLE)));
   }
   else if (elem_name == "separator") {
-    bool center      = bool_attr_is_true(elem, "center");
-    bool right       = bool_attr_is_true(elem, "right");
-    bool middle      = bool_attr_is_true(elem, "middle");
-    bool bottom      = bool_attr_is_true(elem, "bottom");
-    bool horizontal  = bool_attr_is_true(elem, "horizontal");
-    bool vertical    = bool_attr_is_true(elem, "vertical");
+    bool center      = bool_attr(elem, "center", false);
+    bool right       = bool_attr(elem, "right", false);
+    bool middle      = bool_attr(elem, "middle", false);
+    bool bottom      = bool_attr(elem, "bottom", false);
+    bool horizontal  = bool_attr(elem, "horizontal", false);
+    bool vertical    = bool_attr(elem, "vertical", false);
     int align =
       (horizontal ? HORIZONTAL: 0) |
       (vertical ? VERTICAL: 0) |
@@ -392,18 +394,21 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
   else if (elem_name == "slider") {
     const char *min = elem->Attribute("min");
     const char *max = elem->Attribute("max");
-    int min_value = min != NULL ? strtol(min, NULL, 10): 0;
-    int max_value = max != NULL ? strtol(max, NULL, 10): 0;
+    const bool readonly = bool_attr(elem, "readonly", false);
+    int min_value = (min ? strtol(min, nullptr, 10): 0);
+    int max_value = (max ? strtol(max, nullptr, 10): 0);
 
     widget = new Slider(min_value, max_value, min_value);
+    static_cast<Slider*>(widget)->setReadOnly(readonly);
   }
   else if (elem_name == "textbox") {
-    bool wordwrap = bool_attr_is_true(elem, "wordwrap");
+    const char* text = (elem->GetText() ? elem->GetText(): "");
+    bool wordwrap = bool_attr(elem, "wordwrap", false);
 
     if (!widget)
-      widget = new TextBox(elem->GetText(), 0);
+      widget = new TextBox(text, 0);
     else
-      widget->setText(elem->GetText());
+      widget->setText(text);
 
     if (wordwrap)
       widget->setAlign(widget->align() | WORDWRAP);
@@ -414,7 +419,7 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
   }
   else if (elem_name == "window") {
     if (!widget) {
-      bool desktop = bool_attr_is_true(elem, "desktop");
+      bool desktop = bool_attr(elem, "desktop", false);
 
       if (desktop)
         widget = new Window(Window::DesktopWindow);
@@ -425,8 +430,8 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
     }
   }
   else if (elem_name == "colorpicker") {
-    const bool rgba = bool_attr_is_true(elem, "rgba");
-    const bool simple = bool_attr_is_true(elem, "simple");
+    const bool rgba = bool_attr(elem, "rgba", false);
+    const bool simple = bool_attr(elem, "simple", false);
 
     if (!widget) {
       ColorButtonOptions options;
@@ -451,9 +456,9 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
       widget = new ButtonSet(strtol(columns, NULL, 10));
 
     if (ButtonSet* buttonset = dynamic_cast<ButtonSet*>(widget)) {
-      if (bool_attr_is_true(elem, "multiple"))
+      if (bool_attr(elem, "multiple", false))
         buttonset->setMultiMode(ButtonSet::MultiMode::Set);
-      if (bool_attr_is_true(elem, "oneormore"))
+      if (bool_attr(elem, "oneormore", false))
         buttonset->setMultiMode(ButtonSet::MultiMode::OneOrMore);
     }
   }
@@ -485,21 +490,30 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
   else if (elem_name == "image") {
     if (!widget) {
       const char* file = elem->Attribute("file");
+      const char* icon = elem->Attribute("icon");
 
-      // Load image
-      std::string icon(file);
+      if (file) {
+        ResourceFinder rf;
+        rf.includeDataDir(file);
+        if (!rf.findFirst())
+          throw base::Exception("File %s not found", file);
 
-      ResourceFinder rf;
-      rf.includeDataDir(file);
-      if (!rf.findFirst())
-        throw base::Exception("File %s not found", file);
-
-      try {
-        os::Surface* sur = os::instance()->loadRgbaSurface(rf.filename().c_str());
-        widget = new ImageView(sur, 0, true);
+        try {
+          os::SurfaceRef sur = os::instance()->loadRgbaSurface(rf.filename().c_str());
+          if (sur) {
+            sur->setImmutable();
+            widget = new ImageView(sur, 0);
+          }
+        }
+        catch (...) {
+          throw base::Exception("Error loading %s file", file);
+        }
       }
-      catch (...) {
-        throw base::Exception("Error loading %s file", file);
+      else if (icon) {
+        SkinPartPtr part = SkinTheme::instance()->getPartById(std::string(icon));
+        if (part) {
+          widget = new ImageView(part->bitmapRef(0), 0);
+        }
       }
     }
   }
@@ -520,12 +534,13 @@ void WidgetLoader::fillWidgetWithXmlElementAttributes(const TiXmlElement* elem, 
 {
   const char* id        = elem->Attribute("id");
   const char* tooltip_dir = elem->Attribute("tooltip_dir");
-  bool selected         = bool_attr_is_true(elem, "selected");
-  bool disabled         = bool_attr_is_true(elem, "disabled");
-  bool expansive        = bool_attr_is_true(elem, "expansive");
-  bool homogeneous      = bool_attr_is_true(elem, "homogeneous");
-  bool magnet           = bool_attr_is_true(elem, "magnet");
-  bool noborders        = bool_attr_is_true(elem, "noborders");
+  bool selected         = bool_attr(elem, "selected", false);
+  bool disabled         = bool_attr(elem, "disabled", false);
+  bool expansive        = bool_attr(elem, "expansive", false);
+  bool homogeneous      = bool_attr(elem, "homogeneous", false);
+  bool magnet           = bool_attr(elem, "magnet", false);
+  bool noborders        = bool_attr(elem, "noborders", false);
+  bool visible          = bool_attr(elem, "visible", true);
   const char* width     = elem->Attribute("width");
   const char* height    = elem->Attribute("height");
   const char* minwidth  = elem->Attribute("minwidth");
@@ -583,6 +598,9 @@ void WidgetLoader::fillWidgetWithXmlElementAttributes(const TiXmlElement* elem, 
   if (expansive)
     widget->setExpansive(true);
 
+  if (!visible)
+    widget->setVisible(false);
+
   if (homogeneous)
     widget->setAlign(widget->align() | HOMOGENEOUS);
 
@@ -637,7 +655,7 @@ void WidgetLoader::fillWidgetWithXmlElementAttributes(const TiXmlElement* elem, 
     std::string styleIdStr = styleid;
     widget->InitTheme.connect(
       [widget, styleIdStr]{
-        SkinTheme* theme = static_cast<SkinTheme*>(widget->theme());
+        auto theme = SkinTheme::get(widget);
         ui::Style* style = theme->getStyleById(styleIdStr);
         if (style)
           widget->setStyle(style);
@@ -676,16 +694,16 @@ void WidgetLoader::fillWidgetWithXmlElementAttributesWithChildren(const TiXmlEle
         int hspan = cell_hspan ? strtol(cell_hspan, NULL, 10): 1;
         int vspan = cell_vspan ? strtol(cell_vspan, NULL, 10): 1;
         int align = cell_align ? convert_align_value_to_flags(cell_align): 0;
-        Grid* grid = dynamic_cast<Grid*>(widget);
-        ASSERT(grid != NULL);
+        auto grid = dynamic_cast<ui::Grid*>(widget);
+        ASSERT(grid != nullptr);
 
         grid->addChildInCell(child, hspan, vspan, align);
       }
       // Attach the child in the view
       else if (widget->type() == kComboBoxWidget &&
                child->type() == kListItemWidget) {
-        ComboBox* combo = dynamic_cast<ComboBox*>(widget);
-        ASSERT(combo != NULL);
+        auto combo = dynamic_cast<ComboBox*>(widget);
+        ASSERT(combo != nullptr);
 
         combo->addItem(dynamic_cast<ListItem*>(child));
       }
@@ -697,7 +715,7 @@ void WidgetLoader::fillWidgetWithXmlElementAttributesWithChildren(const TiXmlEle
   }
 
   if (widget->type() == kViewWidget) {
-    bool maxsize = bool_attr_is_true(elem, "maxsize");
+    bool maxsize = bool_attr(elem, "maxsize", false);
     if (maxsize)
       static_cast<View*>(widget)->makeVisibleAllScrollableArea();
   }

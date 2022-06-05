@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -12,9 +12,8 @@
 #include "gfx/rect.h"
 
 #include <vector>
-#include <iterator>
 
-#include "SkRegion.h"
+#include "include/core/SkRegion.h"
 
 namespace gfx {
 
@@ -24,12 +23,16 @@ namespace gfx {
 
   namespace details {
 
-    typedef SkRegion Region;
+    using Region = SkRegion;
 
     template<typename T>
-    class RegionIterator : public std::iterator<std::forward_iterator_tag, T> {
+    class RegionIterator {
     public:
-      typedef typename std::iterator<std::forward_iterator_tag, T>::reference reference;
+      using iterator_category = std::forward_iterator_tag;
+      using value_type = T;
+      using difference_type = std::ptrdiff_t;
+      using pointer = T*;
+      using reference = T&;
 
       RegionIterator() { }
       RegionIterator(const RegionIterator& o) : m_it(o.m_it) { }
@@ -64,8 +67,8 @@ namespace gfx {
   public:
     enum Overlap { Out, In, Part };
 
-    typedef details::RegionIterator<Rect> iterator;
-    typedef details::RegionIterator<const Rect> const_iterator;
+    using iterator = details::RegionIterator<Rect>;
+    using const_iterator = details::RegionIterator<const Rect>;
 
     Region();
     Region(const Region& copy);

@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2021  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -134,7 +134,7 @@ bool handle_dde_messages(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, LRES
       std::string topic = get_atom_string((ATOM)topicAtom, useUnicode);
       FreeDDElParam(msg, lparam);
 
-      if (auto system = dynamic_cast<WindowSystem*>(os::instance())) {
+      if (auto system = dynamic_cast<SystemWin*>(os::instance())) {
         if (system->appName().empty() ||
             app != system->appName())
           return false;

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -74,7 +74,7 @@ ButtonSet* ButtonSet::Item::buttonSet()
 
 void ButtonSet::Item::onPaint(ui::PaintEvent& ev)
 {
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+  auto theme = SkinTheme::get(this);
   Graphics* g = ev.graphics();
   gfx::Rect rc = clientBounds();
   gfx::Color fg;
@@ -148,7 +148,10 @@ void ButtonSet::Item::onPaint(ui::PaintEvent& ev)
   if (m_icon) {
     os::Surface* bmp = m_icon->bitmap(0);
 
-    if (isSelected() && hasCapture())
+    if (!isEnabled())
+      g->drawColoredRgbaSurface(bmp, theme->colors.disabled(),
+                                iconRc.x, iconRc.y);
+    else if (isSelected() && hasCapture())
       g->drawColoredRgbaSurface(bmp, theme->colors.buttonSelectedText(),
                                 iconRc.x, iconRc.y);
     else if (m_mono)
@@ -159,7 +162,7 @@ void ButtonSet::Item::onPaint(ui::PaintEvent& ev)
   }
 
   if (hasText()) {
-    g->setFont(font());
+    g->setFont(AddRef(font()));
     g->drawUIText(text(), fg, gfx::ColorNone, textRc.origin(), 0);
   }
 }
@@ -196,7 +199,9 @@ bool ButtonSet::Item::onProcessMessage(ui::Message* msg)
       // user leaves the ButtonSet without releasing the mouse button
       // and the mouse capture if offered to other ButtonSet.
       if (buttonSet()->m_triggerOnMouseUp) {
-        ASSERT(g_itemBeforeCapture < 0);
+        // g_itemBeforeCapture can be >= 0 if we clicked other button
+        // without releasing the first button.
+        //ASSERT(g_itemBeforeCapture < 0);
         g_itemBeforeCapture = buttonSet()->selectedItem();
       }
 

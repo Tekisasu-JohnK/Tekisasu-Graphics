@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -37,10 +37,10 @@ std::string get_hmonitor_icc_filename(HMONITOR monitor)
   return iccFilename;
 }
 
-os::ColorSpacePtr get_colorspace_from_icc_file(const std::string& iccFilename)
+os::ColorSpaceRef get_colorspace_from_icc_file(const std::string& iccFilename)
 {
   auto buf = base::read_file_content(iccFilename);
-  auto osCS = os::instance()->createColorSpace(gfx::ColorSpace::MakeICC(std::move(buf)));
+  auto osCS = os::instance()->makeColorSpace(gfx::ColorSpace::MakeICC(std::move(buf)));
   if (osCS) {
     osCS->gfxColorSpace()
       ->setName("Display Profile: " +
@@ -49,9 +49,9 @@ os::ColorSpacePtr get_colorspace_from_icc_file(const std::string& iccFilename)
   return osCS;
 }
 
-os::ColorSpacePtr get_hmonitor_colorspace(HMONITOR monitor)
+os::ColorSpaceRef get_hmonitor_colorspace(HMONITOR monitor)
 {
-  os::ColorSpacePtr osCS;
+  os::ColorSpaceRef osCS;
   std::string filename = get_hmonitor_icc_filename(monitor);
   if (!filename.empty())
     osCS = get_colorspace_from_icc_file(filename);
@@ -62,14 +62,14 @@ static BOOL CALLBACK list_display_colorspaces_enumproc(HMONITOR monitor,
                                                        HDC hdc, LPRECT rc,
                                                        LPARAM data)
 {
-  auto list = (std::vector<os::ColorSpacePtr>*)data;
+  auto list = (std::vector<os::ColorSpaceRef>*)data;
   auto osCS = get_hmonitor_colorspace(monitor);
   if (osCS)
     list->push_back(osCS);
   return TRUE;
 }
 
-void list_display_colorspaces(std::vector<os::ColorSpacePtr>& list)
+void list_display_colorspaces(std::vector<os::ColorSpaceRef>& list)
 {
   EnumDisplayMonitors(
     nullptr, nullptr,

@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (c) 2018-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -9,21 +9,23 @@
 #pragma once
 
 #include "gfx/color_space.h"
+#include "os/ref.h"
 
 #include <cstdint>
-#include <memory>
 
 namespace os {
 
-  class ColorSpace {
+  class ColorSpace;
+  using ColorSpaceRef = Ref<ColorSpace>;
+
+  class ColorSpace : public RefCount {
   public:
     virtual ~ColorSpace() { }
-    virtual const gfx::ColorSpacePtr& gfxColorSpace() const = 0;
+    virtual const gfx::ColorSpaceRef& gfxColorSpace() const = 0;
+    virtual const bool isSRGB() const = 0;
   };
 
-  typedef std::shared_ptr<ColorSpace> ColorSpacePtr;
-
-  class ColorSpaceConversion {
+  class ColorSpaceConversion : public RefCount {
   public:
     virtual ~ColorSpaceConversion() { }
     // Transform RGBA pixels between two color spaces.

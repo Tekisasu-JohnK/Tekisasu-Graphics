@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -19,11 +19,13 @@
 #include "app/ui/color_shades.h"
 #include "app/ui/expr_entry.h"
 #include "app/ui/filename_field.h"
+#include "app/ui/main_window.h"
 #include "base/paths.h"
 #include "base/remove_from_container.h"
 #include "ui/box.h"
 #include "ui/button.h"
 #include "ui/combobox.h"
+#include "ui/display.h"
 #include "ui/entry.h"
 #include "ui/grid.h"
 #include "ui/label.h"
@@ -133,6 +135,37 @@ struct Dialog {
       it->second->setText(text);
   }
 
+  gfx::Rect getWindowBounds() const {
+    gfx::Rect bounds = window.bounds();
+    // Bounds in scripts will be relative to the the main window
+    // origin/scale.
+    if (window.ownDisplay()) {
+      const auto mainWindow = App::instance()->mainWindow();
+      const int scale = mainWindow->display()->scale();
+      const gfx::Point dialogOrigin = window.display()->nativeWindow()->contentRect().origin();
+      const gfx::Point mainOrigin = mainWindow->display()->nativeWindow()->contentRect().origin();
+      bounds.setOrigin((dialogOrigin - mainOrigin) / scale);
+    }
+    return bounds;
+  }
+
+  void setWindowBounds(const gfx::Rect& rc) {
+    if (window.ownDisplay()) {
+      window.expandWindow(rc.size());
+
+      const auto mainWindow = App::instance()->mainWindow();
+      const int scale = mainWindow->display()->scale();
+      const gfx::Point mainOrigin = mainWindow->display()->nativeWindow()->contentRect().origin();
+      gfx::Rect frame = window.display()->nativeWindow()->contentRect();
+      frame.setOrigin(mainOrigin + rc.origin() * scale);
+      window.display()->nativeWindow()->setFrame(frame);
+    }
+    else {
+      window.setBounds(rc);
+      window.invalidate();
+    }
+  }
+
 };
 
 template<typename...Args,
@@ -201,6 +234,10 @@ void Dialog_connect_signal(lua_State* L,
 
 int Dialog_new(lua_State* L)
 {
+  // If we don't have UI, just return nil
+  if (!App::instance()->isGui())
+    return 0;
+
   auto dlg = push_new<Dialog>(L);
 
   // The uservalue of the dialog userdata will contain a table that
@@ -255,6 +292,7 @@ int Dialog_show(lua_State* L)
   dlg->refShow(L);
 
   bool wait = true;
+  obs::scoped_connection conn;
   if (lua_istable(L, 2)) {
     int type = lua_getfield(L, 2, "wait");
     if (type == LUA_TBOOLEAN)
@@ -265,8 +303,9 @@ int Dialog_show(lua_State* L)
     if (VALID_LUATYPE(type)) {
       const auto rc = convert_args_into_rect(L, -1);
       if (!rc.isEmpty()) {
-        dlg->window.remapWindow();
-        dlg->window.setBounds(rc);
+        conn = dlg->window.Open.connect([dlg, rc]{
+          dlg->setWindowBounds(rc);
+        });
       }
     }
     lua_pop(L, 1);
@@ -940,6 +979,29 @@ int Dialog_modify(lua_State* L)
     }
     lua_pop(L, 1);
 
+    // Handling options before option should support
+    // using both or only one of them at the same time
+    type = lua_getfield(L, 2, "options");
+    if (type != LUA_TNIL) {
+      if (lua_istable(L, -1)) {
+        if (auto combobox = dynamic_cast<ui::ComboBox*>(widget)) {
+          combobox->deleteAllItems();
+          lua_pushnil(L);
+          bool empty = true;
+          while (lua_next(L, -2) != 0) {
+            if (auto p = lua_tostring(L, -1)) {
+              combobox->addItem(p);
+              empty = false;
+            }
+            lua_pop(L, 1);
+          }
+          if (empty)
+            combobox->getEntryWidget()->setText("");
+        }
+      }
+    }
+    lua_pop(L, 1);
+
     type = lua_getfield(L, 2, "option");
     if (auto p = lua_tostring(L, -1)) {
       if (auto combobox = dynamic_cast<ui::ComboBox*>(widget)) {
@@ -983,17 +1045,14 @@ int Dialog_modify(lua_State* L)
     }
     lua_pop(L, 1);
 
-    // TODO combobox options? shades mode? file title / open / save / filetypes? on* events?
+    // TODO shades mode? file title / open / save / filetypes? on* events?
 
     if (relayout) {
       dlg->window.layout();
 
-      gfx::Rect origBounds = dlg->window.bounds();
-      gfx::Rect bounds = origBounds;
-      bounds.h = dlg->window.sizeHint().h;
-      dlg->window.setBounds(bounds);
-
-      dlg->window.manager()->invalidateRect(origBounds);
+      gfx::Rect bounds(dlg->window.bounds().w,
+                       dlg->window.sizeHint().h);
+      dlg->window.expandWindow(bounds.size());
     }
   }
   lua_pushvalue(L, 1);
@@ -1183,7 +1242,8 @@ int Dialog_get_bounds(lua_State* L)
   auto dlg = get_obj<Dialog>(L, 1);
   if (!dlg->window.isVisible())
     dlg->window.remapWindow();
-  push_new<gfx::Rect>(L, dlg->window.bounds());
+
+  push_new<gfx::Rect>(L, dlg->getWindowBounds());
   return 1;
 }
 
@@ -1191,9 +1251,9 @@ int Dialog_set_bounds(lua_State* L)
 {
   auto dlg = get_obj<Dialog>(L, 1);
   const auto rc = get_obj<gfx::Rect>(L, 2);
-  if (*rc != dlg->window.bounds()) {
-    dlg->window.setBounds(*rc);
-    dlg->window.invalidate();
+  if (rc) {
+    if (*rc != dlg->getWindowBounds())
+      dlg->setWindowBounds(*rc);
   }
   return 0;
 }

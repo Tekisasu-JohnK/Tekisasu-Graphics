@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -12,17 +12,19 @@
 #include <vector>
 #include <iterator>
 
-#if defined(LAF_SKIA)
+#if LAF_SKIA
   // There is a header file on Skia (SkTFitsIn.h) that uses
   // std::numeric_limits<>::max() and fails if we don't undef the
   // max() macro.
-  #ifdef _WIN32
+  #if LAF_WINDOWS
     #undef max
   #endif
 
   #include "gfx/region_skia.h"
-#elif defined(LAF_PIXMAN)
+#elif LAF_PIXMAN
   #include "gfx/region_pixman.h"
+#elif LAF_WINDOWS
+  #include "gfx/region_win.h"
 #endif
 
 #endif

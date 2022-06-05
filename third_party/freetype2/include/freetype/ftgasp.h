@@ -4,7 +4,7 @@
  *
  *   Access of TrueType's 'gasp' table (specification).
  *
- * Copyright 2007-2018 by
+ * Copyright (C) 2007-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,8 +19,7 @@
 #ifndef FTGASP_H_
 #define FTGASP_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -32,7 +31,7 @@
 FT_BEGIN_HEADER
 
 
-  /***************************************************************************
+  /**************************************************************************
    *
    * @section:
    *   gasp_table
@@ -50,7 +49,7 @@ FT_BEGIN_HEADER
    *   interpreter to duplicate the Windows text rendering results.
    */
 
-  /*************************************************************************
+  /**************************************************************************
    *
    * @enum:
    *   FT_GASP_XXX
@@ -99,7 +98,7 @@ FT_BEGIN_HEADER
 #define FT_GASP_SYMMETRIC_SMOOTHING  0x08
 
 
-  /*************************************************************************
+  /**************************************************************************
    *
    * @function:
    *   FT_Get_Gasp

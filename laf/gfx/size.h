@@ -142,4 +142,8 @@ typedef SizeT<double> SizeF;
 
 } // namespace gfx
 
+#ifdef _DEBUG
+#include "gfx/size_io.h"
+#endif
+
 #endif

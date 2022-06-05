@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -550,8 +550,9 @@ private:
     return Window::onProcessMessage(msg);
   }
 
-  void onBroadcastMouseMessage(WidgetsList& targets) override {
-    Window::onBroadcastMouseMessage(targets);
+  void onBroadcastMouseMessage(const gfx::Point& screenPos,
+                               WidgetsList& targets) override {
+    Window::onBroadcastMouseMessage(screenPos, targets);
 
     // Add the editor as receptor of mouse events too.
     if (m_editor)
@@ -903,10 +904,7 @@ private:
   }
 
   void resize() {
-    gfx::Size reqSize = sizeHint();
-    moveWindow(gfx::Rect(origin(), reqSize));
-    layout();
-    invalidate();
+    expandWindow(sizeHint());
   }
 
   void updateExportButton() {

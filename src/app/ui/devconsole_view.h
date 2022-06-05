@@ -32,6 +32,7 @@ namespace app {
     // TabView implementation
     std::string getTabText() override;
     TabIcon getTabIcon() override;
+    gfx::Color getTabColor() override;
 
     // WorkspaceView implementation
     ui::Widget* getContentWidget() override { return this; }
@@ -42,6 +43,7 @@ namespace app {
     void onTabPopup(Workspace* workspace) override;
 
     // EngineDelegate impl
+    virtual void onConsoleError(const char* text) override;
     virtual void onConsolePrint(const char* text) override;
 
   protected:

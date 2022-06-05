@@ -1,4 +1,5 @@
 // Aseprite Document IO Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2016-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -20,6 +21,9 @@
 #define GIF_89_STAMP     "GIF89a"
 #define PNG_MAGIC_DWORD1 0x474E5089
 #define PNG_MAGIC_DWORD2 0x0A1A0A0D
+#define WEBP_STAMP_1     "RIFF" // "RIFFnnnnWEBP"
+#define WEBP_STAMP_2     "WEBP"
+#define PSD_STAMP        "8BPS"
 
 namespace dio {
 
@@ -47,6 +51,12 @@ FileFormat detect_format_by_file_content_bytes(const uint8_t* buf,
   if (n >= 2) {
     if (n >= 6) {
       if (n >= 8) {
+        if (n >= 12) {
+          if (std::strncmp((const char*)buf, WEBP_STAMP_1, 4) == 0 ||
+              std::strncmp((const char*)buf+8, WEBP_STAMP_2, 4) == 0)
+            return FileFormat::WEBP_ANIMATION;
+        }
+
         if (IS_MAGIC_DWORD(0, PNG_MAGIC_DWORD1) &&
             IS_MAGIC_DWORD(4, PNG_MAGIC_DWORD2))
           return FileFormat::PNG_IMAGE;
@@ -55,6 +65,9 @@ FileFormat detect_format_by_file_content_bytes(const uint8_t* buf,
       if (std::strncmp((const char*)buf, GIF_87_STAMP, 6) == 0 ||
           std::strncmp((const char*)buf, GIF_89_STAMP, 6) == 0)
         return FileFormat::GIF_ANIMATION;
+
+      if (std::strncmp((const char*)buf, PSD_STAMP, 4) == 0)
+        return FileFormat::PSD_IMAGE;
 
       if (IS_MAGIC_WORD(4, ASE_MAGIC_NUMBER))
         return FileFormat::ASE_ANIMATION;
@@ -81,8 +94,8 @@ FileFormat detect_format_by_file_content(const std::string& filename)
     return FileFormat::ERROR;
 
   FILE* f = handle.get();
-  uint8_t buf[8];
-  int n = (int)fread(buf, 1, 8, f);
+  uint8_t buf[12];
+  int n = (int)fread(buf, 1, 12, f);
 
   return detect_format_by_file_content_bytes(buf, n);
 }
@@ -134,7 +147,7 @@ FileFormat detect_format_by_file_extension(const std::string& filename)
 
   if (ext == "png")
     return FileFormat::PNG_IMAGE;
-  
+
   if (ext == "svg")
     return FileFormat::SVG_IMAGE;
 
@@ -146,6 +159,10 @@ FileFormat detect_format_by_file_extension(const std::string& filename)
 
   if (ext == "webp")
     return FileFormat::WEBP_ANIMATION;
+
+  if (ext == "psd" ||
+      ext == "psb")
+    return FileFormat::PSD_IMAGE;
 
   return FileFormat::UNKNOWN;
 }

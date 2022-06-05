@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,7 +16,8 @@
 #include "gfx/rect.h"
 #include "os/color_space.h"
 #include "os/paint.h"
-#include "os/scoped_handle.h"
+#include "os/ref.h"
+#include "os/sampling.h"
 #include "os/surface_format.h"
 
 #include <string>
@@ -29,7 +30,10 @@ namespace gfx {
 namespace os {
 
   class ColorSpace;
+  struct Sampling;
+  class Surface;
   class SurfaceLock;
+  using SurfaceRef = Ref<Surface>;
 
   enum class DrawMode {
     Solid,
@@ -37,15 +41,18 @@ namespace os {
     Xor
   };
 
-  class Surface {
+  class Surface : public RefCount {
   public:
     virtual ~Surface() { }
-    virtual void dispose() = 0;
     virtual int width() const = 0;
     virtual int height() const = 0;
     gfx::Rect bounds() const { return gfx::Rect(0, 0, width(), height()); }
-    virtual const ColorSpacePtr& colorSpace() const = 0;
+    virtual const ColorSpaceRef& colorSpace() const = 0;
     virtual bool isDirectToScreen() const = 0;
+
+    // Call if you are not going to modify the pixels of this surface
+    // in the future. E.g. useful for sprite sheets/texture atlases.
+    virtual void setImmutable() = 0;
 
     virtual int getSaveCount() const = 0;
     virtual gfx::Rect getClipBounds() const = 0;
@@ -115,7 +122,7 @@ namespace os {
     void drawCircle(const gfx::PointF& center,
                     float radius,
                     const os::Paint& paint) {
-      drawCircle(center.x, center.y, radius, paint);
+      drawCircle(float(center.x), float(center.y), radius, paint);
     }
 
     void drawCircle(const gfx::Point& center,
@@ -131,10 +138,13 @@ namespace os {
     virtual void scrollTo(const gfx::Rect& rc, int dx, int dy) = 0;
     // TODO merge all these functions expoing a SkPaint-like structure
     virtual void drawSurface(const Surface* src, int dstx, int dsty) = 0;
-    virtual void drawSurface(const Surface* surface, const gfx::Rect& srcRect, const gfx::Rect& dstRect) = 0;
+    virtual void drawSurface(const Surface* src,
+                             const gfx::Rect& srcRect,
+                             const gfx::Rect& dstRect,
+                             const os::Sampling& sampling = os::Sampling(),
+                             const os::Paint* paint = nullptr) = 0;
     virtual void drawRgbaSurface(const Surface* src, int dstx, int dsty) = 0;
     virtual void drawRgbaSurface(const Surface* src, int srcx, int srcy, int dstx, int dsty, int width, int height) = 0;
-    virtual void drawRgbaSurface(const Surface* surface, const gfx::Rect& srcRect, const gfx::Rect& dstRect) = 0;
     virtual void drawColoredRgbaSurface(const Surface* src, gfx::Color fg, gfx::Color bg, const gfx::Clip& clip) = 0;
     virtual void drawSurfaceNine(os::Surface* surface,
                                  const gfx::Rect& src,
@@ -153,8 +163,6 @@ namespace os {
   private:
     Surface* m_surface;
   };
-
-  typedef ScopedHandle<Surface> SurfaceHandle;
 
 } // namespace os
 

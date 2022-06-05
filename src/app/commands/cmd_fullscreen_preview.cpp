@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -26,7 +26,6 @@
 #include "doc/palette.h"
 #include "doc/primitives.h"
 #include "doc/sprite.h"
-#include "os/scoped_handle.h"
 #include "os/surface.h"
 #include "os/system.h"
 
@@ -52,8 +51,13 @@ public:
     , m_pal(m_sprite->palette(editor->frame()))
     , m_proj(editor->projection())
     , m_index_bg_color(-1)
-    , m_doublebuf(Image::create(IMAGE_RGB, ui::display_w(), ui::display_h()))
-    , m_doublesur(os::instance()->createRgbaSurface(ui::display_w(), ui::display_h())) {
+    , m_doublebuf(Image::create(
+                    IMAGE_RGB,
+                    editor->display()->size().w,
+                    editor->display()->size().h))
+    , m_doublesur(os::instance()->makeRgbaSurface(
+                    editor->display()->size().w,
+                    editor->display()->size().h)) {
     // Do not use DocWriter (do not lock the document) because we
     // will call other sub-commands (e.g. previous frame, next frame,
     // etc.).
@@ -70,7 +74,7 @@ public:
     gfx::Rect vp = view->viewportBounds();
     gfx::Point scroll = view->viewScroll();
 
-    m_oldMousePos = ui::get_mouse_position();
+    m_oldMousePos = mousePosInDisplay();
     m_pos.x = -scroll.x + vp.x + editor->padding().x;
     m_pos.y = -scroll.y + vp.y + editor->padding().y;
 
@@ -171,6 +175,7 @@ protected:
   }
 
   virtual void onPaint(PaintEvent& ev) override {
+    gfx::Size displaySize = display()->size();
     Graphics* g = ev.graphics();
     EditorRender& render = m_editor->renderEngine();
     render.setRefLayersVisiblity(false);
@@ -214,26 +219,26 @@ protected:
                            255, BlendMode::NORMAL);
         break;
       case TiledMode::X_AXIS:
-        for (u=x-w; u<ui::display_w()+w; u+=w)
+        for (u=x-w; u<displaySize.w+w; u+=w)
           render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, u, y,
                              255, BlendMode::NORMAL);
         break;
       case TiledMode::Y_AXIS:
-        for (v=y-h; v<ui::display_h()+h; v+=h)
+        for (v=y-h; v<displaySize.h+h; v+=h)
           render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, x, v,
                              255, BlendMode::NORMAL);
         break;
       case TiledMode::BOTH:
-        for (v=y-h; v<ui::display_h()+h; v+=h)
-          for (u=x-w; u<ui::display_w()+w; u+=w)
+        for (v=y-h; v<displaySize.h+h; v+=h)
+          for (u=x-w; u<displaySize.w+w; u+=w)
             render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, u, v,
                                255, BlendMode::NORMAL);
         break;
     }
 
     convert_image_to_surface(m_doublebuf.get(), m_pal,
-      m_doublesur, 0, 0, 0, 0, m_doublebuf->width(), m_doublebuf->height());
-    g->blit(m_doublesur, 0, 0, 0, 0, m_doublesur->width(), m_doublesur->height());
+      m_doublesur.get(), 0, 0, 0, 0, m_doublebuf->width(), m_doublebuf->height());
+    g->blit(m_doublesur.get(), 0, 0, 0, 0, m_doublesur->width(), m_doublesur->height());
   }
 
 private:
@@ -249,7 +254,7 @@ private:
   int m_index_bg_color;
   std::unique_ptr<Image> m_render;
   std::unique_ptr<Image> m_doublebuf;
-  os::ScopedHandle<os::Surface> m_doublesur;
+  os::SurfaceRef m_doublesur;
   filters::TiledMode m_tiled;
 };
 

@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2021  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -334,9 +334,19 @@ public:
     return createIntersection(other);
   }
 
+  RectT operator*(const T factor) const {
+    return RectT(x*factor, y*factor,
+                 w*factor, h*factor);
+  }
+
   RectT operator*(const SizeT<T>& size) const {
     return RectT(x*size.w, y*size.h,
                  w*size.w, h*size.h);
+  }
+
+  RectT operator/(const T scale) const {
+    return RectT(x/scale, y/scale,
+                 w/scale, h/scale);
   }
 
   RectT operator/(const SizeT<T>& size) const {
@@ -378,5 +388,9 @@ typedef RectT<int> Rect;
 typedef RectT<double> RectF;
 
 } // namespace gfx
+
+#ifdef _DEBUG
+#include "gfx/rect_io.h"
+#endif
 
 #endif

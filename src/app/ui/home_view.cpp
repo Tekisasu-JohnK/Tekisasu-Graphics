@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -38,6 +38,10 @@
 #include "app/ui/news_listbox.h"
 #endif
 
+#if ENABLE_SENTRY
+#include "app/sentry_wrapper.h"
+#endif
+
 namespace app {
 
 using namespace ui;
@@ -66,10 +70,27 @@ HomeView::HomeView()
 #endif
 
   checkUpdate()->setVisible(false);
+  shareCrashdb()->setVisible(false);
+
+#if ENABLE_SENTRY
+  // Show this option in home tab only when we require consent for the
+  // first time and there is crash data available to report
+  if (Sentry::requireConsent() &&
+      Sentry::areThereCrashesToReport()) {
+    shareCrashdb()->setVisible(true);
+    shareCrashdb()->Click.connect(
+      [this]{
+        if (shareCrashdb()->isSelected())
+          Sentry::giveConsent();
+        else
+          Sentry::revokeConsent();
+      });
+  }
+#endif
 
   InitTheme.connect(
     [this]{
-      SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+      auto theme = SkinTheme::get(this);
       setBgColor(theme->colors.workspace());
       setChildSpacing(8 * guiscale());
     });
@@ -91,7 +112,7 @@ void HomeView::dataRecoverySessionsAreReady()
 #ifdef ENABLE_DATA_RECOVERY
   if (App::instance()->dataRecovery()->hasRecoverySessions()) {
     // We highlight the "Recover Files" options because we came from a crash
-    SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+    auto theme = SkinTheme::get(this);
     recoverSprites()->setStyle(theme->styles.workspaceUpdateLink());
     layout();
   }
@@ -101,6 +122,21 @@ void HomeView::dataRecoverySessionsAreReady()
 #endif
 }
 
+#if ENABLE_SENTRY
+void HomeView::updateConsentCheckbox()
+{
+  if (Sentry::requireConsent()) {
+    shareCrashdb()->setVisible(true);
+    shareCrashdb()->setSelected(false);
+  }
+  else if (Sentry::consentGiven()) {
+    shareCrashdb()->setVisible(false);
+    shareCrashdb()->setSelected(true);
+  }
+  layout();
+}
+#endif
+
 std::string HomeView::getTabText()
 {
   return Strings::home_view_title();
@@ -109,6 +145,11 @@ std::string HomeView::getTabText()
 TabIcon HomeView::getTabIcon()
 {
   return TabIcon::HOME;
+}
+
+gfx::Color HomeView::getTabColor()
+{
+  return gfx::ColorNone;
 }
 
 bool HomeView::onCloseView(Workspace* workspace, bool quitting)
@@ -131,7 +172,7 @@ void HomeView::onTabPopup(Workspace* workspace)
   if (!menu)
     return;
 
-  menu->showPopup(ui::get_mouse_position());
+  menu->showPopup(mousePosInDisplay(), display());
 }
 
 void HomeView::onWorkspaceViewSelected()
@@ -176,9 +217,7 @@ void HomeView::onCheckingUpdates()
 
 void HomeView::onUpToDate()
 {
-  checkUpdate()->setText(
-    fmt::format(Strings::home_view_is_up_to_date(), get_app_name()));
-  checkUpdate()->setVisible(true);
+  checkUpdate()->setVisible(false);
 
   layout();
 }
@@ -192,7 +231,7 @@ void HomeView::onNewUpdate(const std::string& url, const std::string& version)
   checkUpdate()->setVisible(true);
   checkUpdate()->InitTheme.connect(
     [this]{
-      SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+      auto theme = SkinTheme::get(this);
       checkUpdate()->setStyle(theme->styles.workspaceUpdateLink());
     });
   checkUpdate()->initTheme();
@@ -218,7 +257,7 @@ void HomeView::onRecoverSprites()
     // it).
     m_dataRecoveryView->Empty.connect(
       [this]{
-        SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
+        auto theme = SkinTheme::get(this);
         recoverSprites()->setStyle(theme->styles.workspaceLink());
         layout();
       });

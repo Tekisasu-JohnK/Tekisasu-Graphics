@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -20,7 +21,7 @@ namespace base {
     Exception(const std::string& msg) throw();
     virtual ~Exception() throw();
 
-    const char* what() const throw();
+    const char* what() const throw() override;
 
   protected:
     void setMessage(const char* msg) throw();

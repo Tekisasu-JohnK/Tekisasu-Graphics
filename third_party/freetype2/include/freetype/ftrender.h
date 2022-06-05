@@ -4,7 +4,7 @@
  *
  *   FreeType renderer modules public interface (specification).
  *
- * Copyright 1996-2018 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -20,9 +20,8 @@
 #define FTRENDER_H_
 
 
-#include <ft2build.h>
-#include FT_MODULE_H
-#include FT_GLYPH_H
+#include <freetype/ftmodapi.h>
+#include <freetype/ftglyph.h>
 
 
 FT_BEGIN_HEADER
@@ -225,8 +224,8 @@ FT_BEGIN_HEADER
    *
    *   This doesn't change the current renderer for other formats.
    *
-   *   Currently, no FreeType renderer module uses 'parameters'; you should
-   *   thus always pass NULL as the value.
+   *   Currently, no FreeType renderer module uses `parameters`; you should
+   *   thus always pass `NULL` as the value.
    */
   FT_EXPORT( FT_Error )
   FT_Set_Renderer( FT_Library     library,

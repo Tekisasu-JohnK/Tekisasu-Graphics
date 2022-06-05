@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,10 +11,11 @@
 
 #include "base/system_console.h"
 
-#ifdef _WIN32 // Windows needs some adjustments to the console if the
-              // process is linked with /subsystem:windows. These
-              // adjustments are not great but are good enough.
-              // See system_console.h for more information.
+#ifdef LAF_WINDOWS
+
+// Windows needs some adjustments to the console if the process is
+// linked with /subsystem:windows. These adjustments are not great but
+// are good enough.  See system_console.h for more information.
 
 #include <cstdio>
 #include <iostream>

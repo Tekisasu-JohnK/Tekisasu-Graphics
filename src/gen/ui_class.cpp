@@ -1,4 +1,5 @@
 // Aseprite Code Generator
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2014-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -116,6 +117,9 @@ static Item convert_to_item(TiXmlElement* elem)
   if (name == "hbox")
     return item.typeIncl("ui::HBox",
                          "ui/box.h");
+  if (name == "image")
+    return item.typeIncl("ui::ImageView",
+                         "ui/image_view.h");
   if (name == "item" &&
       parent == "buttonset")
     return item.typeIncl("app::ButtonSet::Item",
@@ -129,6 +133,9 @@ static Item convert_to_item(TiXmlElement* elem)
   if (name == "listbox")
     return item.typeIncl("ui::ListBox",
                          "ui/listbox.h");
+  if (name == "listitem")
+    return item.typeIncl("ui::ListItem",
+                         "ui/listitem.h");
   if (name == "panel")
     return item.typeIncl("ui::Panel",
                          "ui/panel.h");
@@ -150,6 +157,9 @@ static Item convert_to_item(TiXmlElement* elem)
   if (name == "splitter")
     return item.typeIncl("ui::Splitter",
                          "ui/splitter.h");
+  if (name == "textbox")
+    return item.typeIncl("ui::TextBox",
+                         "ui/textbox.h");
   if (name == "tipwindow")
     return item.typeIncl("ui::TipWindow",
                          "ui/tooltips.h");

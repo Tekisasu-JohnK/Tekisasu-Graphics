@@ -164,11 +164,11 @@ public:
     static Json parse(const std::string & in,
                       std::string & err,
                       JsonParse strategy = JsonParse::STANDARD);
-    static Json parse(const char * in,
+    static Json parse(const char * in, size_t count,
                       std::string & err,
                       JsonParse strategy = JsonParse::STANDARD) {
         if (in) {
-            return parse(std::string(in), err, strategy);
+          return parse(std::string(in, count), err, strategy);
         } else {
             err = "null input";
             return nullptr;

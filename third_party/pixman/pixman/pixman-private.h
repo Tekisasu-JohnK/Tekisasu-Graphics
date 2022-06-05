@@ -180,6 +180,10 @@ struct bits_image
     uint32_t *                 free_me;
     int                        rowstride;  /* in number of uint32_t's */
 
+    pixman_dither_t            dither;
+    uint32_t                   dither_offset_y;
+    uint32_t                   dither_offset_x;
+
     fetch_scanline_t           fetch_scanline_32;
     fetch_pixel_32_t	       fetch_pixel_32;
     store_scanline_t           store_scanline_32;
@@ -363,9 +367,38 @@ void
 _pixman_gradient_walker_reset (pixman_gradient_walker_t *walker,
                                pixman_fixed_48_16_t      pos);
 
-uint32_t
-_pixman_gradient_walker_pixel (pixman_gradient_walker_t *walker,
-                               pixman_fixed_48_16_t      x);
+typedef void (*pixman_gradient_walker_write_t) (
+    pixman_gradient_walker_t *walker,
+    pixman_fixed_48_16_t      x,
+    uint32_t                 *buffer);
+
+void
+_pixman_gradient_walker_write_narrow(pixman_gradient_walker_t *walker,
+				     pixman_fixed_48_16_t      x,
+				     uint32_t                 *buffer);
+
+void
+_pixman_gradient_walker_write_wide(pixman_gradient_walker_t *walker,
+				   pixman_fixed_48_16_t      x,
+				   uint32_t                 *buffer);
+
+typedef void (*pixman_gradient_walker_fill_t) (
+    pixman_gradient_walker_t *walker,
+    pixman_fixed_48_16_t      x,
+    uint32_t                 *buffer,
+    uint32_t                 *end);
+
+void
+_pixman_gradient_walker_fill_narrow(pixman_gradient_walker_t *walker,
+				    pixman_fixed_48_16_t      x,
+				    uint32_t                 *buffer,
+				    uint32_t                 *end);
+
+void
+_pixman_gradient_walker_fill_wide(pixman_gradient_walker_t *walker,
+				  pixman_fixed_48_16_t      x,
+				  uint32_t                 *buffer,
+				  uint32_t                 *end);
 
 /*
  * Edges
@@ -603,6 +636,11 @@ _pixman_implementation_create_arm_simd (pixman_implementation_t *fallback);
 #endif
 
 #ifdef USE_ARM_NEON
+pixman_implementation_t *
+_pixman_implementation_create_arm_neon (pixman_implementation_t *fallback);
+#endif
+
+#ifdef USE_ARM_A64_NEON
 pixman_implementation_t *
 _pixman_implementation_create_arm_neon (pixman_implementation_t *fallback);
 #endif
@@ -1073,16 +1111,19 @@ _pixman_log_error (const char *function, const char *message);
 
 typedef struct { pixman_fixed_48_16_t v[3]; } pixman_vector_48_16_t;
 
+PIXMAN_EXPORT
 pixman_bool_t
 pixman_transform_point_31_16 (const pixman_transform_t    *t,
                               const pixman_vector_48_16_t *v,
                               pixman_vector_48_16_t       *result);
 
+PIXMAN_EXPORT
 void
 pixman_transform_point_31_16_3d (const pixman_transform_t    *t,
                                  const pixman_vector_48_16_t *v,
                                  pixman_vector_48_16_t       *result);
 
+PIXMAN_EXPORT
 void
 pixman_transform_point_31_16_affine (const pixman_transform_t    *t,
                                      const pixman_vector_48_16_t *v,

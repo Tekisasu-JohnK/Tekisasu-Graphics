@@ -10,6 +10,7 @@
 #pragma once
 
 #include "os/keys.h"
+#include "os/ref.h"
 #include "os/shortcut.h"
 
 #include <functional>
@@ -61,32 +62,34 @@ namespace os {
   class MenuItem;
   class Menus;
 
-  class MenuItem {
+  using MenuItemRef = Ref<MenuItem>;
+  using MenuRef = Ref<Menu>;
+  using MenusRef = Ref<Menus>;
+
+  class MenuItem : public RefCount {
   public:
     virtual ~MenuItem() { }
-    virtual void dispose() = 0;
     virtual void setText(const std::string& text) = 0;
-    virtual void setSubmenu(Menu* submenu) = 0;
+    virtual void setSubmenu(const MenuRef& submenu) = 0;
     virtual void setEnabled(bool state) = 0;
     virtual void setChecked(bool state) = 0;
     virtual void setShortcut(const Shortcut& shortcut) = 0;
   };
 
-  class Menu {
+  class Menu : public RefCount {
   public:
     virtual ~Menu() { }
-    virtual void dispose() = 0;
-    virtual void addItem(MenuItem* item) = 0;
-    virtual void insertItem(const int index, MenuItem* item) = 0;
-    virtual void removeItem(MenuItem* item) = 0;
+    virtual void addItem(const MenuItemRef& item) = 0;
+    virtual void insertItem(const int index, const MenuItemRef& item) = 0;
+    virtual void removeItem(const MenuItemRef& item) = 0;
   };
 
-  class Menus {
+  class Menus : public RefCount {
   public:
     virtual ~Menus() { }
-    virtual Menu* createMenu() = 0;
-    virtual MenuItem* createMenuItem(const MenuItemInfo& info) = 0;
-    virtual void setAppMenu(Menu* menu) = 0;
+    virtual MenuRef makeMenu() = 0;
+    virtual MenuItemRef makeMenuItem(const MenuItemInfo& info) = 0;
+    virtual void setAppMenu(const MenuRef& menu) = 0;
   };
 
 } // namespace os

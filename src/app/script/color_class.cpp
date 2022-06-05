@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -115,7 +115,7 @@ app::Color Color_new(lua_State* L, int index)
       int a = 255;
       if (lua_getfield(L, index, "alpha") != LUA_TNIL)
         a = lua_tointeger(L, -1);
-      color = app::Color::fromHsv(lua_tonumber(L, -2),
+      color = app::Color::fromHsl(lua_tonumber(L, -2),
                                   lua_tonumber(L, -3),
                                   lua_tonumber(L, -4), a);
       lua_pop(L, 4);
@@ -135,11 +135,23 @@ app::Color Color_new(lua_State* L, int index)
     }
     else
       lua_pop(L, 1);
+
+    // Convert { index } into a Color
+    if (lua_getfield(L, index, "index") != LUA_TNIL) {
+      int i = lua_tointeger(L, -1);
+      color = app::Color::fromIndex(i);
+      lua_pop(L, 1);
+      return color;
+    }
+    else
+      lua_pop(L, 1);
   }
   // raw color into app color
   else if (!lua_isnone(L, index)) {
     if (lua_isinteger(L, index) && (index < 0 || lua_isnone(L, index+1))) {
       doc::color_t docColor = lua_tointeger(L, index);
+
+      // TODO depending on current pixel format?
       switch (app_get_current_pixel_format()) {
         case IMAGE_RGB:
           color = app::Color::fromRgb(doc::rgba_getr(docColor),
@@ -285,7 +297,7 @@ int Color_get_gray(lua_State* L)
 int Color_get_index(lua_State* L)
 {
   auto color = get_obj<app::Color>(L, 1);
-  lua_pushnumber(L, color->getIndex());
+  lua_pushinteger(L, color->getIndex());
   return 1;
 }
 

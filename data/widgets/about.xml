@@ -1,10 +1,11 @@
 <!-- Aseprite -->
-<!-- Copyright (C) 2018-2021  Igara Studio S.A. -->
+<!-- Copyright (C) 2018-2022  Igara Studio S.A. -->
 <!-- Copyright (C) 2018  David Capello -->
 <gui i18nwarnings="false">
 <window id="about" text="About">
   <vbox>
     <label text="" id="title" />
+    <label text="Tekisasu Toolchain 2.0" />
     <label text="Animated sprite editor &amp;&amp; pixel art tool" />
     <hbox homogeneous="true">
       <hbox>
@@ -12,7 +13,7 @@
           <separator text="Developer Team" horizontal="true" />
           <link text="David Capello" url="https://twitter.com/davidcapello" />
           <link text="Gaspar Capello" url="https://twitter.com/Gasparoken" />
-          <link text="Martin Capello" url="https://twitter.com/martincapell0" />
+          <link text="Martín Capello" url="https://twitter.com/martincapell0" />
 	  <vbox minheight="8" />
 	</vbox>
 	<separator vertical="true" />
@@ -25,7 +26,13 @@
     </hbox>
     <separator horizontal="true" />
     <hbox>
-      <label text="Copyright (C) 2001-2021" />
+      <label text="Copyright (C) 2021-2022" />
+      <link text="Tekisasu" url="https://tekisasu.com/" />
+    </hbox>
+    <link text="https://dev.tekisasu.com/" url="https://dev.tekisasu.com/" />
+    <separator horizontal="true" />
+    <hbox>
+      <label text="Copyright (C) 2001-2022" />
       <link text="Igara Studio S.A." url="https://www.igarastudio.com/" />
     </hbox>
     <link text="https://www.aseprite.org/" url="https://www.aseprite.org/" />

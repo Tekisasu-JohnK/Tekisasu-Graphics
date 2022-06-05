@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2021  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -33,6 +33,7 @@
 #include "render/render.h"
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 
 namespace app {
@@ -43,12 +44,17 @@ namespace {
 struct ImageObj {
   doc::ObjectId imageId = 0;
   doc::ObjectId celId = 0;
+  doc::ObjectId tilesetId = 0;
   ImageObj(doc::Image* image)
     : imageId(image->id()) {
   }
   ImageObj(doc::Cel* cel)
     : imageId(cel->image()->id())
     , celId(cel->id()) {
+  }
+  ImageObj(doc::Tileset* tileset, doc::Image* image)
+    : imageId(image->id())
+    , tilesetId(tileset->id()) {
   }
   ImageObj(const ImageObj&) = delete;
   ImageObj& operator=(const ImageObj&) = delete;
@@ -58,7 +64,7 @@ struct ImageObj {
   }
 
   void gc(lua_State* L) {
-    if (!celId)
+    if (!celId && !tilesetId)
       delete this->image(L);
     imageId = 0;
   }
@@ -229,15 +235,16 @@ int Image_drawImage(lua_State* L)
     doc::copy_image(dst, src, pos.x, pos.y);
   }
   else {
-    gfx::Rect bounds(pos, src->size());
-    gfx::Rect output;
-    if (doc::algorithm::shrink_bounds2(src, dst, bounds, output)) {
-      Tx tx;
-      tx(new cmd::CopyRegion(
-           dst, src, gfx::Region(output),
-           gfx::Point(0, 0)));
-      tx.commit();
-    }
+    gfx::Rect bounds(0, 0, src->size().w, src->size().h);
+
+    // TODO Use something similar to doc::algorithm::shrink_bounds2()
+    //      but we need something that does the render and compares
+    //      the minimal modified area.
+    Tx tx;
+    tx(new cmd::CopyRegion(
+         dst, src, gfx::Region(bounds),
+         gfx::Point(pos.x + bounds.x, pos.y + bounds.y)));
+    tx.commit();
   }
   return 0;
 }
@@ -366,17 +373,17 @@ int Image_saveAs(lua_State* L)
     return luaL_error(L, "missing filename in Image:saveAs()");
 
   std::string absFn = base::get_absolute_path(fn);
-  if (!ask_access(L, absFn.c_str(), FileAccessMode::Write, true))
+  if (!ask_access(L, absFn.c_str(), FileAccessMode::Write, ResourceType::File))
     return luaL_error(L, "script doesn't have access to write file %s",
                       absFn.c_str());
 
   std::unique_ptr<Sprite> sprite(Sprite::MakeStdSprite(img->spec(), 256));
 
-  std::vector<Image*> oneImage;
+  std::vector<ImageRef> oneImage;
   sprite->getImages(oneImage);
   ASSERT(oneImage.size() == 1);
   if (!oneImage.empty())
-    copy_image(oneImage.front(), img);
+    copy_image(oneImage.front().get(), img);
 
   if (pal)
     sprite->setPalette(pal, false);
@@ -483,6 +490,37 @@ int Image_resize(lua_State* L)
   return 0;
 }
 
+int Image_get_rowStride(lua_State* L)
+{
+  const auto obj = get_obj<ImageObj>(L, 1);
+  lua_pushinteger(L, obj->image(L)->getRowStrideSize());
+  return 1;
+}
+
+int Image_get_bytes(lua_State* L)
+{
+  const auto img = get_obj<ImageObj>(L, 1)->image(L);
+  lua_pushlstring(L, (const char*)img->getPixelAddress(0, 0), img->getRowStrideSize() * img->height());
+  return 1;
+}
+
+int Image_set_bytes(lua_State* L)
+{
+  const auto img = get_obj<ImageObj>(L, 1)->image(L);
+  size_t bytes_size, bytes_needed = img->getRowStrideSize() * img->height();
+  const char* bytes = lua_tolstring(L, 2, &bytes_size);
+
+  if (bytes_size == bytes_needed) {
+    std::memcpy(img->getPixelAddress(0, 0), bytes, bytes_size);
+  }
+  else {
+    lua_pushfstring(L, "Data size does not match: given %d, needed %d.", bytes_size, bytes_needed);
+    lua_error(L);
+  }
+
+  return 0;
+}
+
 int Image_get_width(lua_State* L)
 {
   const auto obj = get_obj<ImageObj>(L, 1);
@@ -537,6 +575,8 @@ const luaL_Reg Image_methods[] = {
 };
 
 const Property Image_properties[] = {
+  { "rowStride", Image_get_rowStride, nullptr },
+  { "bytes", Image_get_bytes, Image_set_bytes },
   { "width", Image_get_width, nullptr },
   { "height", Image_get_height, nullptr },
   { "colorMode", Image_get_colorMode, nullptr },
@@ -566,6 +606,11 @@ void push_cel_image(lua_State* L, doc::Cel* cel)
 void push_image(lua_State* L, doc::Image* image)
 {
   push_new<ImageObj>(L, image);
+}
+
+void push_tileset_image(lua_State* L, doc::Tileset* tileset, doc::Image* image)
+{
+  push_new<ImageObj>(L, tileset, image);
 }
 
 doc::Image* may_get_image_from_arg(lua_State* L, int index)

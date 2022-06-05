@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -36,6 +36,7 @@
 #include "os/surface.h"
 #include "os/system.h"
 #include "ui/button.h"
+#include "ui/fit_bounds.h"
 #include "ui/link_label.h"
 #include "ui/listitem.h"
 #include "ui/menu.h"
@@ -52,23 +53,24 @@ using namespace ui;
 
 namespace {
 
-void show_popup_menu(PopupWindow* popupWindow, Menu* popupMenu,
-                     const gfx::Point& pt)
+void show_popup_menu(PopupWindow* popupWindow,
+                     Menu* popupMenu,
+                     const gfx::Point& pt,
+                     Display* display)
 {
-  // Here we make the popup window temporaly floating, so it's
-  // not closed by the popup menu.
-  popupWindow->makeFloating();
+  // Add the menu window region when it popups to the the BrushPopup
+  // hot region, so when we click inside the popup menu it doesn't
+  // close the BrushPopup.
+  obs::scoped_connection c = popupMenu->OpenPopup.connect([popupWindow, popupMenu]{
+    gfx::Region rgn(popupWindow->boundsOnScreen());
+    rgn |= gfx::Region(popupMenu->boundsOnScreen());
+    popupWindow->setHotRegion(rgn);
+  });
 
-  popupMenu->showPopup(pt);
+  popupMenu->showPopup(pt, display);
 
-  // Add the menu popup region to the window popup hot region so it's
-  // not closed after we close the menu.
-  popupWindow->makeFixed();
-
-  gfx::Region rgn;
-  rgn.createUnion(gfx::Region(popupWindow->bounds()),
-                  gfx::Region(popupMenu->bounds()));
-  popupWindow->setHotRegion(rgn);
+  // Restore hot region of the BrushPopup window
+  popupWindow->setHotRegion(gfx::Region(popupWindow->boundsOnScreen()));
 }
 
 class SelectBrushItem : public ButtonSet::Item {
@@ -148,7 +150,8 @@ public:
     : m_popup(popup)
     , m_brushes(App::instance()->brushes())
     , m_slot(slot) {
-    setIcon(SkinTheme::instance()->parts.iconArrowDown(), true);
+    auto theme = skin::SkinTheme::get(this);
+    setIcon(theme->parts.iconArrowDown(), true);
   }
 
 private:
@@ -194,7 +197,8 @@ private:
 
     m_changeFlags = true;
     show_popup_menu(m_popup, &menu,
-                    gfx::Point(origin().x, origin().y+bounds().h));
+                    gfx::Point(origin().x, origin().y+bounds().h),
+                    display());
 
     if (m_changeFlags) {
       brush = m_brushes.getBrushSlot(m_slot);
@@ -274,7 +278,8 @@ private:
 class NewBrushOptionsItem : public ButtonSet::Item {
 public:
   NewBrushOptionsItem() {
-    setIcon(SkinTheme::instance()->parts.iconArrowDown(), true);
+    auto theme = skin::SkinTheme::get(this);
+    setIcon(theme->parts.iconArrowDown(), true);
   }
 
 private:
@@ -299,8 +304,10 @@ private:
     params.shade()->setSelected(saveBrush.shade());
     params.pixelPerfect()->setSelected(saveBrush.pixelPerfect());
 
-    show_popup_menu(static_cast<PopupWindow*>(window()), &menu,
-                    gfx::Point(origin().x, origin().y+bounds().h));
+    show_popup_menu(static_cast<PopupWindow*>(window()),
+                    &menu,
+                    gfx::Point(origin().x, origin().y+bounds().h),
+                    display());
 
     // Save preferences
     if (saveBrush.brushType() != params.brushType()->isSelected())
@@ -329,7 +336,7 @@ private:
 } // anonymous namespace
 
 BrushPopup::BrushPopup()
-  : PopupWindow("", ClickBehavior::CloseOnClickInOtherWindow)
+  : PopupWindow("", ClickBehavior::CloseOnClickOutsideHotRegion)
   , m_standardBrushes(3)
   , m_customBrushes(nullptr)
 {
@@ -384,7 +391,8 @@ void BrushPopup::setBrush(Brush* brush)
   }
 }
 
-void BrushPopup::regenerate(const gfx::Rect& box)
+void BrushPopup::regenerate(ui::Display* display,
+                            const gfx::Point& pos)
 {
   auto& brushSlots = App::instance()->brushes().getBrushSlots();
 
@@ -425,8 +433,8 @@ void BrushPopup::regenerate(const gfx::Rect& box)
   m_box.addChild(m_customBrushes);
 
   // Resize the window and change the hot region.
-  setBounds(gfx::Rect(box.origin(), sizeHint()));
-  setHotRegion(gfx::Region(bounds()));
+  fit_bounds(display, this, gfx::Rect(pos, sizeHint()));
+  setHotRegion(gfx::Region(boundsOnScreen()));
 }
 
 void BrushPopup::onBrushChanges()
@@ -435,7 +443,9 @@ void BrushPopup::onBrushChanges()
     gfx::Region rgn;
     getDrawableRegion(rgn, kCutTopWindowsAndUseChildArea);
 
-    regenerate(bounds());
+    Display* mainDisplay = manager()->display();
+    regenerate(mainDisplay,
+               mainDisplay->nativeWindow()->pointFromScreen(boundsOnScreen().origin()));
     invalidate();
 
     parent()->invalidateRegion(rgn);
@@ -443,7 +453,7 @@ void BrushPopup::onBrushChanges()
 }
 
 // static
-os::Surface* BrushPopup::createSurfaceForBrush(const BrushRef& origBrush)
+os::SurfaceRef BrushPopup::createSurfaceForBrush(const BrushRef& origBrush)
 {
   Image* image = nullptr;
   BrushRef brush = origBrush;
@@ -455,7 +465,7 @@ os::Surface* BrushPopup::createSurfaceForBrush(const BrushRef& origBrush)
     image = brush->image();
   }
 
-  os::Surface* surface = os::instance()->createRgbaSurface(
+  os::SurfaceRef surface = os::instance()->makeRgbaSurface(
     std::min(10, image ? image->width(): 4),
     std::min(10, image ? image->height(): 4));
 
@@ -468,7 +478,7 @@ os::Surface* BrushPopup::createSurfaceForBrush(const BrushRef& origBrush)
     }
 
     convert_image_to_surface(
-      image, palette, surface,
+      image, palette, surface.get(),
       0, 0, 0, 0, image->width(), image->height());
 
     if (image->pixelFormat() == IMAGE_BITMAP)

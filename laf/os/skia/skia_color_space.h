@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -11,19 +11,21 @@
 #include "base/disable_copying.h"
 #include "os/color_space.h"
 
-#include "SkColorSpace.h"
+#include "include/core/SkColorSpace.h"
 
 namespace os {
 
 class SkiaColorSpace : public ColorSpace {
 public:
-  SkiaColorSpace(const gfx::ColorSpacePtr& gfxcs);
+  SkiaColorSpace(const gfx::ColorSpaceRef& gfxcs);
 
-  const gfx::ColorSpacePtr& gfxColorSpace() const override { return m_gfxcs; }
+  const gfx::ColorSpaceRef& gfxColorSpace() const override { return m_gfxcs; }
   sk_sp<SkColorSpace> skColorSpace() const { return m_skcs; }
 
+  const bool isSRGB() const override { return m_skcs->isSRGB(); }
+
 private:
-  gfx::ColorSpacePtr m_gfxcs;
+  gfx::ColorSpaceRef m_gfxcs;
   sk_sp<SkColorSpace> m_skcs;
 
   DISABLE_COPYING(SkiaColorSpace);
@@ -31,15 +33,15 @@ private:
 
 class SkiaColorSpaceConversion : public ColorSpaceConversion {
 public:
-  SkiaColorSpaceConversion(const os::ColorSpacePtr& srcColorSpace,
-                           const os::ColorSpacePtr& dstColorSpace);
+  SkiaColorSpaceConversion(const os::ColorSpaceRef& srcColorSpace,
+                           const os::ColorSpaceRef& dstColorSpace);
 
   bool convertRgba(uint32_t* dst, const uint32_t* src, int n) override;
   bool convertGray(uint8_t* dst, const uint8_t* src, int n) override;
 
 private:
-  os::ColorSpacePtr m_srcCS;
-  os::ColorSpacePtr m_dstCS;
+  os::ColorSpaceRef m_srcCS;
+  os::ColorSpaceRef m_dstCS;
 };
 
 } // namespace os

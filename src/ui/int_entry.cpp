@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,6 +16,7 @@
 #include "gfx/rect.h"
 #include "gfx/region.h"
 #include "os/font.h"
+#include "ui/fit_bounds.h"
 #include "ui/manager.h"
 #include "ui/message.h"
 #include "ui/popup_window.h"
@@ -90,16 +91,16 @@ bool IntEntry::onProcessMessage(Message* msg)
     case kMouseMoveMessage:
       if (hasCapture()) {
         MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
-        Widget* pick = manager()->pick(mouseMsg->position());
+        Widget* pick = manager()->pickFromScreenPos(
+          display()->nativeWindow()->pointToScreen(mouseMsg->position()));
         if (pick == &m_slider) {
           releaseMouse();
 
           MouseMessage mouseMsg2(kMouseDownMessage,
-                                 mouseMsg->pointerType(),
-                                 mouseMsg->button(),
-                                 mouseMsg->modifiers(),
-                                 mouseMsg->position());
-          m_slider.sendMessage(&mouseMsg2);
+                                 *mouseMsg,
+                                 mouseMsg->positionForDisplay(pick->display()));
+          mouseMsg2.setDisplay(pick->display());
+          pick->sendMessage(&mouseMsg2);
         }
       }
       break;
@@ -181,19 +182,28 @@ void IntEntry::openPopup()
   m_popupWindow->addChild(&m_slider);
   m_popupWindow->Close.connect(&IntEntry::onPopupClose, this);
 
-  Rect rc = bounds();
-  gfx::Size sz = m_popupWindow->sizeHint();
-  rc.w = 128*guiscale();
-  if (rc.x+rc.w > ui::display_w())
-    rc.x = rc.x-rc.w+bounds().w;
-  if (rc.y+rc.h+sz.h < ui::display_h())
-    rc.y += rc.h;
-  else
-    rc.y -= sz.h;
-  m_popupWindow->setBounds(rc);
+  fit_bounds(
+    display(),
+    m_popupWindow,
+    gfx::Rect(0, 0, 128*guiscale(), m_popupWindow->sizeHint().h),
+    [this](const gfx::Rect& workarea,
+           gfx::Rect& rc,
+           std::function<gfx::Rect(Widget*)> getWidgetBounds) {
+      Rect entryBounds = getWidgetBounds(this);
 
-  Region rgn(rc.createUnion(bounds()));
-  rgn.createUnion(rgn, Region(bounds()));
+      rc.x = entryBounds.x;
+      rc.y = entryBounds.y2();
+
+      if (rc.x2() > workarea.x2())
+        rc.x = rc.x-rc.w+entryBounds.w;
+
+      if (rc.y2() > workarea.y2())
+        rc.y = entryBounds.y-entryBounds.h;
+
+      m_popupWindow->setBounds(rc);
+    });
+
+  Region rgn(m_popupWindow->boundsOnScreen().createUnion(boundsOnScreen()));
   m_popupWindow->setHotRegion(rgn);
 
   m_popupWindow->openWindow();

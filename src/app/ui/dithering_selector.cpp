@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This program is distributed under the terms of
@@ -80,11 +80,10 @@ private:
       // Reuse the preview in case that the palette is exactly the same
       if (palette->id() == m_palId &&
           palette->getModifications() == m_palMods)
-        return m_preview;
+        return m_preview.get();
 
       // In other case regenerate the preview for the current palette
-      m_preview->dispose();
-      m_preview = nullptr;
+      m_preview.reset();
     }
 
     const int w = 128, h = 16;
@@ -111,13 +110,13 @@ private:
         m_dithering, nullptr, palette, true, -1, nullptr);
     }
 
-    m_preview = os::instance()->createRgbaSurface(w, h);
-    convert_image_to_surface(image2.get(), palette, m_preview,
+    m_preview = os::instance()->makeRgbaSurface(w, h);
+    convert_image_to_surface(image2.get(), palette, m_preview.get(),
                              0, 0, 0, 0, w, h);
 
     m_palId = palette->id();
     m_palMods = palette->getModifications();
-    return m_preview;
+    return m_preview.get();
   }
 
   void onSizeHint(SizeHintEvent& ev) override {
@@ -131,7 +130,7 @@ private:
 
   void onPaint(PaintEvent& ev) override {
     Graphics* g = ev.graphics();
-    skin::SkinTheme* theme = static_cast<skin::SkinTheme*>(this->theme());
+    auto theme = skin::SkinTheme::get(this);
 
     gfx::Color fg, bg;
     if (isSelected()) {
@@ -150,19 +149,25 @@ private:
     g->drawText(text(), fg, bg,
                 gfx::Point(rc.x+2*guiscale(),
                            rc.y+2*guiscale()));
-    g->drawRgbaSurface(
+
+    ui::Paint paint;
+    paint.blendMode(os::BlendMode::SrcOver);
+
+    g->drawSurface(
       preview(),
       preview()->bounds(),
       gfx::Rect(
         rc.x+2*guiscale(),
         rc.y+4*guiscale()+textsz.h,
         preview()->width()*guiscale(),
-        preview()->height()*guiscale()));
+        preview()->height()*guiscale()),
+      os::Sampling(),
+      &paint);
   }
 
   bool m_matrixOnly;
   render::Dithering m_dithering;
-  os::Surface* m_preview;
+  os::SurfaceRef m_preview;
   doc::ObjectId m_palId;
   int m_palMods;
 };

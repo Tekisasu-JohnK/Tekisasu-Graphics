@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2022 Igara Studio S.A.
 // Copyright (c) 2014-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,10 +11,11 @@
 
 namespace base {
 
-  template<typename T>
+  template<typename T,
+           typename U = T>
   class ScopedValue {
   public:
-    ScopedValue(T& instance, const T& inScopeValue, const T& outScopeValue)
+    ScopedValue(T& instance, const U& inScopeValue, const U& outScopeValue)
       : m_instance(instance)
       , m_outScopeValue(outScopeValue) {
       m_instance = inScopeValue;
@@ -25,7 +27,7 @@ namespace base {
 
   private:
     T& m_instance;
-    T m_outScopeValue;
+    U m_outScopeValue;
   };
 
 } // namespace base

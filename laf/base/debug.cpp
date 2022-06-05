@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -21,13 +22,13 @@
 #include <string>
 #include <vector>
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include <windows.h>
 #endif
 
 int base_assert(const char* condition, const char* file, int lineNum)
 {
-#ifdef _WIN32
+#if LAF_WINDOWS
 
   std::vector<wchar_t> buf(MAX_PATH);
   GetModuleFileNameW(NULL, &buf[0], MAX_PATH);
@@ -62,7 +63,7 @@ void base_trace(const char* msg, ...)
   vsprintf(buf, msg, ap);
   va_end(ap);
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   _CrtDbgReport(_CRT_WARN, NULL, 0, NULL, buf);
 #endif
 

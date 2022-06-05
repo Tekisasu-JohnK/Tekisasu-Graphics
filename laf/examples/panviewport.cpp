@@ -1,5 +1,5 @@
 // LAF Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -17,23 +17,23 @@
 class PanWindow {
 public:
   PanWindow(os::System* system)
-    : m_display(system->createDisplay(800, 600, 1))
+    : m_window(system->makeWindow(800, 600))
     , m_scroll(0.0, 0.0)
     , m_zoom(1.0)
     , m_hasCapture(false) {
-    m_display->setNativeMouseCursor(os::kArrowCursor);
-    m_display->setTitle("Pan Viewport");
-
+    m_window->setCursor(os::NativeCursor::Arrow);
+    m_window->setTitle("Pan Viewport");
     repaint();
+    m_window->setVisible(true);
   }
 
   bool processEvent(const os::Event& ev) {
     switch (ev.type()) {
 
-      case os::Event::CloseDisplay:
+      case os::Event::CloseWindow:
         return false;
 
-      case os::Event::ResizeDisplay:
+      case os::Event::ResizeWindow:
         repaint();
         break;
 
@@ -49,8 +49,8 @@ public:
 
       case os::Event::MouseDown:
         if (!m_hasCapture) {
-          m_display->setNativeMouseCursor(os::kMoveCursor);
-          m_display->captureMouse();
+          m_window->setCursor(os::NativeCursor::Move);
+          m_window->captureMouse();
           m_hasCapture = true;
           m_capturePos = ev.position();
           m_captureScroll = m_scroll;
@@ -59,8 +59,8 @@ public:
 
       case os::Event::MouseUp:
         if (m_hasCapture) {
-          m_display->setNativeMouseCursor(os::kArrowCursor);
-          m_display->releaseMouse();
+          m_window->setCursor(os::NativeCursor::Arrow);
+          m_window->releaseMouse();
           m_hasCapture = false;
         }
         break;
@@ -83,8 +83,8 @@ public:
           m_scroll += gfx::PointF(-ev.wheelDelta());
         }
         else {
-          m_scroll += gfx::PointF(-ev.wheelDelta().x*m_display->width()/32,
-                                  -ev.wheelDelta().y*m_display->height()/32);
+          m_scroll += gfx::PointF(-ev.wheelDelta().x*m_window->width()/32,
+                                  -ev.wheelDelta().y*m_window->height()/32);
         }
         repaint();
         break;
@@ -97,6 +97,14 @@ public:
       case os::Event::KeyDown:
         if (ev.scancode() == os::kKeyEsc)
           return false;
+        // Toggle full-screen
+        else if (// F11 for Windows/Linux
+                 (ev.scancode() == os::kKeyF11) ||
+                 // Ctrl+Command+F for macOS
+                 (ev.scancode() == os::kKeyF &&
+                  ev.modifiers() == (os::kKeyCmdModifier | os::kKeyCtrlModifier))) {
+          m_window->setFullscreen(!m_window->isFullscreen());
+        }
         break;
 
       default:
@@ -106,9 +114,8 @@ public:
     return true;
   }
 
-private:
   void repaint() {
-    os::Surface* surface = m_display->getSurface();
+    os::Surface* surface = m_window->surface();
     os::SurfaceLock lock(surface);
     const gfx::Rect rc(surface->bounds());
 
@@ -145,9 +152,11 @@ private:
       os::draw_text(surface, nullptr, &buf[0], gfx::Point(12, 12), &p);
     }
 
-    m_display->invalidate();
+    m_window->invalidate();
+    m_window->swapBuffers();
   }
 
+private:
   void setZoom(const gfx::PointF& mousePos, double newZoom) {
     double oldZoom = m_zoom;
     m_zoom = base::clamp(newZoom, 0.01, 10.0);
@@ -169,11 +178,11 @@ private:
   }
 
   gfx::Point center() const {
-    return gfx::Point(m_display->width()/2,
-                      m_display->height()/2);
+    return gfx::Point(m_window->width()/2,
+                      m_window->height()/2);
   }
 
-  os::DisplayHandle m_display;
+  os::WindowRef m_window;
   gfx::PointF m_scroll;
   double m_zoom;
 
@@ -185,10 +194,15 @@ private:
 
 int app_main(int argc, char* argv[])
 {
-  os::SystemHandle system(os::create_system());
+  os::SystemRef system = os::make_system();
   system->setAppMode(os::AppMode::GUI);
+  system->setGpuAcceleration(true);
 
-  PanWindow window(system);
+  PanWindow window(system.get());
+
+  system->handleWindowResize = [&window](os::Window* win){
+    window.repaint();
+  };
 
   system->finishLaunching();
   system->activateApp();
@@ -196,7 +210,7 @@ int app_main(int argc, char* argv[])
   os::EventQueue* queue = system->eventQueue();
   while (true) {
     os::Event ev;
-    queue->getEvent(ev, true);
+    queue->getEvent(ev);
     if (!window.processEvent(ev))
       break;
   }

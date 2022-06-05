@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2021 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -8,7 +9,7 @@
 #define BASE_MEMORY_DUMP_WIN32_H_INCLUDED
 #pragma once
 
-#ifdef _WIN32
+#if LAF_WINDOWS
   #include <windows.h>
   #include <dbghelp.h>
 #endif

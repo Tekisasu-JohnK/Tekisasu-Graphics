@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -12,9 +12,11 @@
 #include "app/commands/params.h"
 #include "app/ui/key_context.h"
 #include "base/convert_to.h"
+#include "base/vector2d.h"
 #include "ui/accelerator.h"
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace ui {
@@ -31,6 +33,7 @@ namespace app {
 
   enum class KeySource {
     Original,
+    ExtensionDefined,
     UserDefined
   };
 
@@ -40,6 +43,7 @@ namespace app {
     Quicktool,
     Action,
     WheelAction,
+    DragAction,
   };
 
   // TODO This should be called "KeyActionModifier" or something similar
@@ -63,6 +67,7 @@ namespace app {
     ScaleFromCenter           = 0x00008000,
     AngleSnapFromLastPoint    = 0x00010000,
     RotateShape               = 0x00020000,
+    FineControl               = 0x00040000,
   };
 
   enum class WheelAction {
@@ -72,12 +77,15 @@ namespace app {
     HScroll,
     FgColor,
     BgColor,
+    FgTile,
+    BgTile,
     Frame,
     BrushSize,
     BrushAngle,
     ToolSameGroup,
     ToolOtherGroup,
     Layer,
+    InkType,
     InkOpacity,
     LayerOpacity,
     CelOpacity,
@@ -98,20 +106,27 @@ namespace app {
     return KeyAction(int(a) & int(b));
   }
 
+  class Key;
+  using KeyPtr = std::shared_ptr<Key>;
+  using Keys = std::vector<KeyPtr>;
+  using KeySourceAccelList = std::vector<std::pair<KeySource, ui::Accelerator>>;
+  using DragVector = base::Vector2d<double>;
+
   class Key {
   public:
-    Key(Command* command, const Params& params, KeyContext keyContext);
-    Key(KeyType type, tools::Tool* tool);
-    explicit Key(KeyAction action);
-    explicit Key(WheelAction action);
+    Key(const Key& key);
+    Key(Command* command, const Params& params,
+        const KeyContext keyContext);
+    Key(const KeyType type, tools::Tool* tool);
+    explicit Key(const KeyAction action,
+                 const KeyContext keyContext);
+    explicit Key(const WheelAction action);
+    static KeyPtr MakeDragAction(WheelAction dragAction);
 
     KeyType type() const { return m_type; }
-    const ui::Accelerators& accels() const {
-      return (m_useUsers ? m_users: m_accels);
-    }
-    const ui::Accelerators& origAccels() const { return m_accels; }
-    const ui::Accelerators& userAccels() const { return m_users; }
-    const ui::Accelerators& userRemovedAccels() const { return m_userRemoved; }
+    const ui::Accelerators& accels() const;
+    const KeySourceAccelList addsKeys() const { return m_adds; }
+    const KeySourceAccelList delsKeys() const { return m_dels; }
 
     void add(const ui::Accelerator& accel,
              const KeySource source,
@@ -122,9 +137,15 @@ namespace app {
     bool isLooselyPressed() const;
 
     bool hasAccel(const ui::Accelerator& accel) const;
-    void disableAccel(const ui::Accelerator& accel);
+    bool hasUserDefinedAccels() const;
 
-    // Resets user accelerators to the original ones.
+    // The KeySource indicates from where the key was disabled
+    // (e.g. if it was removed from an extension-defined file, or from
+    // user-defined).
+    void disableAccel(const ui::Accelerator& accel,
+                      const KeySource source);
+
+    // Resets user accelerators to the original & extension-defined ones.
     void reset();
 
     void copyOriginalToUser();
@@ -137,34 +158,33 @@ namespace app {
     tools::Tool* tool() const { return m_tool; }
     // for KeyType::Action
     KeyAction action() const { return m_action; }
-    // for KeyType::WheelAction
+    // for KeyType::WheelAction / KeyType::DragAction
     WheelAction wheelAction() const { return m_wheelAction; }
+    // for KeyType::DragAction
+    DragVector dragVector() const { return m_dragVector; }
+    void setDragVector(const DragVector& v) { m_dragVector = v; }
 
     std::string triggerString() const;
 
   private:
     KeyType m_type;
-    ui::Accelerators m_accels;      // Default accelerators (from gui.xml)
-    ui::Accelerators m_users;       // User-defined accelerators
-    ui::Accelerators m_userRemoved; // Default accelerators removed by user
-    bool m_useUsers;
+    KeySourceAccelList m_adds;
+    KeySourceAccelList m_dels;
+    // Final list of accelerators after processing the
+    // addition/deletion of extension-defined & user-defined keys.
+    mutable std::unique_ptr<ui::Accelerators> m_accels;
     KeyContext m_keycontext;
 
     // for KeyType::Command
     Command* m_command;
     Params m_params;
-    // for KeyType::Tool or Quicktool
-    tools::Tool* m_tool;
-    // for KeyType::Action
-    KeyAction m_action;
-    // for KeyType::WheelAction
-    WheelAction m_wheelAction;
+
+    tools::Tool* m_tool;        // for KeyType::Tool or Quicktool
+    KeyAction m_action;         // for KeyType::Action
+    WheelAction m_wheelAction;  // for KeyType::WheelAction / DragAction
+    DragVector m_dragVector;    // for KeyType::DragAction
   };
 
-  typedef std::shared_ptr<Key> KeyPtr;
-  typedef std::vector<KeyPtr> Keys;
-
-  std::string convertKeyContextToString(KeyContext keyContext);
   std::string convertKeyContextToUserFriendlyString(KeyContext keyContext);
 
 } // namespace app

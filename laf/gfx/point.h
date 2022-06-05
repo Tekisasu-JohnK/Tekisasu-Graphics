@@ -128,4 +128,8 @@ typedef PointT<double> PointF;
 
 } // namespace gfx
 
+#ifdef _DEBUG
+#include "gfx/point_io.h"
+#endif
+
 #endif

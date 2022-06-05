@@ -2,7 +2,7 @@
 # Copyright (C) 2020  Igara Studio S.A.
 
 # Version of Aseprite
-set(VERSION "1.2.27_Toolchain-1.3")
+set(VERSION "1.3-b16")
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/generated_version.h.in"
@@ -15,4 +15,4 @@ endif()
 
 add_library(ver-lib info.c ${gen_ver_fn})
 add_dependencies(ver-lib generated_version_h)
-target_include_directories(ver-lib PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(ver-lib PRIVATE .. "${CMAKE_CURRENT_BINARY_DIR}")

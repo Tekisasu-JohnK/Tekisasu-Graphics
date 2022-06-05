@@ -1,5 +1,5 @@
 # LAF FreeType Wrapper
-# Copyright (C) 2019  Igara Studio S.A.
+# Copyright (C) 2019-2022  Igara Studio S.A.
 # Copyright (C) 2017  David Capello
 
 add_library(laf-ft

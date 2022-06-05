@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -8,7 +8,6 @@
 #define BASE_THREAD_POOL_H_INCLUDED
 #pragma once
 
-#include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -35,7 +34,7 @@ namespace base {
     // Called for each worker thread.
     void worker();
 
-    std::atomic<bool> m_running;
+    bool m_running;
     std::vector<std::thread> m_threads;
     std::mutex m_mutex;
     std::condition_variable m_cv;

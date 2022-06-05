@@ -1,5 +1,5 @@
 // LAF Library
-// Copyright (c) 2019  Igara Studio S.A.
+// Copyright (c) 2019-2020  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -69,7 +69,7 @@ static void print_set(const std::string& name, os::FontStyleSet* set)
 
 int app_main(int argc, char* argv[])
 {
-  os::SystemHandle system(os::create_system());
+  os::SystemRef system = os::make_system();
   system->setAppMode(os::AppMode::CLI);
 
   auto fm = system->fontManager();
@@ -87,7 +87,7 @@ int app_main(int argc, char* argv[])
         std::printf("Font family '%s' not found\n", argv[i]);
         return 1;
       }
-      print_set(name, set);
+      print_set(name, set.get());
     }
   }
   // Print all font families
@@ -101,7 +101,7 @@ int app_main(int argc, char* argv[])
       auto set = fm->familyStyleSet(i);
       assert(fnset->count() == set->count());
 
-      print_set(name, set);
+      print_set(name, set.get());
     }
   }
   return 0;

@@ -4,7 +4,7 @@
  *
  *   Support functions for font formats.
  *
- * Copyright 2002-2018 by
+ * Copyright (C) 2002-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -19,8 +19,7 @@
 #ifndef FTFNTFMT_H_
 #define FTFNTFMT_H_
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <freetype/freetype.h>
 
 #ifdef FREETYPE_H
 #error "freetype.h of FreeType 1 has been loaded!"
@@ -69,7 +68,7 @@ FT_BEGIN_HEADER
    *    Input face handle.
    *
    * @return:
-   *  Font format string.  NULL in case of error.
+   *  Font format string.  `NULL` in case of error.
    *
    * @note:
    *  A deprecated name for the same function is `FT_Get_X11_Font_Format`.
