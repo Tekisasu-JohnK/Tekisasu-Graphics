@@ -48,7 +48,7 @@ namespace {
 const char* kPackageJson = "package.json";
 const char* kInfoJson = "__info.json";
 const char* kPrefLua = "__pref.lua";
-const char* kAsepriteDefaultThemeExtensionName = "aseprite-theme";
+const char* kAsepriteDefaultThemeExtensionName = "tekisasu-theme";
 
 class ReadArchive {
 public:
