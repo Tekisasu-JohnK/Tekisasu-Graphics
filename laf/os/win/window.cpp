@@ -16,6 +16,7 @@
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <shobjidl.h>
+#include <dwmapi.h> /* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) */
 
 #include <algorithm>
 #include <sstream>
@@ -242,7 +243,6 @@ WindowWin::WindowWin(const WindowSpec& spec)
   }
 
   registerClass();
-
   // The HWND returned by CreateWindowEx() is different than the
   // HWND used in WM_CREATE message.
   m_hwnd = createHwnd(this, spec);
@@ -2443,6 +2443,15 @@ HWND WindowWin::createHwnd(WindowWin* self, const WindowSpec& spec)
     nullptr,
     GetModuleHandle(nullptr),
     reinterpret_cast<LPVOID>(self));
+
+/* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) BEGIN */
+  #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+  #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+  #endif
+  BOOL value = TRUE;
+  ::DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+  /* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) END */
+
   if (!hwnd)
     return nullptr;
 
