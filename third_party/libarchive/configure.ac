@@ -4,8 +4,8 @@ dnl First, define all of the version numbers up front.
 dnl In particular, this allows the version macro to be used in AC_INIT
 
 dnl These first two version numbers are updated automatically on each release.
-m4_define([LIBARCHIVE_VERSION_S],[3.5.2dev])
-m4_define([LIBARCHIVE_VERSION_N],[3005002])
+m4_define([LIBARCHIVE_VERSION_S],[3.6.2dev])
+m4_define([LIBARCHIVE_VERSION_N],[3006002])
 
 dnl bsdtar and bsdcpio versioning tracks libarchive
 m4_define([BSDTAR_VERSION_S],LIBARCHIVE_VERSION_S())
@@ -378,6 +378,7 @@ if test "x$with_iconv" != "xno"; then
     AC_CHECK_HEADERS([localcharset.h])
     am_save_LIBS="$LIBS"
     LIBS="${LIBS} ${LIBICONV}"
+    LIBSREQUIRED="$LIBSREQUIRED${LIBSREQUIRED:+ }iconv"
     AC_CHECK_FUNCS([locale_charset])
     LIBS="${am_save_LIBS}"
     if test "x$ac_cv_func_locale_charset" != "xyes"; then
@@ -400,7 +401,9 @@ AC_ARG_WITH([zstd],
 
 if test "x$with_zstd" != "xno"; then
   AC_CHECK_HEADERS([zstd.h])
-  AC_CHECK_LIB(zstd,ZSTD_compressStream)
+  AC_CHECK_LIB(zstd,ZSTD_decompressStream)
+  AC_CHECK_LIB(zstd,ZSTD_compressStream,
+    AC_DEFINE([HAVE_LIBZSTD_COMPRESSOR], [1], [Define to 1 if you have the `zstd' library (-lzstd) with compression support.]))
 fi
 
 AC_ARG_WITH([lzma],
@@ -540,6 +543,22 @@ fi
 # Checks for supported compiler flags
 AX_APPEND_COMPILE_FLAGS([-Wall -Wformat -Wformat-security])
 
+# Place the functions and data into separate sections, allowing the linker
+# to garbage collect the unused ones.
+save_LDFLAGS=$LDFLAGS
+LDFLAGS="$LDFLAGS -Wl,--gc-sections"
+AC_MSG_CHECKING([whether ld supports --gc-sections])
+AC_LINK_IFELSE(
+    [AC_LANG_SOURCE([static char UnusedFunc() { return 5; } int main() { return 0;}])],
+    [AC_MSG_RESULT([yes])
+        GC_SECTIONS="-Wl,--gc-sections";
+        AX_APPEND_COMPILE_FLAGS([-ffunction-sections -fdata-sections])],
+    [AC_MSG_RESULT([no])
+        GC_SECTIONS="";])
+LDFLAGS=$save_LDFLAGS
+
+AC_SUBST(GC_SECTIONS)
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 # la_TYPE_UID_T defaults to "int", which is incorrect for MinGW
@@ -633,6 +652,9 @@ AC_CHECK_TYPE([wchar_t],
 		AC_CHECK_SIZEOF([wchar_t])],
 		[])
 
+AX_COMPILE_CHECK_SIZEOF(int)
+AX_COMPILE_CHECK_SIZEOF(long)
+
 AC_HEADER_TIME
 
 # Checks for library functions.
@@ -656,7 +678,7 @@ AC_CHECK_FUNCS([fstat fstatat fstatfs fstatvfs ftruncate])
 AC_CHECK_FUNCS([futimens futimes futimesat])
 AC_CHECK_FUNCS([geteuid getpid getgrgid_r getgrnam_r])
 AC_CHECK_FUNCS([getpwnam_r getpwuid_r getvfsbyname gmtime_r])
-AC_CHECK_FUNCS([lchflags lchmod lchown link localtime_r lstat lutimes])
+AC_CHECK_FUNCS([lchflags lchmod lchown link linkat localtime_r lstat lutimes])
 AC_CHECK_FUNCS([mbrtowc memmove memset])
 AC_CHECK_FUNCS([mkdir mkfifo mknod mkstemp])
 AC_CHECK_FUNCS([nl_langinfo openat pipe poll posix_spawnp readlink readlinkat])
@@ -694,14 +716,14 @@ AC_CHECK_TYPES(struct statfs,,,
 
 # There are several variants of readdir_r around; we only
 # accept the POSIX-compliant version.
-AC_COMPILE_IFELSE(
+AC_LINK_IFELSE(
  [AC_LANG_PROGRAM([[#include <dirent.h>]],
                   [[DIR *dir; struct dirent e, *r;
 		    return(readdir_r(dir, &e, &r));]])],
  [AC_DEFINE(HAVE_READDIR_R,1,[Define to 1 if you have a POSIX compatible readdir_r])]
 )
 # dirfd can be either a function or a macro.
-AC_COMPILE_IFELSE(
+AC_LINK_IFELSE(
  [AC_LANG_PROGRAM([[#include <dirent.h>
                     DIR *dir;]],
                   [[return(dirfd(dir));]])],
@@ -1188,24 +1210,8 @@ fi
 if test "x$with_openssl" != "xno"; then
     AC_CHECK_HEADERS([openssl/evp.h])
     saved_LIBS=$LIBS
-    case "$host_os" in
-      *mingw* | *cygwin* | *msys*)
-        case "$host_cpu" in
-          x86_64)
-            AC_CHECK_LIB(eay64,OPENSSL_config)
-            if test "x$ac_cv_lib_eay64_main" != "xyes"; then
-              AC_CHECK_LIB(eay32,OPENSSL_config)
-            fi
-            ;;
-          *)
-            AC_CHECK_LIB(eay32,OPENSSL_config)
-            ;;
-        esac
-        ;;
-      *)
-        AC_CHECK_LIB(crypto,OPENSSL_config)
-        ;;
-    esac
+    LIBSREQUIRED="$LIBSREQUIRED${LIBSREQUIRED:+ }libssl libcrypto"
+    AC_CHECK_LIB(crypto,OPENSSL_config)
     CRYPTO_CHECK(MD5, OPENSSL, md5)
     CRYPTO_CHECK(RMD160, OPENSSL, rmd160)
     CRYPTO_CHECK(SHA1, OPENSSL, sha1)
@@ -1214,6 +1220,8 @@ if test "x$with_openssl" != "xno"; then
     CRYPTO_CHECK(SHA512, OPENSSL, sha512)
     AC_CHECK_FUNCS([PKCS5_PBKDF2_HMAC_SHA1])
 fi
+
+AC_SUBST(LIBSREQUIRED)
 
 # Probe libmd AFTER OpenSSL/libcrypto.
 # The two are incompatible and OpenSSL is more complete.
@@ -1238,6 +1246,18 @@ case "$host_os" in
 	CRYPTO_CHECK_WIN(SHA512, CALG_SHA_512)
 	;;
 esac
+
+dnl Visibility annotations...
+saved_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -fvisibility=hidden -Werror"
+AC_MSG_CHECKING(whether compiler supports visibility annotations)
+AC_LINK_IFELSE([AC_LANG_PROGRAM([
+                 int foo( void ) __attribute__((visibility("default")));
+               ])],
+               [CFLAGS="$saved_CFLAGS -fvisibility=hidden -D__LIBARCHIVE_ENABLE_VISIBILITY";
+                AC_MSG_RESULT(yes)],
+               [CFLAGS="$saved_CFLAGS"
+                AC_MSG_RESULT(no)])
 
 # Ensure test directories are present if building out-of-tree
 AC_CONFIG_COMMANDS([mkdirs],

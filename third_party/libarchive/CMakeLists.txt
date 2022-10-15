@@ -1,5 +1,8 @@
 #
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12 FATAL_ERROR)
+if(POLICY CMP0065)
+  cmake_policy(SET CMP0065 NEW) #3.4 don't use `-rdynamic` with executables
+endif()
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW) #3.12.0 `find_package()`` uses ``<PackageName>_ROOT`` variables.
 endif()
@@ -26,14 +29,6 @@ GET_PROPERTY(cached_type CACHE CMAKE_BUILD_TYPE PROPERTY TYPE)
 IF("${cached_type}" STREQUAL "UNINITIALIZED")
   SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build Type" FORCE)
 ENDIF("${cached_type}" STREQUAL "UNINITIALIZED")
-# Check the Build Type.
-IF(NOT "${CMAKE_BUILD_TYPE}"
-       MATCHES "^(Debug|Release|RelWithDebInfo|MinSizeRel)\$")
-  MESSAGE(FATAL_ERROR
-          "Unknown keyword for CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}\n"
-          "Acceptable keywords: Debug,Release,RelWithDebInfo,MinSizeRel")
-ENDIF(NOT "${CMAKE_BUILD_TYPE}"
-          MATCHES "^(Debug|Release|RelWithDebInfo|MinSizeRel)\$")
 
 # On MacOS, prefer MacPorts libraries to system libraries.
 # I haven't come up with a compelling argument for this to be conditional.
@@ -77,7 +72,7 @@ math(EXPR INTERFACE_VERSION  "13 + ${_minor}")
 # ?? Should there be more here ??
 SET(SOVERSION "${INTERFACE_VERSION}")
 
-# Enalbe CMAKE_PUSH_CHECK_STATE() and CMAKE_POP_CHECK_STATE() macros
+# Enable CMAKE_PUSH_CHECK_STATE() and CMAKE_POP_CHECK_STATE() macros
 # saving and restoring the state of the variables.
 INCLUDE(CMakePushCheckState)
 
@@ -96,24 +91,8 @@ endif ()
 # Especially for early development, we want to be a little
 # aggressive about diagnosing build problems; this can get
 # relaxed somewhat in final shipping versions.
-IF (CMAKE_C_COMPILER_ID MATCHES "^GNU$")
-  SET(CMAKE_REQUIRED_FLAGS "-Wall -Wformat -Wformat-security")
-  #################################################################
-  # Set compile flags for all build types.
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wformat -Wformat-security")
-  if (ENABLE_WERROR)
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
-  endif ()
-  #################################################################
-  # Set compile flags for debug build.
-  # This is added into CMAKE_C_FLAGS when CMAKE_BUILD_TYPE is "Debug"
-  SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra")
-  SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wunused")
-  SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wshadow")
-  SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wmissing-prototypes")
-  SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wcast-qual")
-ENDIF (CMAKE_C_COMPILER_ID MATCHES "^GNU$")
-IF (CMAKE_C_COMPILER_ID MATCHES "^Clang$")
+IF (CMAKE_C_COMPILER_ID MATCHES "^GNU$" OR
+    CMAKE_C_COMPILER_ID MATCHES "^Clang$")
   SET(CMAKE_REQUIRED_FLAGS "-Wall -Wformat -Wformat-security")
   #################################################################
   # Set compile flags for all build types.
@@ -130,7 +109,26 @@ IF (CMAKE_C_COMPILER_ID MATCHES "^Clang$")
   SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wshadow")
   SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wmissing-prototypes")
   SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wcast-qual")
-ENDIF (CMAKE_C_COMPILER_ID MATCHES "^Clang$")
+  # Ideally this will be a compile/link time check, yet there's no obvious way
+  # how considering how old our minimum required cmake version is. The official
+  # cmake.org side does not host the manual pages even. Normally we can use
+  # either of the following two, yet neither is supported as of 3.0.2
+  # - check_linker_flag - does not exist
+  # - try_compile - does not support linker flags
+  #
+  # The CI fails with this on MacOS
+  IF(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    # Place the functions and data into separate sections, allowing the linker
+    # to garbage collect the unused ones.
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
+    SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections")
+    # Printing the discarded section is "too much", so enable on demand.
+    #SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -Wl,--print-gc-sections")
+    #SET(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} -Wl,--print-gc-sections")
+  ENDIF(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
+ENDIF (CMAKE_C_COMPILER_ID MATCHES "^GNU$" OR
+       CMAKE_C_COMPILER_ID MATCHES "^Clang$")
 IF (CMAKE_C_COMPILER_ID MATCHES "^XL$")
   SET(CMAKE_C_COMPILER "xlc_r")
   SET(CMAKE_REQUIRED_FLAGS "-qflag=e:e -qformat=sec")
@@ -378,7 +376,7 @@ IF(WIN32 AND NOT CMAKE_CL_64 AND NOT CYGWIN)
   SET(__GNUWIN32PATH "C:/Program Files/GnuWin32")
 ENDIF(WIN32 AND NOT CMAKE_CL_64 AND NOT CYGWIN)
 IF(DEFINED __GNUWIN32PATH AND EXISTS "${__GNUWIN32PATH}")
-  # You have to add a path availabel DLL file into PATH environment variable.
+  # You have to add a path available DLL file into PATH environment variable.
   # Maybe DLL path is "C:/Program Files/GnuWin32/bin".
   # The zlib and the bzip2 Setup program have installed programs and DLLs into
   # "C:/Program Files/GnuWin32" by default.
@@ -618,7 +616,8 @@ IF(ZSTD_FOUND)
   CMAKE_PUSH_CHECK_STATE()
   SET(CMAKE_REQUIRED_LIBRARIES ${ZSTD_LIBRARY})
   SET(CMAKE_REQUIRED_INCLUDES ${ZSTD_INCLUDE_DIR})
-  CHECK_FUNCTION_EXISTS(ZSTD_compressStream HAVE_LIBZSTD)
+  CHECK_FUNCTION_EXISTS(ZSTD_decompressStream HAVE_LIBZSTD)
+  CHECK_FUNCTION_EXISTS(ZSTD_compressStream HAVE_LIBZSTD_COMPRESSOR)
   #
   # TODO: test for static library.
   #
@@ -1022,7 +1021,7 @@ MACRO(CHECK_ICONV LIB TRY_ICONV_CONST)
         CMAKE_C_COMPILER_ID MATCHES "^Clang$")
       #
       # During checking iconv proto type, we should use -Werror to avoid the
-      # success of iconv detection with a warnig which success is a miss
+      # success of iconv detection with a warning which success is a miss
       # detection. So this needs for all build mode(even it's a release mode).
       #
       SET(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -Werror")
@@ -1359,6 +1358,7 @@ CHECK_FUNCTION_EXISTS_GLIBC(lchflags HAVE_LCHFLAGS)
 CHECK_FUNCTION_EXISTS_GLIBC(lchmod HAVE_LCHMOD)
 CHECK_FUNCTION_EXISTS_GLIBC(lchown HAVE_LCHOWN)
 CHECK_FUNCTION_EXISTS_GLIBC(link HAVE_LINK)
+CHECK_FUNCTION_EXISTS_GLIBC(linkat HAVE_LINKAT)
 CHECK_FUNCTION_EXISTS_GLIBC(localtime_r HAVE_LOCALTIME_R)
 CHECK_FUNCTION_EXISTS_GLIBC(lstat HAVE_LSTAT)
 CHECK_FUNCTION_EXISTS_GLIBC(lutimes HAVE_LUTIMES)
@@ -1554,11 +1554,11 @@ CHECK_STRUCT_HAS_MEMBER("struct tm" tm_sec
 # Check for integer types
 #
 #
-CHECK_TYPE_SIZE("short" SIZE_OF_SHORT)
-CHECK_TYPE_SIZE("int" SIZE_OF_INT)
+CHECK_TYPE_SIZE("short" SIZEOF_SHORT)
+CHECK_TYPE_SIZE("int" SIZEOF_INT)
 
-CHECK_TYPE_SIZE("unsigned short" SIZE_OF_UNSIGNED_SHORT)
-CHECK_TYPE_SIZE("unsigned" SIZE_OF_UNSIGNED)
+CHECK_TYPE_SIZE("unsigned short" SIZEOF_UNSIGNED_SHORT)
+CHECK_TYPE_SIZE("unsigned" SIZEOF_UNSIGNED)
 
 CHECK_TYPE_SIZE("__int64" __INT64)
 CHECK_TYPE_SIZE("unsigned __int64" UNSIGNED___INT64)
@@ -2020,6 +2020,17 @@ if(LIBMD)
 endif()
 
 CHECK_CRYPTO_WIN("MD5;SHA1;SHA256;SHA384;SHA512")
+
+# Check visibility annotations
+SET(OLD_CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS}")
+SET(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -fvisibility=hidden -Werror")
+CHECK_C_SOURCE_COMPILES("void __attribute__((visibility(\"default\"))) foo(void);
+int main() { return 0; }" HAVE_VISIBILITY_ATTR)
+IF (HAVE_VISIBILITY_ATTR)
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+  ADD_DEFINITIONS(-D__LIBARCHIVE_ENABLE_VISIBILITY)
+ENDIF(HAVE_VISIBILITY_ATTR)
+SET(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS}")
 
 # Generate "config.h" from "build/cmake/config.h.in"
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/build/cmake/config.h.in
