@@ -1,4 +1,5 @@
 // Aseprite Document Library
+// Copyright (c) 2022 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,13 +11,13 @@
 
 #include "base/base.h"
 #include "base/cfile.h"
-#include "base/clamp.h"
 #include "doc/color_scales.h"
 #include "doc/image.h"
 #include "doc/palette.h"
 
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 #define PROCOL_MAGIC_NUMBER     0xB123
 
@@ -26,15 +27,13 @@ namespace file {
 using namespace base;
 
 // Loads a COL file (Animator and Animator Pro format)
-Palette* load_col_file(const char* filename)
+std::unique_ptr<Palette> load_col_file(const char* filename)
 {
-  Palette *pal = NULL;
   int c, r, g, b;
-  FILE* f;
 
-  f = std::fopen(filename, "rb");
+  FILE* f = std::fopen(filename, "rb");
   if (!f)
-    return NULL;
+    return nullptr;
 
   // Get file size.
   std::fseek(f, 0, SEEK_END);
@@ -49,8 +48,9 @@ Palette* load_col_file(const char* filename)
   }
 
   // Animator format
+  std::unique_ptr<Palette> pal = nullptr;
   if (!pro) {
-    pal = new Palette(frame_t(0), 256);
+    pal = std::make_unique<Palette>(frame_t(0), 256);
 
     for (c=0; c<256; c++) {
       r = fgetc(f);
@@ -59,9 +59,9 @@ Palette* load_col_file(const char* filename)
       if (ferror(f))
         break;
 
-      pal->setEntry(c, rgba(scale_6bits_to_8bits(base::clamp(r, 0, 63)),
-                            scale_6bits_to_8bits(base::clamp(g, 0, 63)),
-                            scale_6bits_to_8bits(base::clamp(b, 0, 63)), 255));
+      pal->setEntry(c, rgba(scale_6bits_to_8bits(std::clamp(r, 0, 63)),
+                            scale_6bits_to_8bits(std::clamp(g, 0, 63)),
+                            scale_6bits_to_8bits(std::clamp(b, 0, 63)), 255));
     }
   }
   // Animator Pro format
@@ -75,10 +75,10 @@ Palette* load_col_file(const char* filename)
     // Unknown format
     if (magic != PROCOL_MAGIC_NUMBER || version != 0) {
       fclose(f);
-      return NULL;
+      return nullptr;
     }
 
-    pal = new Palette(frame_t(0), std::min(d.quot, 256));
+    pal = std::make_unique<Palette>(frame_t(0), std::min(d.quot, 256));
 
     for (c=0; c<pal->size(); c++) {
       r = fgetc(f);
@@ -87,9 +87,9 @@ Palette* load_col_file(const char* filename)
       if (ferror(f))
         break;
 
-      pal->setEntry(c, rgba(base::clamp(r, 0, 255),
-                            base::clamp(g, 0, 255),
-                            base::clamp(b, 0, 255), 255));
+      pal->setEntry(c, rgba(std::clamp(r, 0, 255),
+                            std::clamp(g, 0, 255),
+                            std::clamp(b, 0, 255), 255));
     }
   }
 

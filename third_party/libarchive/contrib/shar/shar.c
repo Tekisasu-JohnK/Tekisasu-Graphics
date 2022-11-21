@@ -170,7 +170,7 @@ out:
 }
 
 /*
- * Write single path to the archive. The path can be a regular file, directory
+ * Write singe path to the archive. The path can be a regular file, directory
  * or device. Symbolic links are followed.
  */
 static int

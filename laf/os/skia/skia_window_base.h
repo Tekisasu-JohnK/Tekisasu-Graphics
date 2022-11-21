@@ -187,6 +187,12 @@ public:
 #endif
   }
 
+#if SK_SUPPORT_GPU
+  GrDirectContext* sk_grCtx() const override {
+    return m_gl.grCtx();
+  }
+#endif
+
 protected:
   void initializeSurface() {
     m_initialized = true;

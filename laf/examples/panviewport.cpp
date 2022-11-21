@@ -4,11 +4,11 @@
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
-#include "base/clamp.h"
 #include "gfx/hsv.h"
 #include "gfx/rgb.h"
 #include "os/os.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdlib>
 #include <string>
@@ -159,7 +159,7 @@ public:
 private:
   void setZoom(const gfx::PointF& mousePos, double newZoom) {
     double oldZoom = m_zoom;
-    m_zoom = base::clamp(newZoom, 0.01, 10.0);
+    m_zoom = std::clamp(newZoom, 0.01, 10.0);
 
     // To calculate the new scroll value (m_scroll), we know that the
     // mouse position (mousePos) will be the same with the old and the

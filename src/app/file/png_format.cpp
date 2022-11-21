@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2020  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -16,7 +16,6 @@
 #include "app/file/format_options.h"
 #include "app/file/png_format.h"
 #include "app/file/png_options.h"
-#include "base/clamp.h"
 #include "base/file_handle.h"
 #include "doc/doc.h"
 #include "gfx/color_space.h"
@@ -55,7 +54,8 @@ class PngFormat : public FileFormat {
       FILE_SUPPORT_GRAYA |
       FILE_SUPPORT_INDEXED |
       FILE_SUPPORT_SEQUENCES |
-      FILE_SUPPORT_PALETTE_WITH_ALPHA;
+      FILE_SUPPORT_PALETTE_WITH_ALPHA |
+      FILE_ENCODE_ABSTRACT_IMAGE;
   }
 
   bool onLoad(FileOp* fop) override;
@@ -255,12 +255,14 @@ bool PngFormat::onLoad(FileOp* fop)
 
     case PNG_COLOR_TYPE_RGB_ALPHA:
       fop->sequenceSetHasAlpha(true);
+      [[fallthrough]];
     case PNG_COLOR_TYPE_RGB:
       pixelFormat = IMAGE_RGB;
       break;
 
     case PNG_COLOR_TYPE_GRAY_ALPHA:
       fop->sequenceSetHasAlpha(true);
+      [[fallthrough]];
     case PNG_COLOR_TYPE_GRAY:
       pixelFormat = IMAGE_GRAYSCALE;
       break;
@@ -276,7 +278,7 @@ bool PngFormat::onLoad(FileOp* fop)
 
   int imageWidth = png_get_image_width(png, info);
   int imageHeight = png_get_image_height(png, info);
-  Image* image = fop->sequenceImage(pixelFormat, imageWidth, imageHeight);
+  ImageRef image = fop->sequenceImage(pixelFormat, imageWidth, imageHeight);
   if (!image) {
     fop->setError("file_sequence_image %dx%d\n", imageWidth, imageHeight);
     return false;
@@ -551,23 +553,25 @@ bool PngFormat::onSave(FileOp* fop)
 
   png_init_io(png, fp);
 
-  const Image* image = fop->sequenceImage();
-  switch (image->pixelFormat()) {
-    case IMAGE_RGB:
+  const FileAbstractImage* img = fop->abstractImage();
+  const ImageSpec spec = img->spec();
+
+  switch (spec.colorMode()) {
+    case ColorMode::RGB:
       color_type =
-        (fop->document()->sprite()->needAlpha() ||
+        (img->needAlpha() ||
          fix_one_alpha_pixel ?
          PNG_COLOR_TYPE_RGB_ALPHA:
          PNG_COLOR_TYPE_RGB);
       break;
-    case IMAGE_GRAYSCALE:
+    case ColorMode::GRAYSCALE:
       color_type =
-        (fop->document()->sprite()->needAlpha() ||
+        (img->needAlpha() ||
          fix_one_alpha_pixel ?
          PNG_COLOR_TYPE_GRAY_ALPHA:
          PNG_COLOR_TYPE_GRAY);
       break;
-    case IMAGE_INDEXED:
+    case ColorMode::INDEXED:
       if (fix_one_alpha_pixel)
         color_type = PNG_COLOR_TYPE_RGB_ALPHA;
       else
@@ -575,8 +579,8 @@ bool PngFormat::onSave(FileOp* fop)
       break;
   }
 
-  const png_uint_32 width = image->width();
-  const png_uint_32 height = image->height();
+  const png_uint_32 width = spec.width();
+  const png_uint_32 height = spec.height();
 
   png_set_IHDR(png, info, width, height, 8, color_type,
                PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
@@ -607,14 +611,14 @@ bool PngFormat::onSave(FileOp* fop)
     png_set_unknown_chunks(png, info, &unknowns[0], num_unknowns);
   }
 
-  if (fop->preserveColorProfile() &&
-      fop->document()->sprite()->colorSpace())
-    saveColorSpace(png, info, fop->document()->sprite()->colorSpace().get());
+  if (fop->preserveColorProfile() && spec.colorSpace()) {
+    saveColorSpace(png, info, spec.colorSpace().get());
+  }
 
   if (color_type == PNG_COLOR_TYPE_PALETTE) {
     int c, r, g, b;
     int pal_size = fop->sequenceGetNColors();
-    pal_size = base::clamp(pal_size, 1, PNG_MAX_PALETTE_LENGTH);
+    pal_size = std::clamp(pal_size, 1, PNG_MAX_PALETTE_LENGTH);
 
 #if PNG_MAX_PALETTE_LENGTH != 256
 #error PNG_MAX_PALETTE_LENGTH should be 256
@@ -634,7 +638,7 @@ bool PngFormat::onSave(FileOp* fop)
     // If the sprite does not have a (visible) background layer, we
     // put alpha=0 to the transparent color.
     int mask_entry = -1;
-    if (fop->document()->sprite()->backgroundLayer() == NULL ||
+    if (fop->document()->sprite()->backgroundLayer() == nullptr ||
         !fop->document()->sprite()->backgroundLayer()->isVisible()) {
       mask_entry = fop->document()->sprite()->transparentColor();
     }
@@ -669,8 +673,8 @@ bool PngFormat::onSave(FileOp* fop)
       unsigned int x, c, a;
       bool opaque = true;
 
-      if (image->pixelFormat() == IMAGE_RGB) {
-        uint32_t* src_address = (uint32_t*)image->getPixelAddress(0, y);
+      if (spec.colorMode() == ColorMode::RGB) {
+        auto src_address = (const uint32_t*)img->getScanline(y);
 
         for (x=0; x<width; ++x) {
           c = *(src_address++);
@@ -691,8 +695,8 @@ bool PngFormat::onSave(FileOp* fop)
       }
       // In case that we are converting an indexed image to RGB just
       // to convert one pixel with alpha=254.
-      else if (image->pixelFormat() == IMAGE_INDEXED) {
-        uint8_t* src_address = (uint8_t*)image->getPixelAddress(0, y);
+      else if (spec.colorMode() == ColorMode::INDEXED) {
+        auto src_address = (const uint8_t*)img->getScanline(y);
         unsigned int x, c;
         int r, g, b, a;
         bool opaque = true;
@@ -717,7 +721,7 @@ bool PngFormat::onSave(FileOp* fop)
       }
     }
     else if (png_get_color_type(png, info) == PNG_COLOR_TYPE_RGB) {
-      uint32_t* src_address = (uint32_t*)image->getPixelAddress(0, y);
+      auto src_address = (const uint32_t*)img->getScanline(y);
       unsigned int x, c;
 
       for (x=0; x<width; ++x) {
@@ -728,7 +732,7 @@ bool PngFormat::onSave(FileOp* fop)
       }
     }
     else if (png_get_color_type(png, info) == PNG_COLOR_TYPE_GRAY_ALPHA) {
-      uint16_t* src_address = (uint16_t*)image->getPixelAddress(0, y);
+      auto src_address = (const uint16_t*)img->getScanline(y);
       unsigned int x, c, a;
       bool opaque = true;
 
@@ -748,7 +752,7 @@ bool PngFormat::onSave(FileOp* fop)
       }
     }
     else if (png_get_color_type(png, info) == PNG_COLOR_TYPE_GRAY) {
-      uint16_t* src_address = (uint16_t*)image->getPixelAddress(0, y);
+      auto src_address = (const uint16_t*)img->getScanline(y);
       unsigned int x, c;
 
       for (x=0; x<width; ++x) {
@@ -757,7 +761,7 @@ bool PngFormat::onSave(FileOp* fop)
       }
     }
     else if (png_get_color_type(png, info) == PNG_COLOR_TYPE_PALETTE) {
-      uint8_t* src_address = (uint8_t*)image->getPixelAddress(0, y);
+      auto src_address = (const uint8_t*)img->getScanline(y);
       unsigned int x;
 
       for (x=0; x<width; ++x)
@@ -772,7 +776,7 @@ bool PngFormat::onSave(FileOp* fop)
   png_free(png, row_pointer);
   png_write_end(png, info);
 
-  if (image->pixelFormat() == IMAGE_INDEXED) {
+  if (spec.colorMode() == ColorMode::INDEXED) {
     png_free(png, palette);
     palette = nullptr;
   }
@@ -797,6 +801,7 @@ void PngFormat::saveColorSpace(png_structp png_ptr, png_infop info_ptr,
       }
 
       // Continue to RGB case...
+      [[fallthrough]];
 
     case gfx::ColorSpace::RGB: {
       if (colorSpace->hasPrimaries()) {

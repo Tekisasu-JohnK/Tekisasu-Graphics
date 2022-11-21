@@ -8,6 +8,9 @@
 if(UNIX)
   # All warnings except for switch cases with missing enum items
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-switch")
+
+  # Prefer C++17 [[fallthrough]] attribute
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wimplicit-fallthrough")
 endif()
 
 if(MSVC)
@@ -54,6 +57,11 @@ else()
   add_definitions(-DENABLE_TRIAL_MODE)
 endif()
 
+if(ENABLE_DRM)
+  add_definitions(-DENABLE_DRM)
+  add_definitions(-DENABLE_SAVE)
+endif()
+
 if(ENABLE_DEVMODE)
   add_definitions(-DENABLE_DEVMODE)
 endif()
@@ -62,7 +70,7 @@ if(ENABLE_UI)
   add_definitions(-DENABLE_UI)
 endif()
 
-if(ENABLE_UI AND NOT ENABLE_TRIAL_MODE)
+if(ENABLE_UI AND (NOT ENABLE_TRIAL_MODE OR ENABLE_DRM))
   set(ENABLE_DATA_RECOVERY on)
   add_definitions(-DENABLE_DATA_RECOVERY)
 else()

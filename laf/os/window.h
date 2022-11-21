@@ -23,6 +23,10 @@
 #pragma push_macro("None")
 #undef None // Undefine the X11 None macro
 
+#if LAF_SKIA && SK_SUPPORT_GPU
+class GrDirectContext;
+#endif
+
 namespace os {
 
   class Event;
@@ -195,6 +199,10 @@ namespace os {
 
     template<typename T>
     void setUserData(T* data) { m_userData = reinterpret_cast<void*>(data); }
+
+#if LAF_SKIA && SK_SUPPORT_GPU
+    virtual GrDirectContext* sk_grCtx() const = 0;
+#endif
 
   protected:
     virtual void onQueueEvent(Event& ev);

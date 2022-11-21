@@ -13,8 +13,6 @@
    https://blake2.net.
 */
 
-#include "archive_platform.h"
-
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>

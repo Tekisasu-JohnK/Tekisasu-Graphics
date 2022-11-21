@@ -37,7 +37,7 @@ namespace os {
 
   enum class DrawMode {
     Solid,
-    Checked,
+    Checkered,
     Xor
   };
 

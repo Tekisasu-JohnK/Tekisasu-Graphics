@@ -15,7 +15,6 @@
 #include "app/ui/skin/skin_theme.h"
 #include "app/ui/status_bar.h"
 #include "app/util/shader_helpers.h"
-#include "base/clamp.h"
 #include "os/surface.h"
 #include "ui/graphics.h"
 #include "ui/message.h"
@@ -36,51 +35,49 @@ ColorSpectrum::ColorSpectrum()
 {
 }
 
+#if SK_ENABLE_SKSL
+
 const char* ColorSpectrum::getMainAreaShader()
 {
-#if SK_ENABLE_SKSL
   if (m_mainShader.empty()) {
     m_mainShader += "uniform half3 iRes;"
-                    "uniform half4 iColor;";
-    m_mainShader += kRGB_to_HSL_sksl;
+                    "uniform half4 iHsl;";
     m_mainShader += kHSL_to_RGB_sksl;
     m_mainShader += R"(
 half4 main(vec2 fragcoord) {
  vec2 d = fragcoord.xy / iRes.xy;
  half hue = d.x;
- half sat = rgb_to_hsl(iColor.rgb).y;
+ half sat = iHsl.y;
  half lit = 1.0 - d.y;
  return hsl_to_rgb(half3(hue, sat, lit)).rgb1;
 }
 )";
   }
   return m_mainShader.c_str();
-#else
-  return nullptr;
-#endif
 }
 
 const char* ColorSpectrum::getBottomBarShader()
 {
-#if SK_ENABLE_SKSL
   if (m_bottomShader.empty()) {
     m_bottomShader += "uniform half3 iRes;"
-                      "uniform half4 iColor;";
-    m_bottomShader += kRGB_to_HSL_sksl;
+                      "uniform half4 iHsl;";
     m_bottomShader += kHSL_to_RGB_sksl;
     m_bottomShader += R"(
 half4 main(vec2 fragcoord) {
  half s = (fragcoord.x / iRes.x);
- half3 hsl = rgb_to_hsl(iColor.rgb);
- return hsl_to_rgb(half3(hsl.x, s, hsl.z)).rgb1;
+ return hsl_to_rgb(half3(iHsl.x, s, iHsl.z)).rgb1;
 }
 )";
   }
   return m_bottomShader.c_str();
-#else
-  return nullptr;
-#endif
 }
+
+void ColorSpectrum::setShaderParams(SkRuntimeShaderBuilder& builder, bool main)
+{
+  builder.uniform("iHsl") = appColorHsl_to_SkV4(m_color);
+}
+
+#endif // SK_ENABLE_SKSL
 
 app::Color ColorSpectrum::getMainAreaColor(const int u, const int umax,
                                            const int v, const int vmax)
@@ -88,9 +85,9 @@ app::Color ColorSpectrum::getMainAreaColor(const int u, const int umax,
   double hue = 360.0 * u / umax;
   double lit = 1.0 - (double(v)/double(vmax));
   return app::Color::fromHsl(
-    base::clamp(hue, 0.0, 360.0),
+    std::clamp(hue, 0.0, 360.0),
     m_color.getHslSaturation(),
-    base::clamp(lit, 0.0, 1.0),
+    std::clamp(lit, 0.0, 1.0),
     getCurrentAlphaForNewColor());
 }
 
@@ -99,7 +96,7 @@ app::Color ColorSpectrum::getBottomBarColor(const int u, const int umax)
   double sat = double(u) / double(umax);
   return app::Color::fromHsl(
     m_color.getHslHue(),
-    base::clamp(sat, 0.0, 1.0),
+    std::clamp(sat, 0.0, 1.0),
     m_color.getHslLightness(),
     getCurrentAlphaForNewColor());
 }
@@ -147,9 +144,9 @@ void ColorSpectrum::onPaintSurfaceInBgThread(
 
         gfx::Color color = color_utils::color_for_ui(
           app::Color::fromHsl(
-            base::clamp(hue, 0.0, 360.0),
+            std::clamp(hue, 0.0, 360.0),
             sat,
-            base::clamp(lit, 0.0, 1.0)));
+            std::clamp(lit, 0.0, 1.0)));
 
         s->putPixel(color, main.x+x, main.y+y);
       }

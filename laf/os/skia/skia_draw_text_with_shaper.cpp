@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -16,6 +16,8 @@
 #include "include/core/SkTextBlob.h"
 #include "include/utils/SkTextUtils.h"
 #include "modules/skshaper/include/SkShaper.h"
+
+#include "include/core/SkCanvas.h"
 
 #include <cfloat>
 

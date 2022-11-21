@@ -79,21 +79,24 @@ static int	zstd_bidder_bid(struct archive_read_filter_bidder *,
 		    struct archive_read_filter *);
 static int	zstd_bidder_init(struct archive_read_filter *);
 
-static const struct archive_read_filter_bidder_vtable
-zstd_bidder_vtable = {
-	.bid = zstd_bidder_bid,
-	.init = zstd_bidder_init,
-};
-
 int
 archive_read_support_filter_zstd(struct archive *_a)
 {
 	struct archive_read *a = (struct archive_read *)_a;
+	struct archive_read_filter_bidder *bidder;
 
-	if (__archive_read_register_bidder(a, NULL, "zstd",
-				&zstd_bidder_vtable) != ARCHIVE_OK)
+	archive_check_magic(_a, ARCHIVE_READ_MAGIC,
+	    ARCHIVE_STATE_NEW, "archive_read_support_filter_zstd");
+
+	if (__archive_read_get_bidder(a, &bidder) != ARCHIVE_OK)
 		return (ARCHIVE_FATAL);
 
+	bidder->data = NULL;
+	bidder->name = "zstd";
+	bidder->bid = zstd_bidder_bid;
+	bidder->init = zstd_bidder_init;
+	bidder->options = NULL;
+	bidder->free = NULL;
 #if HAVE_ZSTD_H && HAVE_LIBZSTD
 	return (ARCHIVE_OK);
 #else
@@ -157,12 +160,6 @@ zstd_bidder_init(struct archive_read_filter *self)
 
 #else
 
-static const struct archive_read_filter_vtable
-zstd_reader_vtable = {
-	.read = zstd_filter_read,
-	.close = zstd_filter_close,
-};
-
 /*
  * Initialize the filter object
  */
@@ -195,7 +192,9 @@ zstd_bidder_init(struct archive_read_filter *self)
 	state->out_block_size = out_block_size;
 	state->out_block = out_block;
 	state->dstream = dstream;
-	self->vtable = &zstd_reader_vtable;
+	self->read = zstd_filter_read;
+	self->skip = NULL; /* not supported */
+	self->close = zstd_filter_close;
 
 	state->eof = 0;
 	state->in_frame = 0;

@@ -16,7 +16,6 @@
 #include "app/ui/skin/skin_theme.h"
 #include "app/ui/status_bar.h"
 #include "app/util/shader_helpers.h"
-#include "base/clamp.h"
 #include "base/pi.h"
 #include "os/surface.h"
 #include "ui/graphics.h"
@@ -67,13 +66,14 @@ ColorWheel::ColorWheel()
   initTheme();
 }
 
+#if SK_ENABLE_SKSL
+
 const char* ColorWheel::getMainAreaShader()
 {
-#if SK_ENABLE_SKSL
   // TODO create one shader for each wheel mode (RGB, RYB, normal)
   if (m_mainShader.empty()) {
     m_mainShader += "uniform half3 iRes;"
-                    "uniform half4 iColor;"
+                    "uniform half4 iHsv;"
                     "uniform half4 iBack;"
                     "uniform int iDiscrete;"
                     "uniform int iMode;";
@@ -129,8 +129,7 @@ half4 main(vec2 fragcoord) {
    sat /= 100.0;
    sat = clamp(sat, 0.0, 1.0);
   }
-  vec3 hsv = rgb_to_hsv(iColor.rgb);
-  return hsv_to_rgb(vec3(hue, sat, iColor.w > 0 ? hsv.z: 1.0)).rgb1;
+  return hsv_to_rgb(vec3(hue, sat, iHsv.w > 0 ? iHsv.z: 1.0)).rgb1;
  }
  else {
   if (iMode == 2) // Normal map mode
@@ -141,42 +140,36 @@ half4 main(vec2 fragcoord) {
 )";
   }
   return m_mainShader.c_str();
-#else
-  return nullptr;
-#endif
 }
 
 const char* ColorWheel::getBottomBarShader()
 {
-#if SK_ENABLE_SKSL
   if (m_bottomShader.empty()) {
     m_bottomShader += "uniform half3 iRes;"
-                      "uniform half4 iColor;";
-    m_bottomShader += kRGB_to_HSV_sksl;
+                      "uniform half4 iHsv;";
     m_bottomShader += kHSV_to_RGB_sksl;
     // TODO should we display the hue bar with the current sat/value?
     m_bottomShader += R"(
 half4 main(vec2 fragcoord) {
  half v = (fragcoord.x / iRes.x);
- half3 hsv = rgb_to_hsv(iColor.rgb);
- return hsv_to_rgb(half3(hsv.x, hsv.y, v)).rgb1;
+ return hsv_to_rgb(half3(iHsv.x, iHsv.y, v)).rgb1;
 }
 )";
   }
   return m_bottomShader.c_str();
-#else
-  return nullptr;
-#endif
 }
 
-#if SK_ENABLE_SKSL
-void ColorWheel::setShaderMainAreaParams(SkRuntimeShaderBuilder& builder)
+void ColorWheel::setShaderParams(SkRuntimeShaderBuilder& builder, bool main)
 {
-  builder.uniform("iBack") = gfxColor_to_SkV4(m_bgColor);
-  builder.uniform("iDiscrete") = (m_discrete ? 1: 0);
-  builder.uniform("iMode") = int(m_colorModel);
+  builder.uniform("iHsv") = appColorHsv_to_SkV4(m_color);
+  if (main) {
+    builder.uniform("iBack") = gfxColor_to_SkV4(m_bgColor);
+    builder.uniform("iDiscrete") = (m_discrete ? 1: 0);
+    builder.uniform("iMode") = int(m_colorModel);
+  }
 }
-#endif
+
+#endif // SK_ENABLE_SKSL
 
 app::Color ColorWheel::getMainAreaColor(const int _u, const int umax,
                                         const int _v, const int vmax)
@@ -236,9 +229,9 @@ app::Color ColorWheel::getMainAreaColor(const int _u, const int umax,
     int b = 255 - di;
     if (d <= m_wheelRadius) {
       return app::Color::fromRgb(
-        base::clamp(r, 0, 255),
-        base::clamp(g, 0, 255),
-        base::clamp(b, 128, 255));
+        std::clamp(r, 0, 255),
+        std::clamp(g, 0, 255),
+        std::clamp(b, 128, 255));
     }
     else {
       return app::Color::fromRgb(128, 128, 255);
@@ -272,8 +265,8 @@ app::Color ColorWheel::getMainAreaColor(const int _u, const int umax,
     }
 
     return app::Color::fromHsv(
-      base::clamp(hue, 0, 360),
-      base::clamp(sat / 100.0, 0.0, 1.0),
+      std::clamp(hue, 0, 360),
+      std::clamp(sat / 100.0, 0.0, 1.0),
       (m_color.getType() != Color::MaskType ? m_color.getHsvValue(): 1.0),
       getCurrentAlphaForNewColor());
   }
@@ -287,7 +280,7 @@ app::Color ColorWheel::getBottomBarColor(const int u, const int umax)
   return app::Color::fromHsv(
     m_color.getHsvHue(),
     m_color.getHsvSaturation(),
-    base::clamp(val, 0.0, 1.0),
+    std::clamp(val, 0.0, 1.0),
     getCurrentAlphaForNewColor());
 }
 
@@ -306,7 +299,7 @@ void ColorWheel::onPaintMainArea(ui::Graphics* g, const gfx::Rect& rc)
       double angle = std::atan2(m_color.getGreen()-128,
                                 m_color.getRed()-128);
       double dist = (255-m_color.getBlue()) / 128.0;
-      dist = base::clamp(dist, 0.0, 1.0);
+      dist = std::clamp(dist, 0.0, 1.0);
 
       gfx::Point pos =
         m_wheelBounds.center() +
@@ -450,18 +443,18 @@ void ColorWheel::setHarmony(Harmony harmony)
 
 int ColorWheel::getHarmonies() const
 {
-  int i = base::clamp((int)m_harmony, 0, (int)Harmony::LAST);
+  int i = std::clamp((int)m_harmony, 0, (int)Harmony::LAST);
   return harmonies[i].n;
 }
 
 app::Color ColorWheel::getColorInHarmony(int j) const
 {
-  int i = base::clamp((int)m_harmony, 0, (int)Harmony::LAST);
-  j = base::clamp(j, 0, harmonies[i].n-1);
+  int i = std::clamp((int)m_harmony, 0, (int)Harmony::LAST);
+  j = std::clamp(j, 0, harmonies[i].n-1);
   double hue = convertHueAngle(m_color.getHsvHue(), -1) + harmonies[i].hues[j];
   double sat = m_color.getHsvSaturation() * harmonies[i].sats[j] / 100.0;
   return app::Color::fromHsv(std::fmod(hue, 360),
-                             base::clamp(sat, 0.0, 1.0),
+                             std::clamp(sat, 0.0, 1.0),
                              m_color.getHsvValue());
 }
 

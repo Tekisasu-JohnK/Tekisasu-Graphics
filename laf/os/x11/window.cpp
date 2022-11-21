@@ -11,7 +11,6 @@
 
 #include "os/x11/window.h"
 
-#include "base/clamp.h"
 #include "base/debug.h"
 #include "base/hex.h"
 #include "base/split_string.h"

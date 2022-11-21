@@ -49,6 +49,7 @@ DEFINE_TEST(test_read_data_large)
 	char tmpfilename[] = "largefile";
 	int tmpfilefd;
 	FILE *f;
+	unsigned int i;
 	size_t used;
 
 	/* Create a new archive in memory. */
@@ -63,7 +64,8 @@ DEFINE_TEST(test_read_data_large)
 	assert((ae = archive_entry_new()) != NULL);
 	archive_entry_copy_pathname(ae, "file");
 	archive_entry_set_mode(ae, S_IFREG | 0755);
-	fill_with_pseudorandom_data(buff2, sizeof(buff2));
+	for (i = 0; i < sizeof(buff2); i++)
+		buff2[i] = (unsigned char)rand();
 	archive_entry_set_size(ae, sizeof(buff2));
 	assertA(0 == archive_write_header(a, ae));
 	archive_entry_free(ae);

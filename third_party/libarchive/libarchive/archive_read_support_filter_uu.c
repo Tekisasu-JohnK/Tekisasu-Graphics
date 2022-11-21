@@ -76,19 +76,25 @@ archive_read_support_compression_uu(struct archive *a)
 }
 #endif
 
-static const struct archive_read_filter_bidder_vtable
-uudecode_bidder_vtable = {
-	.bid = uudecode_bidder_bid,
-	.init = uudecode_bidder_init,
-};
-
 int
 archive_read_support_filter_uu(struct archive *_a)
 {
 	struct archive_read *a = (struct archive_read *)_a;
+	struct archive_read_filter_bidder *bidder;
 
-	return __archive_read_register_bidder(a, NULL, "uu",
-			&uudecode_bidder_vtable);
+	archive_check_magic(_a, ARCHIVE_READ_MAGIC,
+	    ARCHIVE_STATE_NEW, "archive_read_support_filter_uu");
+
+	if (__archive_read_get_bidder(a, &bidder) != ARCHIVE_OK)
+		return (ARCHIVE_FATAL);
+
+	bidder->data = NULL;
+	bidder->name = "uu";
+	bidder->bid = uudecode_bidder_bid;
+	bidder->init = uudecode_bidder_init;
+	bidder->options = NULL;
+	bidder->free = NULL;
+	return (ARCHIVE_OK);
 }
 
 static const unsigned char ascii[256] = {
@@ -242,7 +248,7 @@ bid_get_line(struct archive_read_filter *filter,
 		*ravail = *avail;
 		*b += diff;
 		*avail -= diff;
-		tested = len;/* Skip some bytes we already determined. */
+		tested = len;/* Skip some bytes we already determinated. */
 		len = get_line(*b + tested, *avail - tested, nl);
 		if (len >= 0)
 			len += tested;
@@ -351,12 +357,6 @@ uudecode_bidder_bid(struct archive_read_filter_bidder *self,
 	return (0);
 }
 
-static const struct archive_read_filter_vtable
-uudecode_reader_vtable = {
-	.read = uudecode_filter_read,
-	.close = uudecode_filter_close,
-};
-
 static int
 uudecode_bidder_init(struct archive_read_filter *self)
 {
@@ -366,6 +366,9 @@ uudecode_bidder_init(struct archive_read_filter *self)
 
 	self->code = ARCHIVE_FILTER_UU;
 	self->name = "uu";
+	self->read = uudecode_filter_read;
+	self->skip = NULL; /* not supported */
+	self->close = uudecode_filter_close;
 
 	uudecode = (struct uudecode *)calloc(sizeof(*uudecode), 1);
 	out_buff = malloc(OUT_BUFF_SIZE);
@@ -385,7 +388,6 @@ uudecode_bidder_init(struct archive_read_filter *self)
 	uudecode->in_allocated = IN_BUFF_SIZE;
 	uudecode->out_buff = out_buff;
 	uudecode->state = ST_FIND_HEAD;
-	self->vtable = &uudecode_reader_vtable;
 
 	return (ARCHIVE_OK);
 }

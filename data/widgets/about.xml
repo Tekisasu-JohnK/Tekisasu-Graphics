@@ -5,12 +5,12 @@
 <window id="about" text="About">
   <vbox>
     <label text="" id="title" />
-    <label text="Tekisasu Toolchain 2.0" />
-    <label text="Animated sprite editor &amp;&amp; pixel art tool" />
+    <label text="Tekisasu Toolchain 4" />
     <hbox homogeneous="true">
       <hbox>
 	<vbox expansive="true">
           <separator text="Developer Team" horizontal="true" />
+          <link text="John Knight" url="https://dev.tekisasu.com" />
           <link text="David Capello" url="https://twitter.com/davidcapello" />
           <link text="Gaspar Capello" url="https://twitter.com/Gasparoken" />
           <link text="Martín Capello" url="https://twitter.com/martincapell0" />
@@ -33,7 +33,7 @@
     <separator horizontal="true" />
     <hbox>
       <label text="Copyright (C) 2001-2022" />
-      <link text="Igara Studio S.A." url="https://www.igarastudio.com/" />
+      <link text="Igara Studio S.A." url="https://igara.com/" />
     </hbox>
     <link text="https://www.aseprite.org/" url="https://www.aseprite.org/" />
     <hbox>

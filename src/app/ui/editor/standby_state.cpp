@@ -53,7 +53,6 @@
 #include "app/util/layer_utils.h"
 #include "app/util/new_image_from_mask.h"
 #include "app/util/readable_time.h"
-#include "base/clamp.h"
 #include "base/pi.h"
 #include "base/vector2d.h"
 #include "doc/grid.h"
@@ -69,6 +68,7 @@
 #include "ui/message.h"
 #include "ui/view.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -497,6 +497,14 @@ bool StandbyState::onKeyDown(Editor* editor, KeyMessage* msg)
   Keys keys = KeyboardShortcuts::instance()
     ->getDragActionsFromKeyMessage(KeyContext::MouseWheel, msg);
   if (!keys.empty()) {
+    // Don't enter DraggingValueState to change brush size if we are
+    // in a selection-like tool
+    if (keys.size() == 1 &&
+        keys[0]->wheelAction() == WheelAction::BrushSize &&
+        editor->getCurrentEditorInk()->isSelection()) {
+      return false;
+    }
+
     EditorStatePtr newState(new DraggingValueState(editor, keys));
     editor->setState(newState);
     return true;
@@ -532,14 +540,15 @@ bool StandbyState::onUpdateStatusBar(Editor* editor)
                    editor->projection(),
                    color, tile);
 
-    auto buf = fmt::format(" :pos: {} {}",
-                           int(std::floor(spritePos.x)),
-                           int(std::floor(spritePos.y)));
+    std::string buf =
+      fmt::format(" :pos: {} {}",
+                  int(std::floor(spritePos.x)),
+                  int(std::floor(spritePos.y)));
 
     if (site.tilemapMode() == TilemapMode::Tiles)
-      StatusBar::instance()->showTile(0, buf.c_str(), tile);
+      StatusBar::instance()->showTile(0, tile, buf);
     else
-      StatusBar::instance()->showColor(0, buf.c_str(), color);
+      StatusBar::instance()->showColor(0, color, buf);
   }
   else {
     Site site = editor->getSite();
@@ -547,22 +556,37 @@ bool StandbyState::onUpdateStatusBar(Editor* editor)
       (editor->document()->isMaskVisible() ?
        editor->document()->mask(): NULL);
 
-    char buf[1024];
-    sprintf(
-            buf, ":pos: %d %d :size: %d %d",
-            int(std::floor(spritePos.x)),
-            int(std::floor(spritePos.y)),
-            sprite->width(),
-            sprite->height());
+    std::string buf = fmt::format(
+      ":pos: {} {}",
+      int(std::floor(spritePos.x)),
+      int(std::floor(spritePos.y)));
+
+    Cel* cel = nullptr;
+    if (editor->showAutoCelGuides()) {
+      cel = editor->getSite().cel();
+    }
+
+    if (cel) {
+      buf += fmt::format(
+        " :start: {} {} :size: {} {}",
+        cel->bounds().x, cel->bounds().y,
+        cel->bounds().w, cel->bounds().h);
+    }
+    else {
+      buf += fmt::format(
+        " :size: {} {}",
+        sprite->width(),
+        sprite->height());
+    }
 
     if (mask)
-      sprintf(buf+std::strlen(buf), " :selsize: %d %d",
-              mask->bounds().w,
-              mask->bounds().h);
+      buf += fmt::format(" :selsize: {} {}",
+                         mask->bounds().w,
+                         mask->bounds().h);
 
     if (sprite->totalFrames() > 1) {
-      sprintf(
-        buf+std::strlen(buf), " :frame: %d :clock: %s/%s",
+      buf += fmt::format(
+        " :frame: {} :clock: {}/{}",
         site.frame()+editor->docPref().timeline.firstFrame(),
         human_readable_time(sprite->frameDuration(site.frame())).c_str(),
         human_readable_time(sprite->totalAnimationDuration()).c_str());
@@ -573,15 +597,14 @@ bool StandbyState::onUpdateStatusBar(Editor* editor)
       doc::Grid grid = site.grid();
       if (!grid.isEmpty()) {
         gfx::Point pt = grid.canvasToTile(gfx::Point(spritePos));
-        sprintf(buf+std::strlen(buf), " :grid: %d %d", pt.x, pt.y);
+        buf += fmt::format(" :grid: {} {}", pt.x, pt.y);
 
         // Show the tile index of this specific tile
         if (site.layer() &&
             site.layer()->isTilemap() &&
             site.image()) {
           if (site.image()->bounds().contains(pt)) {
-            sprintf(buf+std::strlen(buf), " [%d]",
-                    site.image()->getPixel(pt.x, pt.y));
+            buf += fmt::format(" [{}]", site.image()->getPixel(pt.x, pt.y));
           }
         }
       }
@@ -596,14 +619,11 @@ bool StandbyState::onUpdateStatusBar(Editor* editor)
               int(std::floor(spritePos.x)),
               int(std::floor(spritePos.y)))) {
           if (++count == 3) {
-            sprintf(
-              buf+std::strlen(buf), " :slice: ...");
+            buf += fmt::format(" :slice: ...");
             break;
           }
 
-          sprintf(
-            buf+std::strlen(buf), " :slice: %s",
-            slice->name().c_str());
+          buf += fmt::format(" :slice: {}", slice->name());
         }
       }
     }
@@ -946,7 +966,7 @@ bool StandbyState::Decorator::onSetCursor(tools::Ink* ink, Editor* editor, const
     double angle = v.angle();
     angle = base::fmod_radians(angle) + PI;
     ASSERT(angle >= 0.0 && angle <= 2*PI);
-    const int angleInt = base::clamp<int>(std::floor(8.0 * angle / (2.0*PI) + 0.5), 0, 8) % 8;
+    const int angleInt = std::clamp<int>(std::floor(8.0 * angle / (2.0*PI) + 0.5), 0, 8) % 8;
 
     if (handle == PivotHandle) {
       newCursorType = kHandCursor;

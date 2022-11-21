@@ -62,40 +62,30 @@ GNU-format tar archives,
 .It
 most common cpio archive formats,
 .It
-7-Zip archives,
+ISO9660 CD images (including RockRidge and Joliet extensions),
+.It
+Zip archives,
 .It
 ar archives (including GNU/SysV and BSD extensions),
 .It
 Microsoft CAB archives,
 .It
-ISO9660 CD images (including RockRidge and Joliet extensions),
-.It
 LHA archives,
 .It
 mtree file tree descriptions,
 .It
-RAR and most RAR5 archives,
+RAR archives,
 .It
-WARC archives,
-.It
-XAR archives,
-.It
-Zip archives.
+XAR archives.
 .El
 The library automatically detects archives compressed with
-.Xr compress 1 ,
-.Xr bzip2 1 ,
-.Xr grzip 1 ,
 .Xr gzip 1 ,
-.Xr lrzip 1 ,
-.Xr lz4 1 ,
-.Xr lzip 1 ,
-.Xr lzop 1 ,
+.Xr bzip2 1 ,
 .Xr xz 1 ,
+.Xr lzip 1 ,
 or
-.Xr zstd 1
-and decompresses them transparently. Decompression of some formats
-requires external decompressor utilities.
+.Xr compress 1
+and decompresses them transparently.
 It can similarly detect and decode archives processed with
 .Xr uuencode 1
 or which have an
@@ -117,19 +107,19 @@ archives,
 .It
 cpio archives,
 .It
-7-Zip archives,
-.It
-ar archives,
+Zip archive,
 .It
 two different variants of shar archives,
 .It
 ISO9660 CD images,
 .It
+7-Zip archives,
+.It
+ar archives,
+.It
 mtree file tree descriptions,
 .It
-XAR archives,
-.It
-Zip archive.
+XAR archives.
 .El
 Pax interchange format is an extension of the tar archive format that
 eliminates essentially all of the limitations of historic tar formats

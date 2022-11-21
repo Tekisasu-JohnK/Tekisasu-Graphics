@@ -16,13 +16,11 @@
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <shobjidl.h>
-#include <dwmapi.h> /* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) */
 
 #include <algorithm>
 #include <sstream>
 
 #include "base/base.h"
-#include "base/clamp.h"
 #include "base/debug.h"
 #include "base/file_content.h"
 #include "base/fs.h"
@@ -243,6 +241,7 @@ WindowWin::WindowWin(const WindowSpec& spec)
   }
 
   registerClass();
+
   // The HWND returned by CreateWindowEx() is different than the
   // HWND used in WM_CREATE message.
   m_hwnd = createHwnd(this, spec);
@@ -854,6 +853,24 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
           // Without this, we lost the shadow effect when WM_NCCALCSIZE returns 0
           MARGINS margins = { 0, 0, 0, 1 };
           DwmExtendFrameIntoClientArea(m_hwnd, &margins);
+
+#if 1
+          // Don't render anything related to the non-client area in
+          // borderless windows (with this option the Windows 11
+          // rounded borders disappear)
+          DWMNCRENDERINGPOLICY ncrp = DWMNCRP_DISABLED;
+          DwmSetWindowAttribute(m_hwnd, DWMWA_NCRENDERING_POLICY, &ncrp, sizeof(ncrp));
+
+#else // The DWMWCP_DONOTROUND option doesn't fully work on Windows 11,
+      // we still need to set DWMNCRP_DISABLED for DWMWA_NCRENDERING_POLICY
+      // to disable a 1-pixel border in the non-client area.
+
+          // TODO Use the Windows 11 SDK types/constants
+          uint32_t cornerPref = 1; // DWMWCP_DONOTROUND;
+          DwmSetWindowAttribute(
+            m_hwnd, 33, // DWMWA_WINDOW_CORNER_PREFERENCE,
+            &cornerPref, sizeof(cornerPref));
+#endif
         }
       }
 
@@ -1003,10 +1020,12 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       }
 
       if (m_hpenctx) {
-        // Handle z-order of Wintab context
-        auto& api = system()->wintabApi();
-        api.overlap(m_hpenctx, (wparam == WA_ACTIVE ||
-                                wparam == WA_CLICKACTIVE) ? TRUE: FALSE);
+        if (auto sys = system()) {
+          // Handle z-order of Wintab context
+          auto& api = sys->wintabApi();
+          api.overlap(m_hpenctx, (wparam == WA_ACTIVE ||
+                                  wparam == WA_CLICKACTIVE) ? TRUE: FALSE);
+        }
       }
       break;
 
@@ -1119,6 +1138,27 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
     case WM_MOUSEMOVE: {
       Event ev;
       mouseEvent(lparam, ev);
+
+      // Filter spurious mouse move messages out. Sometimes we receive
+      // periodic (e.g. each 2 seconds) WM_MOUSEMOVE messages in the
+      // same mouse position even when the mouse is not moved. This is
+      // specially problematic when a mouse and a stylus are plugged
+      // in, because there are random jumps between the pen position
+      // and the mouse position (receiving a random WM_MOUSEMOVE from
+      // the mouse position in the middle of a flow of
+      // WM_POINTERUPDATE messages from the pen).
+      {
+        static HWND lastHwnd = nullptr;
+        static gfx::Point lastPoint;
+        if (lastHwnd == m_hwnd &&
+            lastPoint == ev.position()) {
+          MOUSE_TRACE("SAME MOUSEMOVE xy=%d,%d\n",
+                      ev.position().x, ev.position().y);
+          break;
+        }
+        lastHwnd = m_hwnd;
+        lastPoint = ev.position();
+      }
 
       MOUSE_TRACE("MOUSEMOVE xy=%d,%d\n",
                   ev.position().x, ev.position().y);
@@ -1998,7 +2038,7 @@ bool WindowWin::pointerEvent(WPARAM wparam, Event& ev, POINTER_INFO& pi)
 
         // Add pressure information
         ev.setPressure(
-          base::clamp(float(ppi.pressure) / 1024.0f, 0.0f, 1.0f));
+          std::clamp(float(ppi.pressure) / 1024.0f, 0.0f, 1.0f));
       }
       break;
     }
@@ -2066,6 +2106,11 @@ void WindowWin::handlePointerButtonChange(Event& ev, POINTER_INFO& pi)
     if (m_emulateDoubleClick)
       m_pointerDownCount = 0;
 #endif
+
+    // Update the internal last mouse position because if a pointer
+    // button wasn't change, the position might have changed anyway
+    // (i.e. we're in a WM_POINTERUPDATE event).
+    system()->_setInternalMousePosition(ev);
     return;
   }
 
@@ -2316,11 +2361,14 @@ void WindowWin::openWintabCtx()
 
 void WindowWin::closeWintabCtx()
 {
-  if (m_hpenctx) {
-    auto& api = system()->wintabApi();
+  if (!m_hpenctx)
+    return;
+
+  if (auto sys = system()) {
+    auto& api = sys->wintabApi();
     api.close(m_hpenctx);
-    m_hpenctx = nullptr;
   }
+  m_hpenctx = nullptr;
 }
 
 void WindowWin::notifyFullScreenStateToShell()
@@ -2443,15 +2491,6 @@ HWND WindowWin::createHwnd(WindowWin* self, const WindowSpec& spec)
     nullptr,
     GetModuleHandle(nullptr),
     reinterpret_cast<LPVOID>(self));
-
-/* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) BEGIN */
-  #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
-  #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-  #endif
-  BOOL value = TRUE;
-  ::DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
-  /* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) END */
-
   if (!hwnd)
     return nullptr;
 

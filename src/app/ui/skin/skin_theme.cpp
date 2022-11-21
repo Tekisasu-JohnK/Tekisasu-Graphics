@@ -25,7 +25,6 @@
 #include "app/ui/skin/skin_slider_property.h"
 #include "app/xml_document.h"
 #include "app/xml_exception.h"
-#include "base/clamp.h"
 #include "base/fs.h"
 #include "base/log.h"
 #include "base/string.h"
@@ -914,9 +913,8 @@ void SkinTheme::initWidget(Widget* widget)
       break;
 
     case kTextBoxWidget:
-      BORDER(4*guiscale());
       widget->setChildSpacing(0);
-      widget->setBgColor(colors.textboxFace());
+      widget->setStyle(styles.textboxText());
       break;
 
     case kViewWidget:
@@ -1431,8 +1429,7 @@ void SkinTheme::paintTextBox(ui::PaintEvent& ev)
   Graphics* g = ev.graphics();
   Widget* widget = static_cast<Widget*>(ev.getSource());
 
-  Theme::drawTextBox(g, widget, nullptr, nullptr,
-                     BGCOLOR, colors.textboxText());
+  Theme::paintTextBoxWithStyle(g, widget);
 }
 
 void SkinTheme::paintViewViewport(PaintEvent& ev)
@@ -1694,7 +1691,7 @@ void SkinTheme::paintProgressBar(ui::Graphics* g, const gfx::Rect& rc0, double p
   rc.shrink(1);
 
   int u = (int)((double)rc.w*progress);
-  u = base::clamp(u, 0, rc.w);
+  u = std::clamp(u, 0, rc.w);
 
   if (u > 0)
     g->fillRect(colors.selected(), gfx::Rect(rc.x, rc.y, u, rc.h));

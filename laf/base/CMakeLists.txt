@@ -75,7 +75,6 @@ else()
 endif()
 
 add_library(laf-base ${BASE_SOURCES})
-target_link_libraries(laf-base modpbase64)
 
 # To #include "base/base.h" and "base/config.h"
 target_include_directories(laf-base PUBLIC

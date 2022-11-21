@@ -28,7 +28,6 @@
 #include "app/util/clipboard.h"
 #include "app/util/conversion_to_surface.h"
 #include "app/util/pal_ops.h"
-#include "base/clamp.h"
 #include "base/convert_to.h"
 #include "doc/image.h"
 #include "doc/layer_tilemap.h"
@@ -151,7 +150,7 @@ public:
                                PaletteViewModification::DRAGANDDROP);
   }
   void showEntryInStatusBar(StatusBar* statusBar, int index) override {
-    statusBar->showColor(0, "", app::Color::fromIndex(index));
+    statusBar->showColor(0, app::Color::fromIndex(index));
   }
   void showDragInfoInStatusBar(StatusBar* statusBar, bool copy, int destIndex, int newSize) override {
     statusBar->setStatusText(
@@ -282,7 +281,7 @@ public:
     picks = newPicks;
   }
   void showEntryInStatusBar(StatusBar* statusBar, int index) override {
-    statusBar->showTile(0, "", doc::tile(index, 0));
+    statusBar->showTile(0, doc::tile(index, 0));
   }
   void showDragInfoInStatusBar(StatusBar* statusBar, bool copy, int destIndex, int newSize) override {
     statusBar->setStatusText(
@@ -548,9 +547,9 @@ int PaletteView::getBoxSize() const
 void PaletteView::setBoxSize(double boxsize)
 {
   if (isTiles())
-    m_boxsize = base::clamp(boxsize, 4.0, 64.0);
+    m_boxsize = std::clamp(boxsize, 4.0, 64.0);
   else
-    m_boxsize = base::clamp(boxsize, 4.0, 32.0);
+    m_boxsize = std::clamp(boxsize, 4.0, 32.0);
 
   if (m_delegate)
     m_delegate->onPaletteViewChangeSize(this, int(m_boxsize));
@@ -661,8 +660,7 @@ bool PaletteView::onProcessMessage(Message* msg)
       }
 
       captureMouse();
-
-      // Continue...
+      [[fallthrough]];
 
     case kMouseMoveMessage: {
       MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
@@ -671,7 +669,7 @@ bool PaletteView::onProcessMessage(Message* msg)
           (m_hot.part == Hit::COLOR ||
            m_hot.part == Hit::POSSIBLE_COLOR)) {
         int idx = m_hot.color;
-        idx = base::clamp(idx, 0, std::max(0, m_adapter->size()-1));
+        idx = std::clamp(idx, 0, std::max(0, m_adapter->size()-1));
 
         const MouseButton button = mouseMsg->button();
 
@@ -976,9 +974,9 @@ void PaletteView::onPaint(ui::PaintEvent& ev)
 
         IntersectClip clip(g, clipR);
         if (clip) {
-          CheckedDrawMode checked(g, getMarchingAntsOffset(),
-                                  gfx::rgba(0, 0, 0, 255),
-                                  gfx::rgba(255, 255, 255, 255));
+          CheckeredDrawMode checkered(g, getMarchingAntsOffset(),
+                                      gfx::rgba(0, 0, 0, 255),
+                                      gfx::rgba(255, 255, 255, 255));
           g->drawRect(gfx::rgba(0, 0, 0), box);
         }
       }
@@ -1137,7 +1135,7 @@ PaletteView::Hit PaletteView::hitTest(const gfx::Point& pos)
   int colsLimit = m_columns;
   if (m_state == State::DRAGGING_OUTLINE)
     --colsLimit;
-  int i = base::clamp((pos.x-vp.x)/box.w, 0, colsLimit)
+  int i = std::clamp((pos.x-vp.x)/box.w, 0, colsLimit)
     + std::max(0, pos.y/box.h)*m_columns;
   return Hit(Hit::POSSIBLE_COLOR, i);
 }

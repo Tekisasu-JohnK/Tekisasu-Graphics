@@ -84,10 +84,6 @@ ctest
 Some functions in *laf* depends on third party libraries (you should
 include these license notices when you distribute your software):
 
-* [base::encode/decode_base64](base/base64.cpp) functions use
-  [stringencoders](https://github.com/client9/stringencoders) by
-  [Nick Galbreath](https://github.com/client9)
-  ([MIT license](https://github.com/aseprite/stringencoders/blob/master/LICENSE)).
 * Tests use the [Google Test](https://github.com/aseprite/googletest/tree/master/googletest)
   framework by Google Inc. licensed under
   [a BSD-like license](https://github.com/aseprite/googletest/blob/master/googletest/LICENSE).

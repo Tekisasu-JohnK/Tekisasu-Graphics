@@ -75,7 +75,7 @@ DEFINE_TEST(test_write_disk_secure744)
 		archive_entry_free(ae);
 
 		*p++ = '/';
-		snprintf(p, buff_size - (p - buff), "target%d", n);
+		sprintf(p, "target%d", n);
 
 		/* Try to create a file through the symlink, should fail. */
 		assert((ae = archive_entry_new()) != NULL);

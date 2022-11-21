@@ -5,10 +5,6 @@
 #
 ############################################
 
-if (ANDROID)
-  include_directories(${PROJECT_SOURCE_DIR}/contrib/android/include)
-endif()
-
 # Public headers
 SET(include_HEADERS
   archive.h
@@ -82,7 +78,6 @@ SET(libarchive_SOURCES
   archive_read_set_format.c
   archive_read_set_options.c
   archive_read_support_filter_all.c
-  archive_read_support_filter_by_code.c
   archive_read_support_filter_bzip2.c
   archive_read_support_filter_compress.c
   archive_read_support_filter_gzip.c

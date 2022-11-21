@@ -278,6 +278,7 @@ if(ENABLE_UI)
     commands/cmd_pixel_perfect_mode.cpp
     commands/cmd_play_animation.cpp
     commands/cmd_refresh.cpp
+    commands/cmd_enter_license.cpp
     commands/cmd_remove_frame.cpp
     commands/cmd_remove_frame_tag.cpp
     commands/cmd_remove_slice.cpp
@@ -426,6 +427,12 @@ if(ENABLE_UI)
       ui/news_listbox.cpp
       ${ui_app_files})
   endif()
+  if(ENABLE_DRM)
+    set(ui_app_files
+      ui/enter_license.cpp
+      ui/aseprite_update.cpp
+    ${ui_app_files})
+  endif()
 endif()
 
 set(send_crash_files)
@@ -563,6 +570,7 @@ add_library(app-lib
   commands/command.cpp
   commands/commands.cpp
   commands/convert_layer.cpp
+  commands/export_tileset.cpp
   commands/filters/cmd_brightness_contrast.cpp
   commands/filters/cmd_color_curve.cpp
   commands/filters/cmd_convolution_matrix.cpp
@@ -706,6 +714,10 @@ target_link_libraries(app-lib
 
 if(ENABLE_PSD)
   target_link_libraries(app-lib psd)
+endif()
+
+if(ENABLE_DRM)
+  target_link_libraries(app-lib drm-lib)
 endif()
 
 # Directory where generated files by "gen" utility will stay.

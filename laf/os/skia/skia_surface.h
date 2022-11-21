@@ -134,6 +134,11 @@ private:
     const SkSamplingOptions& sampling,
     const SkPaint& paint);
 
+#if SK_SUPPORT_GPU
+  const SkImage* getOrCreateTextureImage() const;
+  bool uploadBitmapAsTexture() const;
+#endif
+
   sk_sp<SkColorSpace> skColorSpace() const {
     if (m_colorSpace)
       return static_cast<SkiaColorSpace*>(m_colorSpace.get())->skColorSpace();
@@ -142,6 +147,9 @@ private:
   }
 
   SkBitmap m_bitmap;
+#if SK_SUPPORT_GPU
+  mutable sk_sp<SkImage> m_image;
+#endif
   sk_sp<SkSurface> m_surface;
   ColorSpaceRef m_colorSpace;
   SkCanvas* m_canvas;

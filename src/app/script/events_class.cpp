@@ -129,7 +129,7 @@ public:
   AppEvents() {
   }
 
-  EventType eventType(const char* eventName) const {
+  EventType eventType(const char* eventName) const override {
     if (std::strcmp(eventName, "sitechange") == 0)
       return SiteChange;
     else if (std::strcmp(eventName, "fgcolorchange") == 0)
@@ -202,14 +202,19 @@ public:
 
   ~SpriteEvents() {
     auto doc = this->doc();
-    ASSERT(doc || ui::get_app_state() == ui::AppState::kClosingWithException);
+    // The document can be nullptr in some cases like:
+    // - When closing the App with an exception
+    //   (ui::get_app_state() == ui::AppState::kClosingWithException)
+    // - When Sprite.events property was accessed in a app
+    //   "sitechange" event just when this same sprite was closed
+    //   (so the SpriteEvents is created/destroyed for second time)
     if (doc) {
       disconnectFromUndoHistory(doc);
       doc->remove_observer(this);
     }
   }
 
-  EventType eventType(const char* eventName) const {
+  EventType eventType(const char* eventName) const override {
     if (std::strcmp(eventName, "change") == 0)
       return Change;
     else if (std::strcmp(eventName, "filenamechange") == 0)
@@ -369,6 +374,19 @@ void push_app_events(lua_State* L)
 
 void push_sprite_events(lua_State* L, Sprite* sprite)
 {
+  // Clear the g_spriteEvents map on Exit() signal because if the dtor
+  // is called in the normal C++ order destruction sequence by
+  // compilation units, it could crash because each ~SpriteEvents()
+  // needs the doc::get() function, which uses the "objects"
+  // collection from "src/doc/objects.cpp" (so we cannot garantize
+  // that that "objects" collection will be destroyed after
+  // "g_spriteEvents")
+  static bool atExit = false;
+  if (!atExit) {
+    atExit = true;
+    App::instance()->Exit.connect([]{ g_spriteEvents.clear(); });
+  }
+
   ASSERT(sprite);
 
   SpriteEvents* spriteEvents;

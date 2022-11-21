@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2021  Igara Studio S.A.
+// Copyright (C) 2021-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -10,12 +10,12 @@
 
 #include "os/x11/system.h"
 
-#include "base/clamp.h"
 #include "os/x11/cursor.h"
 
 #include <X11/Xcursor/Xcursor.h>
 #include <X11/cursorfont.h>
 
+#include <algorithm>
 #include <array>
 
 namespace os {
@@ -181,8 +181,8 @@ CursorRef SystemX11::makeCursor(const Surface* surface,
     //   X Error of failed request:  BadMatch (invalid parameter attributes)
     //     Major opcode of failed request:  138 (RENDER)
     //     Minor opcode of failed request:  27 (RenderCreateCursor)
-    image->xhot = base::clamp(scale*focus.x + scale/2, 0, w-1);
-    image->yhot = base::clamp(scale*focus.y + scale/2, 0, h-1);
+    image->xhot = std::clamp(scale*focus.x + scale/2, 0, w-1);
+    image->yhot = std::clamp(scale*focus.y + scale/2, 0, h-1);
     xcursor = XcursorImageLoadCursor(display, image);
   }
 

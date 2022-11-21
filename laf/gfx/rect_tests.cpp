@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022 Igara Studio S.A.
 // Copyright (C) 2001-2013 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -56,6 +56,12 @@ TEST(Rect, FitIn)
   EXPECT_EQ(Rect(10, 10, 8, 4), Rect(0, 0, 16, 8).fitIn(Rect(10, 10, 8, 4)));
   EXPECT_EQ(Rect(10, 12, 8, 4), Rect(0, 0, 16, 8).fitIn(Rect(10, 10, 8, 8)));
   EXPECT_EQ(Rect(13, 10, 2, 4), Rect(0, 0, 8, 16).fitIn(Rect(10, 10, 8, 4)));
+}
+
+TEST(Rect, Floor)
+{
+  EXPECT_EQ(gfx::Rect(0, 0, 1, 2), gfx::Rect(gfx::RectF(-0.25, -0.75, 1, 2)));
+  EXPECT_EQ(gfx::Rect(-1, -1, 1, 2), gfx::RectF(-0.25, -0.75, 1, 2).floor());
 }
 
 int main(int argc, char** argv)

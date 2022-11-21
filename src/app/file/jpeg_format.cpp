@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -19,7 +19,6 @@
 #include "app/find_widget.h"
 #include "app/load_widget.h"
 #include "app/pref/preferences.h"
-#include "base/clamp.h"
 #include "base/file_handle.h"
 #include "base/memory.h"
 #include "doc/doc.h"
@@ -65,7 +64,8 @@ class JpegFormat : public FileFormat {
       FILE_SUPPORT_RGB |
       FILE_SUPPORT_GRAY |
       FILE_SUPPORT_SEQUENCES |
-      FILE_SUPPORT_GET_FORMAT_OPTIONS;
+      FILE_SUPPORT_GET_FORMAT_OPTIONS |
+      FILE_ENCODE_ABSTRACT_IMAGE;
   }
 
   bool onLoad(FileOp* fop) override;
@@ -178,7 +178,7 @@ bool JpegFormat::onLoad(FileOp* fop)
   jpeg_start_decompress(&dinfo);
 
   // Create the image.
-  Image* image = fop->sequenceImage(
+  ImageRef image = fop->sequenceImage(
     (dinfo.out_color_space == JCS_RGB ? IMAGE_RGB:
                                         IMAGE_GRAYSCALE),
     dinfo.output_width,
@@ -353,12 +353,13 @@ bool JpegFormat::onSave(FileOp* fop)
 {
   struct jpeg_compress_struct cinfo;
   struct error_mgr jerr;
-  const Image* image = fop->sequenceImage();
+  const FileAbstractImage* img = fop->abstractImage();
+  const ImageSpec spec = img->spec();
   JSAMPARRAY buffer;
   JDIMENSION buffer_height;
   const auto jpeg_options = std::static_pointer_cast<JpegOptions>(fop->formatOptions());
   const int qualityValue =
-    (jpeg_options ? (int)base::clamp(100.0f * jpeg_options->quality, 0.f, 100.f):
+    (jpeg_options ? (int)std::clamp(100.0f * jpeg_options->quality, 0.f, 100.f):
                     100);
 
   int c;
@@ -378,10 +379,10 @@ bool JpegFormat::onSave(FileOp* fop)
   jpeg_stdio_dest(&cinfo, file);
 
   // SET parameters for compression.
-  cinfo.image_width = image->width();
-  cinfo.image_height = image->height();
+  cinfo.image_width = spec.width();
+  cinfo.image_height = spec.height();
 
-  if (image->pixelFormat() == IMAGE_GRAYSCALE) {
+  if (spec.colorMode() == ColorMode::GRAYSCALE) {
     cinfo.input_components = 1;
     cinfo.in_color_space = JCS_GRAYSCALE;
   }
@@ -428,15 +429,15 @@ bool JpegFormat::onSave(FileOp* fop)
   // Write each scan line.
   while (cinfo.next_scanline < cinfo.image_height) {
     // RGB
-    if (image->pixelFormat() == IMAGE_RGB) {
+    if (spec.colorMode() == ColorMode::RGB) {
       uint32_t* src_address;
       uint8_t* dst_address;
       int x, y;
       for (y=0; y<(int)buffer_height; y++) {
-        src_address = (uint32_t*)image->getPixelAddress(0, cinfo.next_scanline+y);
+        src_address = (uint32_t*)img->getScanline(cinfo.next_scanline+y);
         dst_address = ((uint8_t**)buffer)[y];
 
-        for (x=0; x<image->width(); ++x) {
+        for (x=0; x<spec.width(); ++x) {
           c = *(src_address++);
           *(dst_address++) = rgba_getr(c);
           *(dst_address++) = rgba_getg(c);
@@ -450,9 +451,9 @@ bool JpegFormat::onSave(FileOp* fop)
       uint8_t* dst_address;
       int x, y;
       for (y=0; y<(int)buffer_height; y++) {
-        src_address = (uint16_t*)image->getPixelAddress(0, cinfo.next_scanline+y);
+        src_address = (uint16_t*)img->getScanline(cinfo.next_scanline+y);
         dst_address = ((uint8_t**)buffer)[y];
-        for (x=0; x<image->width(); ++x)
+        for (x=0; x<spec.width(); ++x)
           *(dst_address++) = graya_getv(*(src_address++));
       }
     }

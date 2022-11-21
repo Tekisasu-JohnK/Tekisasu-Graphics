@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2021  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2016-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -354,6 +354,9 @@ bool WintabAPI::loadWintab()
     return false;
   }
 
+  std::string checksum;
+  const bool validDll = checkDll(checksum);
+
   // The delegate might want to get some information about the Wintab
   // .dll (e.g. just for debugging purposes / end-user support)
   if (m_delegate) {
@@ -362,12 +365,14 @@ bool WintabAPI::loadWintab()
       first = false;
 
       auto fields = base::ver_query_values(m_wintabLib);
+      fields.insert_or_assign("sha1", checksum);
+      ASSERT(!fields.empty());
       if (!fields.empty())
         m_delegate->onWintabFields(fields);
     }
   }
 
-  if (!checkDll()) {
+  if (!validDll) {
     base::unload_dll(m_wintabLib);
     m_wintabLib = nullptr;
     return false;
@@ -428,7 +433,7 @@ bool WintabAPI::loadWintab()
   return true;
 }
 
-bool WintabAPI::checkDll()
+bool WintabAPI::checkDll(std::string& checksum)
 {
   ASSERT(m_wintabLib);
 
@@ -436,7 +441,7 @@ bool WintabAPI::checkDll()
   if (!base::is_file(fn))
     return false;
 
-  std::string checksum = base::convert_to<std::string>(base::Sha1::calculateFromFile(fn));
+  checksum = base::convert_to<std::string>(base::Sha1::calculateFromFile(fn));
   base::Version ver = base::get_file_version(fn);
   LOG("PEN: <%s> v%s, sha1 <%s>\n", fn.c_str(), ver.str().c_str(), checksum.c_str());
 

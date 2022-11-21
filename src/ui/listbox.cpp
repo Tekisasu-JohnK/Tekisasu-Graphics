@@ -11,7 +11,6 @@
 
 #include "ui/listbox.h"
 
-#include "base/clamp.h"
 #include "base/fs.h"
 #include "ui/display.h"
 #include "ui/listitem.h"
@@ -208,6 +207,7 @@ bool ListBox::onProcessMessage(Message* msg)
 
     case kMouseDownMessage:
       captureMouse();
+      [[fallthrough]];
 
     case kMouseMoveMessage:
       if (hasCapture()) {
@@ -345,7 +345,7 @@ bool ListBox::onProcessMessage(Message* msg)
             return Widget::onProcessMessage(msg);
         }
 
-        selectIndex(base::clamp(select, 0, bottom), msg);
+        selectIndex(std::clamp(select, 0, bottom), msg);
         return true;
       }
       break;
@@ -421,7 +421,7 @@ int ListBox::advanceIndexThroughVisibleItems(
   const int sgn = SGN(delta);
   int index = startIndex;
 
-  startIndex = base::clamp(startIndex, 0, bottom);
+  startIndex = std::clamp(startIndex, 0, bottom);
   int lastVisibleIndex = startIndex;
 
   bool cycle = false;

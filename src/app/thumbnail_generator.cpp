@@ -17,7 +17,6 @@
 #include "app/file/file.h"
 #include "app/file_system.h"
 #include "app/util/conversion_to_surface.h"
-#include "base/clamp.h"
 #include "base/thread.h"
 #include "doc/algorithm/rotate.h"
 #include "doc/image.h"
@@ -126,8 +125,8 @@ private:
           thumb_w = w;
           thumb_h = h;
         }
-        thumb_w = base::clamp(thumb_w, 1, MAX_THUMBNAIL_SIZE);
-        thumb_h = base::clamp(thumb_h, 1, MAX_THUMBNAIL_SIZE);
+        thumb_w = std::clamp(thumb_w, 1, MAX_THUMBNAIL_SIZE);
+        thumb_h = std::clamp(thumb_h, 1, MAX_THUMBNAIL_SIZE);
 
         // Stretch the 'image'
         thumbnailImage.reset(
@@ -137,7 +136,7 @@ private:
         render::Projection proj(sprite->pixelRatio(),
                                 render::Zoom(thumb_w, w));
         render::Render render;
-        render.setBgType(render::BgType::TRANSPARENT);
+        render.setBgOptions(render::BgOptions::MakeTransparent());
         render.setProjection(proj);
         render.renderSprite(
           thumbnailImage.get(), sprite, frame_t(0),

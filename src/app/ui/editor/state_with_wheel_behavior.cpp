@@ -25,7 +25,6 @@
 #include "app/ui/keyboard_shortcuts.h"
 #include "app/ui/toolbar.h"
 #include "app/ui_context.h"
-#include "base/clamp.h"
 #include "base/string.h"
 #include "doc/brush.h"
 #include "doc/layer.h"
@@ -40,32 +39,32 @@
 namespace app {
 
 using namespace ui;
+using PreciseWheel = StateWithWheelBehavior::PreciseWheel;
 
 template<typename T>
-static inline void adjust_value(bool preciseWheel, double dz, T& v, T min, T max)
+static inline void adjust_value(PreciseWheel preciseWheel, double dz, T& v, T min, T max)
 {
-  if (preciseWheel)
-    v = base::clamp<T>(T(v+dz), min, max);
+  if (preciseWheel == PreciseWheel::On)
+    v = std::clamp<T>(T(v+dz), min, max);
   else
-    v = base::clamp<T>(T(v+dz*max/T(10)), min, max);
+    v = std::clamp<T>(T(v+dz*max/T(10)), min, max);
 }
 
 template<typename T>
-static inline void adjust_hue(bool preciseWheel, double dz, T& v, T min, T max)
+static inline void adjust_hue(PreciseWheel preciseWheel, double dz, T& v, T min, T max)
 {
-  if (preciseWheel)
-    v = base::clamp<T>(T(v+dz), min, max);
+  if (preciseWheel == PreciseWheel::On)
+    v = std::clamp<T>(T(v+dz), min, max);
   else
-    v = base::clamp<T>(T(v+dz*T(10)), min, max);
+    v = std::clamp<T>(T(v+dz*T(10)), min, max);
 }
 
-static inline void adjust_unit(bool preciseWheel, double dz, double& v)
+static inline void adjust_unit(PreciseWheel preciseWheel, double dz, double& v)
 {
-  v = base::clamp<double>(v+(preciseWheel ? dz/100.0: dz/25.0), 0.0, 1.0);
+  v = std::clamp<double>(v+(preciseWheel == PreciseWheel::On ? dz/100.0: dz/25.0), 0.0, 1.0);
 }
 
 StateWithWheelBehavior::StateWithWheelBehavior()
-  : m_groupTool(initialTool())
 {
 }
 
@@ -74,7 +73,6 @@ bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
   gfx::Point delta = msg->wheelDelta();
   double dz = delta.x + delta.y;
   WheelAction wheelAction = WheelAction::None;
-  bool scrollBigSteps = false;
 
   if (KeyboardShortcuts::instance()->hasMouseWheelCustomization()) {
     if (!Preferences::instance().editor.zoomWithSlide() && msg->preciseWheel())
@@ -146,8 +144,15 @@ bool StateWithWheelBehavior::onMouseWheel(Editor* editor, MouseMessage* msg)
                      msg->position(),
                      delta,
                      dz,
-                     scrollBigSteps,
-                     msg->preciseWheel());
+                     // The possibility for big scroll steps was lost
+                     // in history (it was possible using Shift key in
+                     // very old versions, now Shift is used for
+                     // horizontal scroll).
+                     ScrollBigSteps::Off,
+                     (msg->preciseWheel() ?
+                      PreciseWheel::On:
+                      PreciseWheel::Off),
+                     FromMouseWheel::On);
   return true;
 }
 
@@ -157,8 +162,9 @@ void StateWithWheelBehavior::processWheelAction(
   const gfx::Point& position,
   gfx::Point delta,
   double dz,
-  bool scrollBigSteps,
-  bool preciseWheel)
+  const ScrollBigSteps scrollBigSteps,
+  const PreciseWheel preciseWheel,
+  const FromMouseWheel fromMouseWheel)
 {
   switch (wheelAction) {
 
@@ -169,7 +175,7 @@ void StateWithWheelBehavior::processWheelAction(
     case WheelAction::FgColor: {
       int lastIndex = get_current_palette()->size()-1;
       int newIndex = initialFgColor().getIndex() + int(dz);
-      newIndex = base::clamp(newIndex, 0, lastIndex);
+      newIndex = std::clamp(newIndex, 0, lastIndex);
       changeFgColor(app::Color::fromIndex(newIndex));
       break;
     }
@@ -177,7 +183,7 @@ void StateWithWheelBehavior::processWheelAction(
     case WheelAction::BgColor: {
       int lastIndex = get_current_palette()->size()-1;
       int newIndex = initialBgColor().getIndex() + int(dz);
-      newIndex = base::clamp(newIndex, 0, lastIndex);
+      newIndex = std::clamp(newIndex, 0, lastIndex);
       ColorBar::instance()->setBgColor(app::Color::fromIndex(newIndex));
       break;
     }
@@ -186,7 +192,7 @@ void StateWithWheelBehavior::processWheelAction(
       auto tilesView = ColorBar::instance()->getTilesView();
       int lastIndex = tilesView->tileset()->size()-1;
       int newIndex = initialFgTileIndex() + int(dz);
-      newIndex = base::clamp(newIndex, 0, lastIndex);
+      newIndex = std::clamp(newIndex, 0, lastIndex);
       ColorBar::instance()->setFgTile(newIndex);
       break;
     }
@@ -195,14 +201,14 @@ void StateWithWheelBehavior::processWheelAction(
       auto tilesView = ColorBar::instance()->getTilesView();
       int lastIndex = tilesView->tileset()->size()-1;
       int newIndex = initialBgTileIndex() + int(dz);
-      newIndex = base::clamp(newIndex, 0, lastIndex);
+      newIndex = std::clamp(newIndex, 0, lastIndex);
       ColorBar::instance()->setBgTile(newIndex);
       break;
     }
 
     case WheelAction::Frame: {
       frame_t deltaFrame = 0;
-      if (preciseWheel) {
+      if (preciseWheel == PreciseWheel::On) {
         if (dz < 0.0)
           deltaFrame = +1;
         else if (dz > 0.0)
@@ -226,7 +232,7 @@ void StateWithWheelBehavior::processWheelAction(
     case WheelAction::Zoom: {
       render::Zoom zoom = initialZoom(editor);
 
-      if (preciseWheel) {
+      if (preciseWheel == PreciseWheel::On) {
         dz /= 1.5;
         if (dz < -1.0) dz = -1.0;
         else if (dz > 1.0) dz = 1.0;
@@ -243,7 +249,7 @@ void StateWithWheelBehavior::processWheelAction(
       View* view = View::getView(editor);
       gfx::Point scroll = initialScroll(editor);
 
-      if (!preciseWheel) {
+      if (preciseWheel == PreciseWheel::Off) {
         gfx::Rect vp = view->viewportBounds();
 
         if (wheelAction == WheelAction::HScroll) {
@@ -253,7 +259,7 @@ void StateWithWheelBehavior::processWheelAction(
           delta.y = int(dz * vp.h);
         }
 
-        if (scrollBigSteps) {
+        if (scrollBigSteps == ScrollBigSteps::On) {
           delta /= 2;
         }
         else {
@@ -270,20 +276,22 @@ void StateWithWheelBehavior::processWheelAction(
       ToolPreferences::Brush& brush =
         Preferences::instance().tool(tool).brush;
 
+      if (fromMouseWheel == FromMouseWheel::On) {
 #if LAF_WINDOWS || LAF_LINUX
-      // By default on macOS the mouse wheel is correct, up increase
-      // brush size, and down decrease it. But on Windows and Linux
-      // it's inverted.
-      dz = -dz;
+        // By default on macOS the mouse wheel is correct, up increase
+        // brush size, and down decrease it. But on Windows and Linux
+        // it's inverted.
+        dz = -dz;
 #endif
 
-      // We can configure the mouse wheel for brush size to behave as
-      // in previous versions.
-      if (Preferences::instance().editor.invertBrushSizeWheel())
-        dz = -dz;
+        // We can configure the mouse wheel for brush size to behave as
+        // in previous versions.
+        if (Preferences::instance().editor.invertBrushSizeWheel())
+          dz = -dz;
+      }
 
       brush.size(
-        base::clamp(
+        std::clamp(
           int(initialBrushSize()+dz),
           // If we use the "static const int" member directly here,
           // we'll get a linker error (when compiling without
@@ -304,12 +312,12 @@ void StateWithWheelBehavior::processWheelAction(
         angle += 180;
       angle %= 181;
 
-      brush.angle(base::clamp(angle, 0, 180));
+      brush.angle(std::clamp(angle, 0, 180));
       break;
     }
 
     case WheelAction::ToolSameGroup: {
-      const tools::Tool* tool = m_groupTool;
+      const tools::Tool* tool = getInitialToolInActiveGroup();
 
       auto toolBox = App::instance()->toolBox();
       std::vector<tools::Tool*> tools;
@@ -323,24 +331,25 @@ void StateWithWheelBehavior::processWheelAction(
       auto it = std::find(begin, end, tool);
       if (it != end) {
         int i = std::round(dz);
-        while (i++ < 0) {
+        while (i < 0) {
+          ++i;
           if (it == begin)
             it = end;
           --it;
         }
-        while (i-- > 0) {
+        while (i > 0) {
+          --i;
           ++it;
           if (it == end)
             it = begin;
         }
-        if (tool != *it)
-          ToolBar::instance()->selectTool(*it);
+        onToolChange(*it);
       }
       break;
     }
 
     case WheelAction::ToolOtherGroup: {
-      tools::Tool* tool = initialTool();
+      const tools::Tool* tool = initialTool();
 
       auto toolBox = App::instance()->toolBox();
       auto begin = toolBox->begin_group();
@@ -348,25 +357,26 @@ void StateWithWheelBehavior::processWheelAction(
       auto it = std::find(begin, end, tool->getGroup());
       if (it != end) {
         int i = std::round(dz);
-        while (i++ < 0) {
+        while (i < 0) {
+          ++i;
           if (it == begin)
             it = end;
           --it;
         }
-        while (i-- > 0) {
+        while (i > 0) {
+          --i;
           ++it;
           if (it == end)
             it = begin;
         }
-        ToolBar::instance()->selectToolGroup(*it);
-        m_groupTool = getActiveTool();
+        onToolGroupChange(editor, *it);
       }
       break;
     }
 
     case WheelAction::Layer: {
       int deltaLayer = 0;
-      if (preciseWheel) {
+      if (preciseWheel == PreciseWheel::On) {
         if (dz < 0.0)
           deltaLayer = +1;
         else if (dz > 0.0)
@@ -391,16 +401,16 @@ void StateWithWheelBehavior::processWheelAction(
     case WheelAction::InkType: {
       int ink = int(initialInkType(editor));
       int deltaInk = int(dz);
-      if (preciseWheel) {
+      if (preciseWheel == PreciseWheel::On) {
         if (dz < 0.0)
           deltaInk = +1;
         else if (dz > 0.0)
           deltaInk = -1;
       }
       ink += deltaInk;
-      ink = base::clamp(ink,
-                        int(tools::InkType::FIRST),
-                        int(tools::InkType::LAST));
+      ink = std::clamp(ink,
+                       int(tools::InkType::FIRST),
+                       int(tools::InkType::LAST));
 
       App::instance()->contextBar()->setInkType(tools::InkType(ink));
       break;
@@ -489,9 +499,9 @@ void StateWithWheelBehavior::processWheelAction(
           break;
       }
 
-      changeFgColor(Color::fromHsl(base::clamp(h, 0.0, 360.0),
-                                   base::clamp(s, 0.0, 1.0),
-                                   base::clamp(l, 0.0, 1.0)));
+      changeFgColor(Color::fromHsl(std::clamp(h, 0.0, 360.0),
+                                   std::clamp(s, 0.0, 1.0),
+                                   std::clamp(l, 0.0, 1.0)));
       break;
     }
 
@@ -517,9 +527,9 @@ void StateWithWheelBehavior::processWheelAction(
           break;
       }
 
-      changeFgColor(Color::fromHsv(base::clamp(h, 0.0, 360.0),
-                                   base::clamp(s, 0.0, 1.0),
-                                   base::clamp(v, 0.0, 1.0)));
+      changeFgColor(Color::fromHsv(std::clamp(h, 0.0, 360.0),
+                                   std::clamp(s, 0.0, 1.0),
+                                   std::clamp(v, 0.0, 1.0)));
       break;
     }
 
@@ -720,6 +730,31 @@ void StateWithWheelBehavior::disableQuickTool() const
     // the effect is for the selected tool.
     atm->newQuickToolSelectedFromEditor(nullptr);
   }
+}
+
+tools::Tool* StateWithWheelBehavior::getInitialToolInActiveGroup()
+{
+  if (!m_tool)
+    m_tool = initialTool();
+  return m_tool;
+}
+
+void StateWithWheelBehavior::onToolChange(tools::Tool* tool)
+{
+  ToolBar::instance()->selectTool(tool);
+  m_tool = tool;
+}
+
+void StateWithWheelBehavior::onToolGroupChange(Editor* editor,
+                                               tools::ToolGroup* group)
+{
+  ToolBar::instance()->selectToolGroup(group);
+
+  // Update initial tool in active group as the group has just
+  // changed. Useful when the same key modifiers are associated to
+  // WheelAction::ToolSameGroup and WheelAction::ToolOtherGroup at the
+  // same time.
+  m_tool = getActiveTool();
 }
 
 } // namespace app

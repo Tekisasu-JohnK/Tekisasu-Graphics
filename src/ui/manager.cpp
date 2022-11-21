@@ -18,7 +18,6 @@
 
 #include "ui/manager.h"
 
-#include "base/clamp.h"
 #include "base/concurrent_queue.h"
 #include "base/scoped_value.h"
 #include "base/time.h"
@@ -1499,19 +1498,28 @@ void Manager::_closeWindow(Window* window, bool redraw_background)
   if (// The display can be nullptr if the window was not opened or
       // was closed before.
       window->ownDisplay()) {
-    parentDisplay = windowDisplay->parentDisplay();
+    parentDisplay = (windowDisplay ? windowDisplay->parentDisplay(): nullptr);
     ASSERT(parentDisplay);
     ASSERT(windowDisplay);
     ASSERT(windowDisplay != this->display());
+
+    // We are receiving several crashes from Windows users where
+    // parentDisplay != nullptr and parentDisplay->nativeWindow() ==
+    // nullptr, so we have to do some extra checks in these places
+    // (anyway this might produce some crashes in other places)
+    os::Window* nativeWindow = (windowDisplay ? windowDisplay->nativeWindow(): nullptr);
+    os::Window* parentNativeWindow = (parentDisplay ? parentDisplay->nativeWindow(): nullptr);
+    ASSERT(nativeWindow);
+    ASSERT(parentNativeWindow);
 
     // Just as we've set the origin of the window bounds to (0, 0)
     // when we created the native window, we have to restore the
     // ui::Window bounds' origin now that we are going to remove/close
     // the native window.
-    if (parentDisplay && windowDisplay) {
-      const int scale = parentDisplay->nativeWindow()->scale();
-      const gfx::Point parentOrigin = parentDisplay->nativeWindow()->contentRect().origin();
-      const gfx::Point origin = windowDisplay->nativeWindow()->contentRect().origin();
+    if (parentNativeWindow && nativeWindow) {
+      const int scale = parentNativeWindow->scale();
+      const gfx::Point parentOrigin = parentNativeWindow->contentRect().origin();
+      const gfx::Point origin = nativeWindow->contentRect().origin();
       const gfx::Rect newBounds((origin - parentOrigin) / scale,
                                 window->bounds().size());
       window->setBounds(newBounds);
@@ -1520,7 +1528,8 @@ void Manager::_closeWindow(Window* window, bool redraw_background)
     // Set the native window user data to nullptr so any other queued
     // native message is not processed.
     window->setDisplay(nullptr, false);
-    windowDisplay->nativeWindow()->setUserData<void*>(nullptr);
+    if (nativeWindow)
+      nativeWindow->setUserData<void*>(nullptr);
 
     // Remove all messages for this display.
     removeMessagesForDisplay(windowDisplay);
@@ -1529,11 +1538,24 @@ void Manager::_closeWindow(Window* window, bool redraw_background)
     // delete.
     _internal_set_mouse_display(parentDisplay);
 
+    // Remove the display that we're going to delete (windowDisplay)
+    // as parent of any other existent display.
+    for (auto otherChild : children()) {
+      if (auto otherWindow = static_cast<Window*>(otherChild)) {
+        if (otherWindow != window &&
+            otherWindow->display() &&
+            otherWindow->display()->parentDisplay() == windowDisplay) {
+          otherWindow->display()->_setParentDisplay(parentDisplay);
+        }
+      }
+    }
+
     // The ui::Display should destroy the os::Window
     delete windowDisplay;
 
     // Activate main windows
-    parentDisplay->nativeWindow()->activate();
+    if (parentNativeWindow)
+      parentNativeWindow->activate();
   }
   else {
     parentDisplay = windowDisplay;
@@ -1721,8 +1743,8 @@ void Manager::onInitTheme(InitThemeEvent& ev)
         gfx::Rect bounds = window->bounds();
         bounds *= newUIScale;
         bounds /= oldUIScale;
-        bounds.x = base::clamp(bounds.x, 0, displaySize.w - bounds.w);
-        bounds.y = base::clamp(bounds.y, 0, displaySize.h - bounds.h);
+        bounds.x = std::clamp(bounds.x, 0, displaySize.w - bounds.w);
+        bounds.y = std::clamp(bounds.y, 0, displaySize.h - bounds.h);
         window->setBounds(bounds);
       }
     }
@@ -1921,7 +1943,7 @@ bool Manager::sendMessageToWidget(Message* msg, Widget* widget)
     // Restore overlays in the region that we're going to paint.
     OverlayManager::instance()->restoreOverlappedAreas(paintMsg->rect());
 
-    os::Surface* surface = display->surface();
+    os::SurfaceRef surface(base::AddRef(display->surface()));
     surface->saveClip();
 
     if (surface->clipRect(paintMsg->rect())) {
@@ -2231,11 +2253,10 @@ bool Manager::processFocusMovementMessage(Message* msg)
         break;
 
       // Arrow keys
-      case kKeyLeft:  if (!cmp) cmp = cmp_left;
-      case kKeyRight: if (!cmp) cmp = cmp_right;
-      case kKeyUp:    if (!cmp) cmp = cmp_up;
+      case kKeyLeft:  if (!cmp) cmp = cmp_left;  [[fallthrough]];
+      case kKeyRight: if (!cmp) cmp = cmp_right; [[fallthrough]];
+      case kKeyUp:    if (!cmp) cmp = cmp_up;    [[fallthrough]];
       case kKeyDown:  if (!cmp) cmp = cmp_down;
-
         // More than one widget
         if (count > 1) {
           // Position where the focus come

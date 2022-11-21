@@ -46,9 +46,14 @@ namespace doc {
 
     void setImage(const ImageRef& image, Layer* layer);
     void setPosition(const gfx::Point& pos);
-    void setOpacity(int opacity) { m_opacity = opacity; }
+
+    void setOpacity(int opacity) {
+      m_opacity = opacity;
+    }
 
     void setBounds(const gfx::Rect& bounds) {
+      ASSERT(bounds.w > 0);
+      ASSERT(bounds.h > 0);
       m_bounds = bounds;
       if (m_boundsF)
         *m_boundsF = gfx::RectF(bounds);
@@ -58,14 +63,16 @@ namespace doc {
       if (m_boundsF)
         *m_boundsF = boundsF;
       else
-        m_boundsF = new gfx::RectF(boundsF);
+        m_boundsF = std::make_unique<gfx::RectF>(boundsF);
 
       m_bounds = gfx::Rect(boundsF);
+      if (m_bounds.w <= 0) m_bounds.w = 1;
+      if (m_bounds.h <= 0) m_bounds.h = 1;
     }
 
     const gfx::RectF& boundsF() const {
       if (!m_boundsF)
-        m_boundsF = new gfx::RectF(m_bounds);
+        m_boundsF = std::make_unique<gfx::RectF>(m_bounds);
       return *m_boundsF;
     }
 
@@ -87,7 +94,7 @@ namespace doc {
 
     // Special bounds for reference layers that can have subpixel
     // position.
-    mutable gfx::RectF* m_boundsF;
+    mutable std::unique_ptr<gfx::RectF> m_boundsF;
   };
 
   typedef std::shared_ptr<CelData> CelDataRef;

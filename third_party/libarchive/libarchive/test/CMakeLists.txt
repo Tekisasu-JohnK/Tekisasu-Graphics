@@ -63,7 +63,6 @@ IF(ENABLE_TEST)
     test_compat_solaris_pax_sparse.c
     test_compat_solaris_tar_acl.c
     test_compat_star_acl.c
-    test_compat_tar_directory.c
     test_compat_tar_hardlink.c
     test_compat_uudecode.c
     test_compat_uudecode_large.c
@@ -153,7 +152,6 @@ IF(ENABLE_TEST)
     test_read_format_rar_encryption_header.c
     test_read_format_rar_encryption_partially.c
     test_read_format_rar_invalid1.c
-    test_read_format_rar_filter.c
     test_read_format_rar5.c
     test_read_format_raw.c
     test_read_format_tar.c
@@ -162,7 +160,6 @@ IF(ENABLE_TEST)
     test_read_format_tar_empty_with_gnulabel.c
     test_read_format_tar_empty_pax.c
     test_read_format_tar_filename.c
-    test_read_format_tar_invalid_pax_size.c
     test_read_format_tbz.c
     test_read_format_tgz.c
     test_read_format_tlz.c
@@ -212,7 +209,6 @@ IF(ENABLE_TEST)
     test_write_disk.c
     test_write_disk_appledouble.c
     test_write_disk_failures.c
-    test_write_disk_fixup.c
     test_write_disk_hardlink.c
     test_write_disk_hfs_compression.c
     test_write_disk_lookup.c
@@ -279,7 +275,6 @@ IF(ENABLE_TEST)
     test_write_format_zip_compression_store.c
     test_write_format_zip_empty.c
     test_write_format_zip_empty_zip64.c
-    test_write_format_zip_entry_size_unset.c
     test_write_format_zip_file.c
     test_write_format_zip_file_zip64.c
     test_write_format_zip_large.c

@@ -71,7 +71,7 @@ namespace app {
     virtual const char* getMainAreaShader() { return nullptr; }
     virtual const char* getBottomBarShader() { return nullptr; }
 #if SK_ENABLE_SKSL
-    virtual void setShaderMainAreaParams(SkRuntimeShaderBuilder& builder) { }
+    virtual void setShaderParams(SkRuntimeShaderBuilder& builder, bool main) { }
 #endif
     virtual app::Color getMainAreaColor(const int u, const int umax,
                                         const int v, const int vmax) = 0;
@@ -103,6 +103,11 @@ namespace app {
     // already painted in the background thread surface. This must be
     // atomic because we need atomic bitwise operations.
     std::atomic<int> m_paintFlags;
+
+  protected:
+#if SK_ENABLE_SKSL
+    void resetBottomEffect();
+#endif
 
   private:
     app::Color getAlphaBarColor(const int u, const int umax);

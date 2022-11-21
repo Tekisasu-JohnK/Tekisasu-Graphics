@@ -22,13 +22,13 @@ namespace ft {
 
     HBShaper(HBFace& face, const std::string& str)
       : m_face(face) {
-      hb_buffer_t* buf = hb_buffer_create();
-      hb_buffer_t* chrBuf = hb_buffer_create();
-      hb_script_t script = HB_SCRIPT_UNKNOWN;
-
       base::utf8_decode decode(str);
       if (decode.is_end())
         return;
+
+      hb_buffer_t* buf = hb_buffer_create();
+      hb_buffer_t* chrBuf = hb_buffer_create();
+      hb_script_t script = HB_SCRIPT_UNKNOWN;
 
       const auto begin = str.begin();
       while (true) {

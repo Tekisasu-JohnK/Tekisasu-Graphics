@@ -64,7 +64,7 @@ namespace os {
 
   private:
     bool loadWintab();
-    bool checkDll();
+    bool checkDll(std::string& checksum);
 
     Delegate* m_delegate = nullptr;
     base::dll m_wintabLib = nullptr;

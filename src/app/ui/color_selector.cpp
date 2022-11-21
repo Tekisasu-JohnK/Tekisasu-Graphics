@@ -21,7 +21,6 @@
 #include "app/ui/skin/skin_theme.h"
 #include "app/ui/status_bar.h"
 #include "app/util/shader_helpers.h"
-#include "base/clamp.h"
 #include "base/concurrent_queue.h"
 #include "base/scoped_value.h"
 #include "base/thread.h"
@@ -299,7 +298,7 @@ app::Color ColorSelector::getAlphaBarColor(const int u, const int umax)
 {
   int alpha = (255 * u / umax);
   app::Color color = m_color;
-  color.setAlpha(base::clamp(alpha, 0, 255));
+  color.setAlpha(std::clamp(alpha, 0, 255));
   return color;
 }
 
@@ -317,8 +316,7 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
         break;
 
       captureMouse();
-
-      // Continue...
+      [[fallthrough]];
 
     case kMouseMoveMessage: {
       MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
@@ -336,7 +334,7 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
       if (color != app::Color::fromMask()) {
         base::ScopedValue<bool> switcher(m_lockColor, subColorPicked(), false);
 
-        StatusBar::instance()->showColor(0, "", color);
+        StatusBar::instance()->showColor(0, color);
         if (hasCapture())
           ColorChange(color, mouseMsg->button());
       }
@@ -446,8 +444,10 @@ void ColorSelector::onPaint(ui::PaintEvent& ev)
     SkCanvas* canvas;
     bool isSRGB;
     // TODO compare both color spaces
-    if (get_current_color_space()->isSRGB() &&
-        g->getInternalSurface()->colorSpace()->isSRGB()) {
+    if ((!get_current_color_space() ||
+         get_current_color_space()->isSRGB()) &&
+        (!g->getInternalSurface()->colorSpace() ||
+         g->getInternalSurface()->colorSpace()->isSRGB())) {
       // We can render directly in the ui::Graphics surface
       canvas = &static_cast<os::SkiaSurface*>(g->getInternalSurface())->canvas();
       isSRGB = true;
@@ -470,8 +470,7 @@ void ColorSelector::onPaint(ui::PaintEvent& ev)
 
       SkRuntimeShaderBuilder builder1(m_mainEffect);
       builder1.uniform("iRes") = SkV3{float(rc2.w), float(rc2.h), 0.0f};
-      builder1.uniform("iColor") = appColor_to_SkV4(m_color);
-      setShaderMainAreaParams(builder1);
+      setShaderParams(builder1, true);
       p.setShader(builder1.makeShader());
 
       if (isSRGB)
@@ -486,7 +485,7 @@ void ColorSelector::onPaint(ui::PaintEvent& ev)
 
       SkRuntimeShaderBuilder builder2(m_bottomEffect);
       builder2.uniform("iRes") = SkV3{float(rc2.w), float(rc2.h), 0.0f};
-      builder2.uniform("iColor") = appColor_to_SkV4(m_color);
+      setShaderParams(builder2, false);
       p.setShader(builder2.makeShader());
 
       canvas->drawRect(SkRect::MakeXYWH(0, 0, rc2.w, rc2.h), p);
@@ -629,14 +628,13 @@ void ColorSelector::updateColorSpace()
 }
 
 #if SK_ENABLE_SKSL
+
 // static
 const char* ColorSelector::getAlphaBarShader()
 {
   return R"(
 uniform half3 iRes;
-uniform half4 iColor;
-uniform half4 iBg1;
-uniform half4 iBg2;
+uniform half4 iColor, iBg1, iBg2;
 
 half4 main(vec2 fragcoord) {
  vec2 d = (fragcoord.xy / iRes.xy);
@@ -683,6 +681,12 @@ sk_sp<SkRuntimeEffect> ColorSelector::buildEffect(const char* code)
     return result.effect;
   }
 }
+
+void ColorSelector::resetBottomEffect()
+{
+  m_bottomEffect.reset();
+}
+
 #endif  // SK_ENABLE_SKSL
 
 } // namespace app

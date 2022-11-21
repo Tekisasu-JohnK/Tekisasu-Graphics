@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -14,7 +14,6 @@
 #include "app/file/file.h"
 #include "app/file/file_format.h"
 #include "app/file/file_formats_manager.h"
-#include "base/clamp.h"
 #include "base/fs.h"
 #include "base/string.h"
 #include "dio/detect_format.h"
@@ -53,11 +52,12 @@ base::paths get_writable_palette_extensions()
   return paths;
 }
 
-Palette* load_palette(const char* filename,
-                      const FileOpConfig* config)
+std::unique_ptr<doc::Palette> load_palette(
+  const char* filename,
+  const FileOpConfig* config)
 {
   dio::FileFormat dioFormat = dio::detect_format(filename);
-  Palette* pal = nullptr;
+  std::unique_ptr<Palette> pal = nullptr;
 
   switch (dioFormat) {
 
@@ -101,7 +101,7 @@ Palette* load_palette(const char* filename,
         if (fop->document() &&
             fop->document()->sprite() &&
             fop->document()->sprite()->palette(frame_t(0))) {
-          pal = new Palette(
+          pal = std::make_unique<Palette>(
             *fop->document()->sprite()->palette(frame_t(0)));
         }
 
@@ -151,7 +151,7 @@ bool save_palette(const char* filename, const Palette* pal, int columns,
       if (!ff || !ff->support(FILE_SUPPORT_SAVE))
         break;
 
-      int w = (columns > 0 ? base::clamp(columns, 0, pal->size()): pal->size());
+      int w = (columns > 0 ? std::clamp(columns, 0, pal->size()): pal->size());
       int h = (pal->size() / w) + (pal->size() % w > 0 ? 1: 0);
 
       Context tmpContext;

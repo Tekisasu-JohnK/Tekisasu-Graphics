@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -20,6 +20,7 @@
 #include "doc/image_ref.h"
 #include "doc/pixel_format.h"
 #include "doc/selected_frames.h"
+#include "os/color_space.h"
 
 #include <cstdio>
 #include <memory>
@@ -71,12 +72,14 @@ namespace app {
   public:
     FileOpROI();
     FileOpROI(const Doc* doc,
+              const gfx::Rect& bounds,
               const std::string& sliceName,
               const std::string& tagName,
               const doc::SelectedFrames& selFrames,
               const bool adjustByTag);
 
     const Doc* document() const { return m_document; }
+    const gfx::Rect& bounds() const { return m_bounds; }
     doc::Slice* slice() const { return m_slice; }
     doc::Tag* tag() const { return m_tag; }
     doc::frame_t fromFrame() const { return m_selFrames.firstFrame(); }
@@ -89,9 +92,41 @@ namespace app {
 
   private:
     const Doc* m_document;
+    gfx::Rect m_bounds;
     doc::Slice* m_slice;
     doc::Tag* m_tag;
     doc::SelectedFrames m_selFrames;
+  };
+
+  // Used by file formats with FILE_ENCODE_ABSTRACT_IMAGE flag, to
+  // encode a sprite with an intermediate transformation on-the-fly
+  // (e.g. resizing).
+  class FileAbstractImage {
+  public:
+    virtual ~FileAbstractImage() { }
+
+    virtual int width() const { return spec().width(); }
+    virtual int height() const { return spec().height(); }
+
+    virtual const doc::ImageSpec& spec() const = 0;
+    virtual os::ColorSpaceRef osColorSpace() const = 0;
+    virtual bool needAlpha() const = 0;
+    virtual bool isOpaque() const = 0;
+    virtual int frames() const = 0;
+    virtual int frameDuration(doc::frame_t frame) const = 0;
+
+    virtual const doc::Palette* palette(doc::frame_t frame) const = 0;
+    virtual doc::PalettesList palettes() const = 0;
+
+    virtual const doc::ImageRef getScaledImage() const = 0;
+
+    // In case the file format can encode scanline by scanline
+    // (e.g. PNG format).
+    virtual const uint8_t* getScanline(int y) const = 0;
+
+    // In case that the encoder needs full frame renders (or compare
+    // between frames), e.g. GIF format.
+    virtual void renderFrame(const doc::frame_t frame, doc::Image* dst) const = 0;
   };
 
   // Structure to load & save files.
@@ -112,6 +147,8 @@ namespace app {
                                                const std::string& filename,
                                                const std::string& filenameFormat,
                                                const bool ignoreEmptyFrames);
+
+    static bool checkIfFormatSupportResizeOnTheFly(const std::string& filename);
 
     ~FileOp();
 
@@ -189,8 +226,8 @@ namespace app {
     void sequenceGetColor(int index, int* r, int* g, int* b) const;
     void sequenceSetAlpha(int index, int a);
     void sequenceGetAlpha(int index, int* a) const;
-    Image* sequenceImage(PixelFormat pixelFormat, int w, int h);
-    const Image* sequenceImage() const { return m_seq.image.get(); }
+    ImageRef sequenceImage(PixelFormat pixelFormat, int w, int h);
+    const ImageRef sequenceImage() const { return m_seq.image; }
     const Palette* sequenceGetPalette() const { return m_seq.palette; }
     bool sequenceGetHasAlpha() const {
       return m_seq.has_alpha;
@@ -201,6 +238,11 @@ namespace app {
     int sequenceFlags() const {
       return m_seq.flags;
     }
+
+    // Can be used to encode sequences/static files (e.g. png files)
+    // or animations (e.g. gif) resizing the result on the fly.
+    FileAbstractImage* abstractImage();
+    void setOnTheFlyScale(const gfx::PointF& scale);
 
     const std::string& error() const { return m_error; }
     void setError(const char *error, ...);
@@ -272,11 +314,16 @@ namespace app {
       bool has_alpha;
       LayerImage* layer;
       Cel* last_cel;
+      int duration;
       // Flags after the user choose what to do with the sequence.
       int flags;
     } m_seq;
 
+    class FileAbstractImageImpl;
+    std::unique_ptr<FileAbstractImageImpl> m_abstractImage;
+
     void prepareForSequence();
+    void makeAbstractImage();
   };
 
   // Available extensions for each load/save operation.

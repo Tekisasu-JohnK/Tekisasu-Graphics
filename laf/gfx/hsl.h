@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020  Igara Studio S.A.
+// Copyright (c) 2020-2022  Igara Studio S.A.
 // Copyright (c) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,7 +9,7 @@
 #define GFX_HSL_H_INCLUDED
 #pragma once
 
-#include "base/clamp.h"
+#include <algorithm>
 #include <cmath>
 
 namespace gfx {
@@ -55,11 +55,11 @@ public:
   }
 
   void saturation(double saturation) {
-    m_saturation = base::clamp(saturation, 0.0, 1.0);
+    m_saturation = std::clamp(saturation, 0.0, 1.0);
   }
 
   void lightness(double lightness) {
-    m_lightness = base::clamp(lightness, 0.0, 1.0);
+    m_lightness = std::clamp(lightness, 0.0, 1.0);
   }
 
   // The comparison is done through the integer value of each component.

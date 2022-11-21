@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (c) 2018-2020  Igara Studio S.A.
+// Copyright (c) 2018-2022  Igara Studio S.A.
 //
 // This program is distributed under the terms of
 // the End-User License Agreement for Aseprite.
@@ -17,7 +17,6 @@
 #include "app/file/format_options.h"
 #include "app/pref/preferences.h"
 #include "base/cfile.h"
-#include "base/clamp.h"
 #include "base/file_handle.h"
 #include "doc/doc.h"
 #include "ui/window.h"
@@ -82,10 +81,10 @@ bool SvgFormat::onLoad(FileOp* fop)
 
 bool SvgFormat::onSave(FileOp* fop)
 {
-  const Image* image = fop->sequenceImage();
+  const ImageRef image = fop->sequenceImage();
   int x, y, c, r, g, b, a, alpha;
   const auto svg_options = std::static_pointer_cast<SvgOptions>(fop->formatOptions());
-  const int pixelScaleValue = base::clamp(svg_options->pixelScale, 0, 10000);
+  const int pixelScaleValue = std::clamp(svg_options->pixelScale, 0, 10000);
   FileHandle handle(open_file_with_exception_sync_on_close(fop->filename(), "wb"));
   FILE* f = handle.get();
   auto printcol = [f](int x, int y,int r, int g, int b, int a, int pxScale) {
@@ -104,7 +103,7 @@ bool SvgFormat::onSave(FileOp* fop)
     case IMAGE_RGB: {
       for (y=0; y<image->height(); y++) {
         for (x=0; x<image->width(); x++) {
-          c = get_pixel_fast<RgbTraits>(image, x, y);
+          c = get_pixel_fast<RgbTraits>(image.get(), x, y);
           alpha = rgba_geta(c);
           if (alpha != 0x00)
             printcol(x, y, rgba_getr(c), rgba_getg(c), rgba_getb(c), alpha, pixelScaleValue);
@@ -116,7 +115,7 @@ bool SvgFormat::onSave(FileOp* fop)
     case IMAGE_GRAYSCALE: {
       for (y=0; y<image->height(); y++) {
         for (x=0; x<image->width(); x++) {
-          c = get_pixel_fast<GrayscaleTraits>(image, x, y);
+          c = get_pixel_fast<GrayscaleTraits>(image.get(), x, y);
           auto v = graya_getv(c);
           alpha = graya_geta(c);
           if (alpha != 0x00)
@@ -143,7 +142,7 @@ bool SvgFormat::onSave(FileOp* fop)
       }
       for (y=0; y<image->height(); y++) {
         for (x=0; x<image->width(); x++) {
-          c = get_pixel_fast<IndexedTraits>(image, x, y);
+          c = get_pixel_fast<IndexedTraits>(image.get(), x, y);
           if (c != mask_color)
             printcol(x, y, image_palette[c][0] & 0xff,
                      image_palette[c][1] & 0xff,

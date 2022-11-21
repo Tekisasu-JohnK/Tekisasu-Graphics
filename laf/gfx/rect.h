@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -8,6 +8,8 @@
 #ifndef GFX_RECT_H_INCLUDED
 #define GFX_RECT_H_INCLUDED
 #pragma once
+
+#include <cmath>
 
 namespace gfx {
 
@@ -207,6 +209,33 @@ public:
     y += br.top();
     w -= br.left() + br.right();
     h -= br.top() + br.bottom();
+    return *this;
+  }
+
+  // Adjusts the x/y floating-point coordinates to the left most/top
+  // most near integer respectively (instead of rounding towards
+  // zero). Basically applies the std::floor() function to the origin
+  // of the rectangle.
+  //
+  // Generally only useful to convert a gfx::RectF to a gfx::Rect as
+  // an alternative to gfx::Rect(gfx::RectF(...)).
+  //
+  // Example with floor():
+  //
+  //   gfx::RectF boundsF(-0.25, -0.75, 1, 2);
+  //   gfx::Rect bounds = boundsF.floor();
+  //   ASSERT(bounds == gfx::Rect(-1, -1, 1, 2));
+  //
+  // Without floor(), using the Rect(RectF()) ctor converting floating
+  // point to integer directly:
+  //
+  //   gfx::RectF boundsF(-0.25, -0.75, 1, 2);
+  //   gfx::Rect bounds = boundsF;
+  //   ASSERT(bounds == gfx::Rect(0, 0, 1, 2));
+  //
+  RectT& floor() {
+    x = std::floor(x);
+    y = std::floor(y);
     return *this;
   }
 

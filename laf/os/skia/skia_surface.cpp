@@ -14,6 +14,7 @@
 #include "base/file_handle.h"
 #include "gfx/path.h"
 #include "os/skia/skia_helpers.h"
+#include "os/system.h"
 
 #include "include/codec/SkCodec.h"
 #include "include/core/SkCanvas.h"
@@ -21,6 +22,11 @@
 #include "include/core/SkPixelRef.h"
 #include "include/core/SkStream.h"
 #include "include/private/SkColorData.h"
+
+#if SK_SUPPORT_GPU
+  #include "include/gpu/GrDirectContext.h"
+  #include "include/gpu/GrBackendSurface.h"
+#endif
 
 #include <memory>
 
@@ -214,7 +220,7 @@ void SkiaSurface::setDrawMode(DrawMode mode, int param,
       m_paint.setBlendMode(SkBlendMode::kXor);
       m_paint.setShader(nullptr);
       break;
-    case DrawMode::Checked: {
+    case DrawMode::Checkered: {
       m_paint.setBlendMode(SkBlendMode::kSrcOver);
       {
         SkBitmap bitmap;
@@ -459,6 +465,17 @@ void SkiaSurface::blitTo(Surface* _dst, int srcx, int srcy, int dstx, int dsty, 
   SkPaint paint;
   paint.setBlendMode(SkBlendMode::kSrc);
 
+#if SK_SUPPORT_GPU
+    if (auto srcImage = getOrCreateTextureImage()) {
+      dst->m_canvas->drawImageRect(
+        srcImage,
+        srcRect, dstRect,
+        SkSamplingOptions(),
+        &paint, SkCanvas::kStrict_SrcRectConstraint);
+      return;
+    }
+#endif
+
   if (!m_bitmap.empty()) {
     dst->m_canvas->drawImageRect(
       SkImage::MakeFromRaster(m_bitmap.pixmap(), nullptr, nullptr),
@@ -696,6 +713,16 @@ void SkiaSurface::drawSurfaceNine(os::Surface* surface,
   lattice.fBounds = &srcRect;
   lattice.fColors = nullptr;
 
+#if SK_SUPPORT_GPU
+  if (auto srcImage = ((SkiaSurface*)surface)->getOrCreateTextureImage()) {
+    m_canvas->drawImageLattice(
+      srcImage, lattice, dstRect,
+      SkFilterMode::kNearest,
+      &skPaint);
+    return;
+  }
+#endif
+
   m_canvas->drawImageLattice(
     SkImage::MakeFromRaster(((SkiaSurface*)surface)->m_bitmap.pixmap(), nullptr, nullptr).get(),
     lattice, dstRect,
@@ -774,6 +801,20 @@ void SkiaSurface::skDrawSurface(
   const SkSamplingOptions& sampling,
   const SkPaint& paint)
 {
+#if SK_SUPPORT_GPU
+  src->flush();
+  if (auto srcImage = src->getOrCreateTextureImage()) {
+    m_canvas->drawImageRect(
+      srcImage,
+      srcRect,
+      dstRect,
+      sampling,
+      &paint,
+      SkCanvas::kStrict_SrcRectConstraint);
+    return;
+  }
+#endif
+
   m_canvas->drawImageRect(
     SkImage::MakeFromRaster(src->m_bitmap.pixmap(), nullptr, nullptr),
     srcRect,
@@ -782,5 +823,51 @@ void SkiaSurface::skDrawSurface(
     &paint,
     SkCanvas::kStrict_SrcRectConstraint);
 }
+
+#if SK_SUPPORT_GPU
+
+const SkImage* SkiaSurface::getOrCreateTextureImage() const
+{
+  // TODO use the GrDirectContext of the specific os::Window
+  auto win = os::instance()->defaultWindow();
+  if (!win || !win->sk_grCtx())
+    return nullptr;
+
+  if (m_image && m_image->isValid(win->sk_grCtx()))
+    return m_image.get();
+  else if (uploadBitmapAsTexture() &&
+           m_image && m_image->isValid(win->sk_grCtx()))
+    return m_image.get();
+  else
+    return nullptr;
+}
+
+bool SkiaSurface::uploadBitmapAsTexture() const
+{
+  SkImageInfo ii = m_bitmap.info();
+  sk_sp<SkImage> image = m_bitmap.asImage();
+
+  Window* win = os::instance()->defaultWindow();
+
+  GrBackendTexture texture;
+  SkImage::BackendTextureReleaseProc proc;
+  SkImage::MakeBackendTextureFromSkImage(
+    win->sk_grCtx(),
+    image,
+    &texture,
+    &proc);
+
+  m_image = SkImage::MakeFromTexture(
+    win->sk_grCtx(),
+    texture,
+    kTopLeft_GrSurfaceOrigin,
+    ii.colorType(),
+    ii.alphaType(),
+    nullptr);
+
+  return (m_image != nullptr);
+}
+
+#endif // SK_SUPPORT_GPU
 
 } // namespace os

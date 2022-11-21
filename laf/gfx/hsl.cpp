@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020  Igara Studio S.A.
+// Copyright (c) 2020-2022  Igara Studio S.A.
 // Copyright (c) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,9 +9,10 @@
 #include "config.h"
 #endif
 
-#include "base/clamp.h"
 #include "gfx/hsl.h"
 #include "gfx/rgb.h"
+
+#include <algorithm>
 #include <cmath>
 
 namespace gfx {
@@ -20,8 +21,8 @@ using namespace std;
 
 Hsl::Hsl(double hue, double saturation, double lightness)
   : m_hue(hue)
-  , m_saturation(base::clamp(saturation, 0.0, 1.0))
-  , m_lightness(base::clamp(lightness, 0.0, 1.0))
+  , m_saturation(std::clamp(saturation, 0.0, 1.0))
+  , m_lightness(std::clamp(lightness, 0.0, 1.0))
 { }
 
 Hsl::Hsl(const Rgb& rgb)

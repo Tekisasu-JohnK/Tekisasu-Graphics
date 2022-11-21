@@ -73,6 +73,8 @@ void XInput::load(::Display* display)
     return;
 
   std::string userDefinedTablet = X11::instance()->userDefinedTablet();
+  if (!userDefinedTablet.empty())
+    userDefinedTablet = base::string_to_lower(userDefinedTablet);
 
   std::string devName;
   for (int i=0; i<ndevices; ++i) {

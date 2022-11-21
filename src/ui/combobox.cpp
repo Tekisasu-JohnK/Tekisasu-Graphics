@@ -11,7 +11,6 @@
 
 #include "ui/combobox.h"
 
-#include "base/clamp.h"
 #include "gfx/size.h"
 #include "os/font.h"
 #include "ui/button.h"
@@ -329,7 +328,8 @@ void ComboBox::setValue(const std::string& value)
 {
   if (isEditable()) {
     m_entry->setText(value);
-    m_entry->selectAllText();
+    if (hasFocus())
+      m_entry->selectAllText();
   }
   else {
     int index = findItemIndexByValue(value);
@@ -561,6 +561,14 @@ bool ComboBoxEntry::onProcessMessage(Message* msg)
       return result;
     }
 
+    case kFocusLeaveMessage:
+      if (m_comboBox->isEditable() &&
+          m_comboBox->m_window &&
+          !View::getView(m_comboBox->m_listbox)->hasMouse()) {
+        m_comboBox->closeListBox();
+      }
+      break;
+
   }
 
   return Entry::onProcessMessage(msg);
@@ -658,7 +666,7 @@ void ComboBox::openListBox()
       const int maxVal =
         std::max(entryBounds.y, display()->size().h - entryBounds.y2())
         - 8*guiscale();
-      size.h = base::clamp(size.h, textHeight(), maxVal);
+      size.h = std::clamp(size.h, textHeight(), maxVal);
     }
 
     viewport->setMinSize(size);

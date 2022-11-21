@@ -1,14 +1,14 @@
 // LAF Library
-// Copyright (c) 2019-2021  Igara Studio S.A.
+// Copyright (c) 2019-2022  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
-#include "base/clamp.h"
 #include "gfx/hsv.h"
 #include "gfx/rgb.h"
 #include "os/os.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdlib>
 #include <string>
@@ -93,7 +93,7 @@ public:
         logLine("TouchMagnify %.4g",
                 ev.magnification());
         m_brushSize += 32*ev.magnification();
-        m_brushSize = base::clamp(m_brushSize, 1.0, 500.0);
+        m_brushSize = std::clamp(m_brushSize, 1.0, 500.0);
         break;
 
       default:

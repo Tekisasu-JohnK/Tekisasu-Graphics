@@ -13,6 +13,7 @@ if(LAF_BACKEND STREQUAL "skia")
   endfunction()
 
   laf_add_example(allevents GUI)
+  laf_add_example(base64 CONSOLE)
   laf_add_example(complextextlayout GUI)
   laf_add_example(custom_window GUI)
   laf_add_example(floating_window GUI)

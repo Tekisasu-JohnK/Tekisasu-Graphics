@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -11,7 +11,6 @@
 
 #include "doc/sprite.h"
 
-#include "base/clamp.h"
 #include "base/memory.h"
 #include "base/remove_from_container.h"
 #include "doc/cel.h"
@@ -93,7 +92,7 @@ Sprite::Sprite(const ImageSpec& spec,
     case ColorMode::BITMAP:
       for (int c=0; c<ncolors; c++) {
         int g = 255 * c / (ncolors-1);
-        g = base::clamp(g, 0, 255);
+        g = std::clamp(g, 0, 255);
         pal.setEntry(c, rgba(g, g, g, 255));
       }
       break;
@@ -396,9 +395,6 @@ RgbMap* Sprite::rgbMap(const frame_t frame,
                        const RgbMapFor forLayer,
                        RgbMapAlgorithm mapAlgo) const
 {
-  int maskIndex = (forLayer == RgbMapFor::OpaqueLayer ?
-                   -1: transparentColor());
-
   if (!m_rgbMap || m_rgbMapAlgorithm != mapAlgo) {
     m_rgbMapAlgorithm = mapAlgo;
     switch (m_rgbMapAlgorithm) {
@@ -411,7 +407,14 @@ RgbMap* Sprite::rgbMap(const frame_t frame,
         return nullptr;
     }
   }
-
+  int maskIndex;
+  if (forLayer == RgbMapFor::OpaqueLayer)
+    maskIndex = -1;
+  else {
+    maskIndex = palette(frame)->findMaskColor();
+    if (maskIndex == -1)
+      maskIndex = 0;
+  }
   m_rgbMap->regenerateMap(palette(frame), maskIndex);
   return m_rgbMap.get();
 }
@@ -472,19 +475,19 @@ int Sprite::totalAnimationDuration() const
 void Sprite::setFrameDuration(frame_t frame, int msecs)
 {
   if (frame >= 0 && frame < m_frames)
-    m_frlens[frame] = base::clamp(msecs, 1, 65535);
+    m_frlens[frame] = std::clamp(msecs, 1, 65535);
 }
 
 void Sprite::setFrameRangeDuration(frame_t from, frame_t to, int msecs)
 {
   std::fill(
     m_frlens.begin()+(std::size_t)from,
-    m_frlens.begin()+(std::size_t)to+1, base::clamp(msecs, 1, 65535));
+    m_frlens.begin()+(std::size_t)to+1, std::clamp(msecs, 1, 65535));
 }
 
 void Sprite::setDurationForAllFrames(int msecs)
 {
-  std::fill(m_frlens.begin(), m_frlens.end(), base::clamp(msecs, 1, 65535));
+  std::fill(m_frlens.begin(), m_frlens.end(), std::clamp(msecs, 1, 65535));
 }
 
 //////////////////////////////////////////////////////////////////////

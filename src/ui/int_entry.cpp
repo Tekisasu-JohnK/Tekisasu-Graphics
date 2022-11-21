@@ -11,7 +11,6 @@
 
 #include "ui/int_entry.h"
 
-#include "base/clamp.h"
 #include "base/scoped_value.h"
 #include "gfx/rect.h"
 #include "gfx/region.h"
@@ -55,12 +54,12 @@ IntEntry::~IntEntry()
 int IntEntry::getValue() const
 {
   int value = m_slider.convertTextToValue(text());
-  return base::clamp(value, m_min, m_max);
+  return std::clamp(value, m_min, m_max);
 }
 
 void IntEntry::setValue(int value)
 {
-  value = base::clamp(value, m_min, m_max);
+  value = std::clamp(value, m_min, m_max);
 
   setText(m_slider.convertValueToText(value));
 
@@ -76,7 +75,7 @@ bool IntEntry::onProcessMessage(Message* msg)
 
     // Reset value if it's out of bounds when focus is lost
     case kFocusLeaveMessage:
-      setValue(base::clamp(getValue(), m_min, m_max));
+      setValue(std::clamp(getValue(), m_min, m_max));
       deselectText();
       break;
 
@@ -111,7 +110,7 @@ bool IntEntry::onProcessMessage(Message* msg)
         int newValue = oldValue
           + static_cast<MouseMessage*>(msg)->wheelDelta().x
           - static_cast<MouseMessage*>(msg)->wheelDelta().y;
-        newValue = base::clamp(newValue, m_min, m_max);
+        newValue = std::clamp(newValue, m_min, m_max);
         if (newValue != oldValue) {
           setValue(newValue);
           selectAllText();
@@ -177,14 +176,14 @@ void IntEntry::openPopup()
 {
   m_slider.setValue(getValue());
 
-  m_popupWindow = new TransparentPopupWindow(PopupWindow::ClickBehavior::CloseOnClickInOtherWindow);
+  m_popupWindow = std::make_unique<TransparentPopupWindow>(PopupWindow::ClickBehavior::CloseOnClickInOtherWindow);
   m_popupWindow->setAutoRemap(false);
   m_popupWindow->addChild(&m_slider);
   m_popupWindow->Close.connect(&IntEntry::onPopupClose, this);
 
   fit_bounds(
     display(),
-    m_popupWindow,
+    m_popupWindow.get(),
     gfx::Rect(0, 0, 128*guiscale(), m_popupWindow->sizeHint().h),
     [this](const gfx::Rect& workarea,
            gfx::Rect& rc,
@@ -215,8 +214,7 @@ void IntEntry::closePopup()
     removeSlider();
 
     m_popupWindow->closeWindow(nullptr);
-    delete m_popupWindow;
-    m_popupWindow = nullptr;
+    m_popupWindow.reset();
   }
 }
 
@@ -238,7 +236,7 @@ void IntEntry::onPopupClose(CloseEvent& ev)
 void IntEntry::removeSlider()
 {
   if (m_popupWindow &&
-      m_slider.parent() == m_popupWindow) {
+      m_slider.parent() == m_popupWindow.get()) {
     m_popupWindow->removeChild(&m_slider);
   }
 }

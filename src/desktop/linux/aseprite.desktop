@@ -1,13 +1,13 @@
 [Desktop Entry]
 Type=Application
-Name=Tekisasu Graphics
+Name=Aseprite
 GenericName=Sprite Editor
 Comment=Animated sprite editor & pixel art tool
 Icon=aseprite
 Categories=Graphics;2DGraphics;RasterGraphics
-Exec=Tekisasu-Graphics %U
-TryExec=Tekisasu-Graphics
+Exec=aseprite %U
+TryExec=aseprite
 Terminal=false
 StartupNotify=false
-StartupWMClass=Tekisasu-Graphics
+StartupWMClass=Aseprite
 MimeType=image/bmp;image/gif;image/jpeg;image/png;image/x-pcx;image/x-tga;image/vnd.microsoft.icon;video/x-flic;image/webp;image/x-aseprite;

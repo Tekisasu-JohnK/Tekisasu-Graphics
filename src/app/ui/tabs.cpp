@@ -16,7 +16,6 @@
 #include "app/modules/gui.h"
 #include "app/ui/editor/editor_view.h"
 #include "app/ui/skin/skin_theme.h"
-#include "base/clamp.h"
 #include "os/font.h"
 #include "os/surface.h"
 #include "os/system.h"
@@ -255,13 +254,15 @@ void Tabs::setDockedStyle()
   initTheme();
 }
 
-void Tabs::setDropViewPreview(const gfx::Point& pos, TabView* view)
+void Tabs::setDropViewPreview(const gfx::Point& screenPos,
+                              TabView* view)
 {
+  int x0 = (display()->nativeWindow()->pointFromScreen(screenPos).x - bounds().x);
   int newIndex = -1;
 
   if (!m_list.empty()) {
-    newIndex = (pos.x - bounds().x) / m_list[0]->width;
-    newIndex = base::clamp(newIndex, 0, (int)m_list.size());
+    newIndex = x0 / m_list[0]->width;
+    newIndex = std::clamp(newIndex, 0, (int)m_list.size());
   }
   else
     newIndex = 0;
@@ -270,7 +271,7 @@ void Tabs::setDropViewPreview(const gfx::Point& pos, TabView* view)
                    m_dropNewTab != view);
 
   m_dropNewIndex = newIndex;
-  m_dropNewPosX = (pos.x - bounds().x);
+  m_dropNewPosX = x0;
   m_dropNewTab = view;
 
   if (startAni)
@@ -300,8 +301,9 @@ bool Tabs::onProcessMessage(Message* msg)
 
       if (hasCapture() && m_selected) {
         MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
-        gfx::Point mousePos = mouseMsg->position();
-        gfx::Point delta = mousePos - m_dragMousePos;
+        const gfx::Point mousePos = mouseMsg->position();
+        const gfx::Point screenPos = mouseMsg->screenPosition();
+        const gfx::Point delta = mousePos - m_dragMousePos;
 
         if (!m_isDragging) {
           if (!m_clickedCloseButton && mouseMsg->left()) {
@@ -326,7 +328,8 @@ bool Tabs::onProcessMessage(Message* msg)
             }
 
             if (m_delegate)
-              result = m_delegate->onFloatingTab(this, m_selected->view, mousePos);
+              result = m_delegate->onFloatingTab(
+                this, m_selected->view, screenPos);
 
             if (result != DropViewPreviewResult::DROP_IN_TABS) {
               if (!m_floatingOverlay)
@@ -414,7 +417,7 @@ bool Tabs::onProcessMessage(Message* msg)
             ASSERT(m_selected);
             result = m_delegate->onDropTab(
               this, m_selected->view,
-              mouseMsg->position(), m_dragCopy);
+              mouseMsg->screenPosition(), m_dragCopy);
           }
 
           stopDrag(result);
@@ -432,7 +435,7 @@ bool Tabs::onProcessMessage(Message* msg)
         if (it != m_list.end()) {
           int index = (it - m_list.begin());
           int newIndex = index + dz;
-          newIndex = base::clamp(newIndex, 0, int(m_list.size())-1);
+          newIndex = std::clamp(newIndex, 0, int(m_list.size())-1);
           if (newIndex != index) {
             selectTabInternal(m_list[newIndex]);
           }
@@ -1033,14 +1036,14 @@ void Tabs::updateDragTabIndexes(int mouseX, bool startAni)
     int i = (mouseX - m_border*guiscale() - bounds().x) / m_dragTab->width;
 
     if (m_dragCopy) {
-      i = base::clamp(i, 0, int(m_list.size()));
+      i = std::clamp(i, 0, int(m_list.size()));
       if (i != m_dragCopyIndex) {
         m_dragCopyIndex = i;
         startAni = true;
       }
     }
     else if (hasMouseOver()) {
-      i = base::clamp(i, 0, int(m_list.size())-1);
+      i = std::clamp(i, 0, int(m_list.size())-1);
       if (i != m_dragTabIndex) {
         m_list.erase(m_list.begin()+m_dragTabIndex);
         m_list.insert(m_list.begin()+i, m_selected);

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -51,8 +51,8 @@ ExportFileWindow::ExportFileWindow(const Doc* doc)
   }
 
   // Default export configuration
-  resize()->setValue(
-    base::convert_to<std::string>(m_docPref.saveCopy.resizeScale()));
+  setResizeScale(m_docPref.saveCopy.resizeScale());
+  fill_area_combobox(m_doc->sprite(), area(), m_docPref.saveCopy.area());
   fill_layers_combobox(m_doc->sprite(), layers(), m_docPref.saveCopy.layer());
   fill_frames_combobox(m_doc->sprite(), frames(), m_docPref.saveCopy.frameTag());
   fill_anidir_combobox(anidir(), m_docPref.saveCopy.aniDir());
@@ -98,6 +98,7 @@ void ExportFileWindow::savePref()
 {
   m_docPref.saveCopy.filename(outputFilenameValue());
   m_docPref.saveCopy.resizeScale(resizeValue());
+  m_docPref.saveCopy.area(areaValue());
   m_docPref.saveCopy.layer(layersValue());
   m_docPref.saveCopy.aniDir(aniDirValue());
   m_docPref.saveCopy.frameTag(framesValue());
@@ -113,7 +114,13 @@ std::string ExportFileWindow::outputFilenameValue() const
 
 double ExportFileWindow::resizeValue() const
 {
-  return base::convert_to<double>(resize()->getValue());
+  double value = resize()->getEntryWidget()->textDouble() / 100.0;
+  return std::clamp(value, 0.001, 100000000.0);
+}
+
+std::string ExportFileWindow::areaValue() const
+{
+  return area()->getValue();
 }
 
 std::string ExportFileWindow::layersValue() const
@@ -139,6 +146,21 @@ bool ExportFileWindow::applyPixelRatio() const
 bool ExportFileWindow::isForTwitter() const
 {
   return forTwitter()->isSelected();
+}
+
+void ExportFileWindow::setResizeScale(double scale)
+{
+  resize()->setValue(fmt::format("{:.2f}", 100.0 * scale));
+}
+
+void ExportFileWindow::setArea(const std::string& areaValue)
+{
+  area()->setValue(areaValue);
+}
+
+void ExportFileWindow::setAniDir(const doc::AniDir aniDir)
+{
+  anidir()->setSelectedItemIndex(int(aniDir));
 }
 
 void ExportFileWindow::setOutputFilename(const std::string& pathAndFilename)
@@ -201,7 +223,7 @@ void ExportFileWindow::updateAdjustResizeButton()
 
 void ExportFileWindow::onAdjustResize()
 {
-  resize()->setValue(base::convert_to<std::string>(m_preferredResize));
+  resize()->setValue(fmt::format("{:.2f}", 100.0 * m_preferredResize));
 
   adjustResize()->setVisible(false);
   adjustResize()->parent()->layout();
