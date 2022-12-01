@@ -44,12 +44,12 @@ if(ENABLE_WEBP AND NOT LAF_BACKEND STREQUAL "skia")
   set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "Build the webpinfo command line tool.")
   set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "Build the webpmux command line tool.")
 
-  add_subdirectory(libwebp)
+#  add_subdirectory(libwebp)
 
   if(NOT USE_SHARED_LIBPNG)
     add_dependencies(webp ${PNG_LIBRARY})
     add_dependencies(webpdemux ${PNG_LIBRARY})
-    add_dependencies(libwebpmux ${PNG_LIBRARY})
+#    add_dependencies(libwebpmux ${PNG_LIBRARY})
   endif()
 endif()
 

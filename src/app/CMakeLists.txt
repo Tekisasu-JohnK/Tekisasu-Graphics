@@ -42,8 +42,8 @@ add_custom_command(
   DEPENDS ${GEN_DEP})
 list(APPEND generated_files ${output_fn})
 
-# Generate theme.xml.h from data/extensions/tekisasu-theme/theme.xml
-set(theme_xml ${SOURCE_DATA_DIR}/extensions/tekisasu-theme/theme.xml)
+# Generate theme.xml.h from data/extensions/aseprite-theme/theme.xml
+set(theme_xml ${SOURCE_DATA_DIR}/extensions/aseprite-theme/theme.xml)
 set(output_fn ${CMAKE_CURRENT_BINARY_DIR}/theme.xml.h)
 add_custom_command(
   OUTPUT ${output_fn}
