@@ -90,13 +90,13 @@ void ResourceFinder::includeDataDir(const char* filename)
 #ifdef _WIN32
 
   sprintf(buf, "data/%s", filename);
-  includeHomeDir(buf); // %AppData%/Aseprite/data/filename
+  includeHomeDir(buf); // %AppData%/Tekisasu-Graphics/data/filename
   includeBinDir(buf);  // $BINDIR/data/filename
 
 #elif __APPLE__
 
   sprintf(buf, "data/%s", filename);
-  includeUserDir(buf); // $HOME/Library/Application Support/Aseprite/data/filename
+  includeUserDir(buf); // $HOME/Library/Application Support/Tekisasu-Graphics/data/filename
   includeBinDir(buf);  // $BINDIR/data/filename (outside the bundle)
 
   sprintf(buf, "../Resources/data/%s", filename);
@@ -105,7 +105,7 @@ void ResourceFinder::includeDataDir(const char* filename)
 #else
 
   // $HOME/.config/aseprite/filename
-  sprintf(buf, "aseprite/data/%s", filename);
+  sprintf(buf, "Tekisasu-Graphics/data/%s", filename);
   includeHomeConfigDir(buf);
 
   // $BINDIR/data/filename
@@ -113,7 +113,7 @@ void ResourceFinder::includeDataDir(const char* filename)
   includeBinDir(buf);
 
   // $BINDIR/../share/aseprite/data/filename (installed in /usr/ or /usr/local/)
-  sprintf(buf, "../share/aseprite/data/%s", filename);
+  sprintf(buf, "../share/Tekisasu-Graphics/data/%s", filename);
   includeBinDir(buf);
 
 #endif
@@ -126,7 +126,7 @@ void ResourceFinder::includeHomeDir(const char* filename)
   // %AppData%/Aseprite/filename
   wchar_t* env = _wgetenv(L"AppData");
   if (env) {
-    std::string path = base::join_path(base::to_utf8(env), "Aseprite");
+    std::string path = base::join_path(base::to_utf8(env), "Tekisasu-Graphics");
     path = base::join_path(path, filename);
     addPath(path);
     m_default = path;
@@ -203,7 +203,7 @@ void ResourceFinder::includeUserDir(const char* filename)
   #else  // !__APPLE__
 
     // $HOME/.config/aseprite/filename
-    includeHomeConfigDir((std::string("aseprite/") + filename).c_str());
+    includeHomeConfigDir((std::string("Tekisasu-Graphics/") + filename).c_str());
 
   #endif
   }
