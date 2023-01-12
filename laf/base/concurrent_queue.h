@@ -26,28 +26,28 @@ namespace base {
     bool empty() const {
       bool result;
       {
-        std::lock_guard<std::mutex> hold(m_mutex);
+        std::lock_guard lock(m_mutex);
         result = m_queue.empty();
       }
       return result;
     }
 
     void clear() {
-      std::lock_guard<std::mutex> hold(m_mutex);
+      std::lock_guard lock(m_mutex);
       m_queue.clear();
     }
 
     size_t size() const {
       size_t result;
       {
-        std::lock_guard<std::mutex> hold(m_mutex);
+        std::lock_guard lock(m_mutex);
         result = m_queue.size();
       }
       return result;
     }
 
     void push(const T& value) {
-      std::lock_guard<std::mutex> hold(m_mutex);
+      std::lock_guard lock(m_mutex);
       m_queue.push_back(value);
     }
 
@@ -55,7 +55,7 @@ namespace base {
       if (!m_mutex.try_lock())
         return false;
 
-      std::lock_guard<std::mutex> unlock(m_mutex, std::adopt_lock);
+      std::lock_guard unlock(m_mutex, std::adopt_lock);
       if (m_queue.empty())
         return false;
 
@@ -66,7 +66,7 @@ namespace base {
 
     template<typename UnaryPredicate>
     void prioritize(UnaryPredicate p) {
-      std::lock_guard<std::mutex> hold(m_mutex);
+      std::lock_guard lock(m_mutex);
 
       auto it = std::find_if(m_queue.begin(), m_queue.end(), p);
       if (it != m_queue.end()) {

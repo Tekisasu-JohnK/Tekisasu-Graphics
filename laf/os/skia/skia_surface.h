@@ -48,15 +48,13 @@ public:
   void saveClip() override;
   void restoreClip() override;
   bool clipRect(const gfx::Rect& rc) override;
+  void clipPath(const gfx::Path& path) override;
   void save() override;
   void concat(const gfx::Matrix& matrix) override;
   void setMatrix(const gfx::Matrix& matrix) override;
   void resetMatrix() override;
   void restore() override;
   gfx::Matrix matrix() const override;
-  void setDrawMode(DrawMode mode, int param,
-                   const gfx::Color a,
-                   const gfx::Color b) override;
   void lock() override;
   void unlock() override;
   void applyScale(int scaleFactor) override;
@@ -99,6 +97,7 @@ public:
                        const gfx::Rect& src,
                        const gfx::Rect& _center,
                        const gfx::Rect& dst,
+                       const bool drawCenter,
                        const os::Paint* paint) override;
 
   bool isValid() const {

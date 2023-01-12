@@ -1,5 +1,5 @@
 # Aseprite
-# Copyright (C) 2021-2022  Igara Studio S.A.
+# Copyright (C) 2021-2023  Igara Studio S.A.
 # Copyright (C) 2001-2018  David Capello
 
 include_directories(.)
@@ -44,12 +44,12 @@ if(ENABLE_WEBP AND NOT LAF_BACKEND STREQUAL "skia")
   set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "Build the webpinfo command line tool.")
   set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "Build the webpmux command line tool.")
 
-#  add_subdirectory(libwebp)
+  add_subdirectory(libwebp)
 
   if(NOT USE_SHARED_LIBPNG)
     add_dependencies(webp ${PNG_LIBRARY})
     add_dependencies(webpdemux ${PNG_LIBRARY})
-#    add_dependencies(libwebpmux ${PNG_LIBRARY})
+    add_dependencies(libwebpmux ${PNG_LIBRARY})
   endif()
 endif()
 
@@ -210,3 +210,7 @@ if(ENABLE_SCRIPTING)
   endif()
 
 endif()
+
+# qoi
+add_library(qoi INTERFACE)
+target_include_directories(qoi INTERFACE qoi)

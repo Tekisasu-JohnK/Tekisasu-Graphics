@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2017-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -9,10 +9,12 @@
 #include "config.h"
 #endif
 
+#include "app/script/engine.h"
 #include "app/script/luacpp.h"
 #include "fmt/format.h"
 #include "gfx/point.h"
 #include "gfx/rect.h"
+#include "gfx/size.h"
 
 namespace app {
 namespace script {
@@ -21,13 +23,13 @@ namespace {
 
 gfx::Rect Rectangle_new(lua_State* L, int index)
 {
-  gfx::Rect rc(0, 0, 0, 0);
   // Copy other rectangle
   if (auto rc2 = may_get_obj<gfx::Rect>(L, index)) {
-    rc = *rc2;
+    return *rc2;
   }
   // Convert { x, y, width, height } into a Rectangle
   else if (lua_istable(L, index)) {
+    gfx::Rect rc(0, 0, 0, 0);
     const int type = lua_getfield(L, index, "x");
     if (VALID_LUATYPE(type)) {
       lua_getfield(L, index, "y");
@@ -51,14 +53,22 @@ gfx::Rect Rectangle_new(lua_State* L, int index)
       rc.h = lua_tointeger(L, -1);
       lua_pop(L, 4);
     }
+    return rc;
   }
-  else {
-    rc.x = lua_tointeger(L, index);
-    rc.y = lua_tointeger(L, index+1);
-    rc.w = lua_tointeger(L, index+2);
-    rc.h = lua_tointeger(L, index+3);
+  else if (index > 0) {
+    if (lua_gettop(L) >= index+1) {
+      const auto pt = may_get_obj<gfx::Point>(L, index);
+      const auto sz = may_get_obj<gfx::Size>(L, index+1);
+      if (pt && sz)
+        return gfx::Rect(*pt, *sz);
+    }
+    return gfx::Rect(lua_tointeger(L, index),
+                     lua_tointeger(L, index + 1),
+                     lua_tointeger(L, index + 2),
+                     lua_tointeger(L, index + 3));
   }
-  return rc;
+  else
+    return gfx::Rect();
 }
 
 int Rectangle_new(lua_State* L)
@@ -92,8 +102,12 @@ int Rectangle_tostring(lua_State* L)
 int Rectangle_contains(lua_State* L)
 {
   const auto a = get_obj<gfx::Rect>(L, 1);
-  const auto b = get_obj<gfx::Rect>(L, 2);
-  lua_pushboolean(L, a->contains(*b));
+  if (const auto b = may_get_obj<gfx::Rect>(L, 2))
+    lua_pushboolean(L, a->contains(*b));
+  else if (const auto b = may_get_obj<gfx::Point>(L, 2))
+    lua_pushboolean(L, a->contains(*b));
+  else
+    lua_pushboolean(L, false);
   return 1;
 }
 
@@ -149,6 +163,20 @@ int Rectangle_get_height(lua_State* L)
   return 1;
 }
 
+int Rectangle_get_origin(lua_State* L)
+{
+  const auto rc = get_obj<gfx::Rect>(L, 1);
+  push_obj(L, rc->origin());
+  return 1;
+}
+
+int Rectangle_get_size(lua_State* L)
+{
+  const auto rc = get_obj<gfx::Rect>(L, 1);
+  push_obj(L, rc->size());
+  return 1;
+}
+
 int Rectangle_set_x(lua_State* L)
 {
   auto rc = get_obj<gfx::Rect>(L, 1);
@@ -177,6 +205,22 @@ int Rectangle_set_height(lua_State* L)
   return 0;
 }
 
+int Rectangle_set_origin(lua_State* L)
+{
+  const auto rc = get_obj<gfx::Rect>(L, 1);
+  const auto pt = convert_args_into_point(L, 2);
+  rc->setOrigin(pt);
+  return 0;
+}
+
+int Rectangle_set_size(lua_State* L)
+{
+  const auto rc = get_obj<gfx::Rect>(L, 1);
+  const auto sz = convert_args_into_size(L, 2);
+  rc->setSize(sz);
+  return 0;
+}
+
 int Rectangle_get_isEmpty(lua_State* L)
 {
   const auto rc = get_obj<gfx::Rect>(L, 1);
@@ -202,6 +246,8 @@ const Property Rectangle_properties[] = {
   { "y", Rectangle_get_y, Rectangle_set_y },
   { "width", Rectangle_get_width, Rectangle_set_width },
   { "height", Rectangle_get_height, Rectangle_set_height },
+  { "origin", Rectangle_get_origin, Rectangle_set_origin },
+  { "size", Rectangle_get_size, Rectangle_set_size },
   { "isEmpty", Rectangle_get_isEmpty, nullptr },
   { nullptr, nullptr, nullptr }
 };

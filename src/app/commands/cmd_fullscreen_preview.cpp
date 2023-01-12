@@ -14,7 +14,6 @@
 #include "app/commands/command.h"
 #include "app/commands/commands.h"
 #include "app/context.h"
-#include "app/modules/editors.h"
 #include "app/modules/gfx.h"
 #include "app/pref/preferences.h"
 #include "app/ui/editor/editor.h"
@@ -217,23 +216,23 @@ protected:
     switch (m_tiled) {
       case TiledMode::NONE:
         render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, x, y,
-                           255, BlendMode::NORMAL);
+                           255, doc::BlendMode::NORMAL);
         break;
       case TiledMode::X_AXIS:
         for (u=x-w; u<displaySize.w+w; u+=w)
           render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, u, y,
-                             255, BlendMode::NORMAL);
+                             255, doc::BlendMode::NORMAL);
         break;
       case TiledMode::Y_AXIS:
         for (v=y-h; v<displaySize.h+h; v+=h)
           render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, x, v,
-                             255, BlendMode::NORMAL);
+                             255, doc::BlendMode::NORMAL);
         break;
       case TiledMode::BOTH:
         for (v=y-h; v<displaySize.h+h; v+=h)
           for (u=x-w; u<displaySize.w+w; u+=w)
             render.renderImage(m_doublebuf.get(), m_render.get(), m_pal, u, v,
-                               255, BlendMode::NORMAL);
+                               255, doc::BlendMode::NORMAL);
         break;
     }
 
@@ -282,7 +281,7 @@ bool FullscreenPreviewCommand::onEnabled(Context* context)
 // Shows the sprite using the complete screen.
 void FullscreenPreviewCommand::onExecute(Context* context)
 {
-  Editor* editor = current_editor;
+  auto editor = Editor::activeEditor();
 
   // Cancel operation if current editor does not have a sprite
   if (!editor || !editor->sprite())

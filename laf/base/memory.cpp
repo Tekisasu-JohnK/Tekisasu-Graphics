@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2022 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -12,9 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
-#include "base/mutex.h"
-#include "base/scoped_lock.h"
+#include <mutex>
 
 using namespace std;
 
@@ -72,7 +71,7 @@ struct slot_t {
 
 static bool memleak_status = false;
 static slot_t* headslot;
-static base::mutex* mutex = NULL;
+static std::mutex g_mutex;
 
 void base_memleak_init()
 {
@@ -86,7 +85,6 @@ void base_memleak_init()
   assert(!memleak_status);
 
   headslot = NULL;
-  mutex = new base::mutex();
 
   memleak_status = true;
 }
@@ -151,8 +149,6 @@ void base_memleak_exit()
     ::SymCleanup(hproc);
 #endif
   }
-
-  delete mutex;
 }
 
 static void addslot(void* ptr, size_t size)
@@ -184,7 +180,7 @@ static void addslot(void* ptr, size_t size)
   p->ptr = ptr;
   p->size = size;
 
-  base::scoped_lock lock(*mutex);
+  std::lock_guard lock(g_mutex);
   p->next = headslot;
   headslot = p;
 }
@@ -198,7 +194,7 @@ static void delslot(void* ptr)
 
   assert(ptr);
 
-  base::scoped_lock lock(*mutex);
+  std::lock_guard lock(g_mutex);
 
   for (it=headslot; it!=nullptr; prev=it, it=it->next) {
     if (it->ptr == ptr) {

@@ -14,11 +14,11 @@ namespace os {
 class GLContext {
 public:
   virtual ~GLContext() { }
-  virtual bool isValid() = 0;
-  virtual bool createGLContext() = 0;
-  virtual void destroyGLContext() = 0;
-  virtual void makeCurrent() = 0;
-  virtual void swapBuffers() = 0;
+  virtual bool isValid() { return false; }
+  virtual bool createGLContext() { return false; }
+  virtual void destroyGLContext() { }
+  virtual void makeCurrent() { }
+  virtual void swapBuffers() { }
 };
 
 } // namespace os

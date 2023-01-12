@@ -22,7 +22,6 @@
 #include "app/doc_event.h"
 #include "app/i18n/strings.h"
 #include "app/ini_file.h"
-#include "app/modules/editors.h"
 #include "app/modules/gfx.h"
 #include "app/modules/gui.h"
 #include "app/modules/palettes.h"
@@ -112,15 +111,12 @@ public:
     m_g->drawLine(color, a, b);
   }
 
-  void drawRectXor(const gfx::Rect& rc) override {
+  void drawRect(gfx::Color color, const gfx::Rect& rc) override {
     gfx::Rect rc2 = m_editor->editorToScreen(rc);
     gfx::Rect bounds = m_editor->bounds();
     rc2.x -= bounds.x;
     rc2.y -= bounds.y;
-
-    m_g->setDrawMode(Graphics::DrawMode::Xor);
-    m_g->drawRect(gfx::rgba(255, 255, 255), rc2);
-    m_g->setDrawMode(Graphics::DrawMode::Solid);
+    m_g->drawRect(color, rc2);
   }
 
   void fillRect(gfx::Color color, const gfx::Rect& rc) override {
@@ -137,7 +133,10 @@ private:
 };
 
 // static
-EditorRender* Editor::m_renderEngine = nullptr;
+Editor* Editor::m_activeEditor = nullptr;
+
+// static
+std::unique_ptr<EditorRender> Editor::m_renderEngine = nullptr;
 
 Editor::Editor(Doc* document, EditorFlags flags, EditorStatePtr state)
   : Widget(Editor::Type())
@@ -166,7 +165,7 @@ Editor::Editor(Doc* document, EditorFlags flags, EditorStatePtr state)
   , m_tagFocusBand(-1)
 {
   if (!m_renderEngine)
-    m_renderEngine = new EditorRender;
+    m_renderEngine = std::make_unique<EditorRender>();
 
   m_proj.setPixelRatio(m_sprite->pixelRatio());
 
@@ -239,15 +238,8 @@ Editor::~Editor()
 void Editor::destroyEditorSharedInternals()
 {
   BrushPreview::destroyInternals();
-  if (m_renderEngine) {
-    delete m_renderEngine;
-    m_renderEngine = nullptr;
-  }
-}
-
-bool Editor::isActive() const
-{
-  return (current_editor == this);
+  if (m_renderEngine)
+    m_renderEngine.reset();
 }
 
 bool Editor::isUsingNewRenderEngine() const
@@ -1035,12 +1027,11 @@ void Editor::drawMask(Graphics* g)
   auto& segs = m_document->maskBoundaries();
   segs.createPathIfNeeeded();
 
-  CheckeredDrawMode checkered(g, m_antsOffset,
-                              gfx::rgba(0, 0, 0, 255),
-                              gfx::rgba(255, 255, 255, 255));
-  os::Paint paint;
-  paint.style(os::Paint::Stroke);
-  paint.color(gfx::rgba(0, 0, 0));
+  ui::Paint paint;
+  paint.style(ui::Paint::Stroke);
+  set_checkered_paint_mode(paint, m_antsOffset,
+                           gfx::rgba(0, 0, 0, 255),
+                           gfx::rgba(255, 255, 255, 255));
 
   // We translate the path instead of applying a matrix to the
   // ui::Graphics so the "checkered" pattern is not scaled too.
@@ -1335,12 +1326,14 @@ void Editor::drawCelHGuide(ui::Graphics* g,
 
   // Vertical guide to touch the horizontal line
   {
-    CheckeredDrawMode checkered(g, 0, color, gfx::ColorNone);
+    ui::Paint paint;
+    ui::set_checkered_paint_mode(paint, 0, color, gfx::ColorNone);
+    paint.color(color);
 
     if (scrY < scrCmpBounds.y)
-      g->drawVLine(color, dottedX, scrCelBounds.y, scrCmpBounds.y - scrCelBounds.y);
+      g->drawVLine(dottedX, scrCelBounds.y, scrCmpBounds.y - scrCelBounds.y, paint);
     else if (scrY > scrCmpBounds.y2())
-      g->drawVLine(color, dottedX, scrCmpBounds.y2(), scrCelBounds.y2() - scrCmpBounds.y2());
+      g->drawVLine(dottedX, scrCmpBounds.y2(), scrCelBounds.y2() - scrCmpBounds.y2(), paint);
   }
 
   auto text = fmt::format("{}px", ABS(sprX2 - sprX1));
@@ -1361,12 +1354,14 @@ void Editor::drawCelVGuide(ui::Graphics* g,
 
   // Horizontal guide to touch the vertical line
   {
-    CheckeredDrawMode checkered(g, 0, color, gfx::ColorNone);
+    ui::Paint paint;
+    ui::set_checkered_paint_mode(paint, 0, color, gfx::ColorNone);
+    paint.color(color);
 
     if (scrX < scrCmpBounds.x)
-      g->drawHLine(color, scrCelBounds.x, dottedY, scrCmpBounds.x - scrCelBounds.x);
+      g->drawHLine(scrCelBounds.x, dottedY, scrCmpBounds.x - scrCelBounds.x, paint);
     else if (scrX > scrCmpBounds.x2())
-      g->drawHLine(color, scrCmpBounds.x2(), dottedY, scrCelBounds.x2() - scrCmpBounds.x2());
+      g->drawHLine(scrCmpBounds.x2(), dottedY, scrCelBounds.x2() - scrCmpBounds.x2(), paint);
   }
 
   auto text = fmt::format("{}px", ABS(sprY2 - sprY1));
@@ -1411,7 +1406,7 @@ void Editor::flashCurrentLayer()
 
     ExtraCelRef extraCel(new ExtraCel);
     extraCel->setType(render::ExtraType::OVER_COMPOSITE);
-    extraCel->setBlendMode(BlendMode::NEG_BW);
+    extraCel->setBlendMode(doc::BlendMode::NEG_BW);
 
     m_document->setExtraCel(extraCel);
     m_flashing = Flashing::WithFlashExtraCel;
@@ -2629,10 +2624,8 @@ void Editor::pasteImage(const Image* image, const Mask* mask)
     // Limit the image inside the sprite's bounds.
     if (sprite->width() <= image->width() ||
         sprite->height() <= image->height()) {
-      // TODO review this (I think limits are wrong and high limit can
-      //      be negative here)
-      x = std::clamp(x, 0, sprite->width() - image->width());
-      y = std::clamp(y, 0, sprite->height() - image->height());
+      x = std::clamp(x, 0, image->width() - sprite->width());
+      y = std::clamp(y, 0, image->height() - sprite->height());
     }
     else {
       // Also we always limit the 1 image pixel inside the sprite's bounds.
@@ -2756,7 +2749,8 @@ void Editor::startZoomingState(ui::MouseMessage* msg)
 }
 
 void Editor::play(const bool playOnce,
-                  const bool playAll)
+                  const bool playAll,
+                  const bool playSubtags)
 {
   ASSERT(m_state);
   if (!m_state)
@@ -2766,7 +2760,9 @@ void Editor::play(const bool playOnce,
     stop();
 
   m_isPlaying = true;
-  setState(EditorStatePtr(new PlayState(playOnce, playAll)));
+  setState(EditorStatePtr(new PlayState(playOnce,
+                                        playAll,
+                                        playSubtags)));
 }
 
 void Editor::stop()
@@ -2794,13 +2790,14 @@ bool Editor::isPlaying() const
 
 void Editor::showAnimationSpeedMultiplierPopup(Option<bool>& playOnce,
                                                Option<bool>& playAll,
+                                               Option<bool>& playSubtags,
                                                const bool withStopBehaviorOptions)
 {
   const double options[] = { 0.25, 0.5, 1.0, 1.5, 2.0, 3.0 };
   Menu menu;
 
   for (double option : options) {
-    MenuItem* item = new MenuItem(fmt::format("Speed x{}", option));
+    MenuItem* item = new MenuItem(fmt::format(Strings::preview_speed_x(), option));
     item->Click.connect([this, option]{ setAnimationSpeedMultiplier(option); });
     item->setSelected(m_aniSpeed == option);
     menu.addChild(item);
@@ -2810,7 +2807,7 @@ void Editor::showAnimationSpeedMultiplierPopup(Option<bool>& playOnce,
 
   // Play once option
   {
-    MenuItem* item = new MenuItem("Play Once");
+    MenuItem* item = new MenuItem(Strings::preview_play_once());
     item->Click.connect(
       [&playOnce]() {
         playOnce(!playOnce());
@@ -2821,7 +2818,7 @@ void Editor::showAnimationSpeedMultiplierPopup(Option<bool>& playOnce,
 
   // Play all option
   {
-    MenuItem* item = new MenuItem("Play All Frames (Ignore Tags)");
+    MenuItem* item = new MenuItem(Strings::preview_play_all_no_tags());
     item->Click.connect(
       [&playAll]() {
         playAll(!playAll());
@@ -2830,8 +2827,19 @@ void Editor::showAnimationSpeedMultiplierPopup(Option<bool>& playOnce,
     menu.addChild(item);
   }
 
+  // Play subtags & repeats
+  {
+    MenuItem* item = new MenuItem(Strings::preview_play_subtags_and_repeats());
+    item->Click.connect(
+      [&playSubtags]() {
+        playSubtags(!playSubtags());
+      });
+    item->setSelected(playSubtags());
+    menu.addChild(item);
+  }
+
   if (withStopBehaviorOptions) {
-    MenuItem* item = new MenuItem("Rewind on Stop");
+    MenuItem* item = new MenuItem(Strings::preview_rewind_on_stop());
     item->Click.connect(
       []() {
         // Switch the "rewind_on_stop" option
@@ -2848,7 +2856,8 @@ void Editor::showAnimationSpeedMultiplierPopup(Option<bool>& playOnce,
     // Re-play
     stop();
     play(playOnce(),
-         playAll());
+         playAll(),
+         playSubtags());
   }
 }
 

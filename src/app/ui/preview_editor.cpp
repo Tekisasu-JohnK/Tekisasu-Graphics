@@ -16,7 +16,7 @@
 #include "app/doc_event.h"
 #include "app/ini_file.h"
 #include "app/loop_tag.h"
-#include "app/modules/editors.h"
+#include "app/i18n/strings.h"
 #include "app/modules/gui.h"
 #include "app/pref/preferences.h"
 #include "app/ui/editor/editor.h"
@@ -176,7 +176,7 @@ private:
 };
 
 PreviewEditorWindow::PreviewEditorWindow()
-  : Window(WithTitleBar, "Preview")
+  : Window(WithTitleBar, Strings::preview_title())
   , m_docView(NULL)
   , m_centerButton(new MiniCenterButton())
   , m_playButton(new MiniPlayButton())
@@ -208,7 +208,7 @@ void PreviewEditorWindow::setPreviewEnabled(bool state)
 {
   m_isEnabled = state;
 
-  updateUsingEditor(current_editor);
+  updateUsingEditor(Editor::activeEditor());
 }
 
 void PreviewEditorWindow::pressPlayButton()
@@ -316,7 +316,8 @@ void PreviewEditorWindow::onPlayClicked()
   if (m_playButton->isPlaying()) {
     m_refFrame = miniEditor->frame();
     miniEditor->play(Preferences::instance().preview.playOnce(),
-                     Preferences::instance().preview.playAll());
+                     Preferences::instance().preview.playAll(),
+                     Preferences::instance().preview.playSubtags());
   }
   else {
     miniEditor->stop();
@@ -336,6 +337,7 @@ void PreviewEditorWindow::onPopupSpeed()
   miniEditor->showAnimationSpeedMultiplierPopup(
     pref.preview.playOnce,
     pref.preview.playAll,
+    pref.preview.playSubtags,
     false);
   m_aniSpeed = miniEditor->getAnimationSpeedMultiplier();
 }
@@ -512,7 +514,8 @@ void PreviewEditorWindow::adjustPlayingTag()
     miniEditor->setFrame(m_refFrame = editor->frame());
 
   miniEditor->play(Preferences::instance().preview.playOnce(),
-                   Preferences::instance().preview.playAll());
+                   Preferences::instance().preview.playAll(),
+                   Preferences::instance().preview.playSubtags());
 }
 
 } // namespace app

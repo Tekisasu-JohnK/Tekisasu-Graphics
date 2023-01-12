@@ -31,7 +31,7 @@ class scan_parse_context {
   FMT_CONSTEXPR iterator end() const { return format_.end(); }
 
   void advance_to(iterator it) {
-    format_.remove_prefix(internal::to_unsigned(it - begin()));
+    format_.remove_prefix(detail::to_unsigned(it - begin()));
   }
 };
 
@@ -42,17 +42,17 @@ struct scan_context {
  public:
   using iterator = const char*;
 
-  explicit scan_context(string_view input) : input_(input) {}
+  explicit FMT_CONSTEXPR scan_context(string_view input) : input_(input) {}
 
   iterator begin() const { return input_.data(); }
   iterator end() const { return begin() + input_.size(); }
 
   void advance_to(iterator it) {
-    input_.remove_prefix(internal::to_unsigned(it - begin()));
+    input_.remove_prefix(detail::to_unsigned(it - begin()));
   }
 };
 
-namespace internal {
+namespace detail {
 enum class scan_type {
   none_type,
   int_type,
@@ -83,17 +83,21 @@ class scan_arg {
     // TODO: more types
   };
 
-  scan_arg() : type(scan_type::none_type) {}
-  scan_arg(int& value) : type(scan_type::int_type), int_value(&value) {}
-  scan_arg(unsigned& value) : type(scan_type::uint_type), uint_value(&value) {}
-  scan_arg(long long& value)
+  FMT_CONSTEXPR scan_arg() : type(scan_type::none_type), int_value(nullptr) {}
+  FMT_CONSTEXPR scan_arg(int& value)
+      : type(scan_type::int_type), int_value(&value) {}
+  FMT_CONSTEXPR scan_arg(unsigned& value)
+      : type(scan_type::uint_type), uint_value(&value) {}
+  FMT_CONSTEXPR scan_arg(long long& value)
       : type(scan_type::long_long_type), long_long_value(&value) {}
-  scan_arg(unsigned long long& value)
+  FMT_CONSTEXPR scan_arg(unsigned long long& value)
       : type(scan_type::ulong_long_type), ulong_long_value(&value) {}
-  scan_arg(std::string& value) : type(scan_type::string_type), string(&value) {}
-  scan_arg(fmt::string_view& value)
+  FMT_CONSTEXPR scan_arg(std::string& value)
+      : type(scan_type::string_type), string(&value) {}
+  FMT_CONSTEXPR scan_arg(fmt::string_view& value)
       : type(scan_type::string_view_type), string_view(&value) {}
-  template <typename T> scan_arg(T& value) : type(scan_type::custom_type) {
+  template <typename T>
+  FMT_CONSTEXPR scan_arg(T& value) : type(scan_type::custom_type) {
     custom.value = &value;
     custom.scan = scan_custom_arg<T>;
   }
@@ -107,20 +111,20 @@ class scan_arg {
     ctx.advance_to(s.scan(*static_cast<T*>(arg), ctx));
   }
 };
-}  // namespace internal
+}  // namespace detail
 
 struct scan_args {
   int size;
-  const internal::scan_arg* data;
+  const detail::scan_arg* data;
 
   template <size_t N>
-  scan_args(const std::array<internal::scan_arg, N>& store)
+  FMT_CONSTEXPR scan_args(const std::array<detail::scan_arg, N>& store)
       : size(N), data(store.data()) {
     static_assert(N < INT_MAX, "too many arguments");
   }
 };
 
-namespace internal {
+namespace detail {
 
 struct scan_handler : error_handler {
  private:
@@ -154,7 +158,8 @@ struct scan_handler : error_handler {
   }
 
  public:
-  scan_handler(string_view format, string_view input, scan_args args)
+  FMT_CONSTEXPR scan_handler(string_view format, string_view input,
+                             scan_args args)
       : parse_ctx_(format), scan_ctx_(input), args_(args), next_arg_id_(0) {}
 
   const char* pos() const { return scan_ctx_.begin(); }
@@ -169,14 +174,18 @@ struct scan_handler : error_handler {
     scan_ctx_.advance_to(it + size);
   }
 
-  void on_arg_id() { on_arg_id(next_arg_id_++); }
-  void on_arg_id(int id) {
+  FMT_CONSTEXPR int on_arg_id() { return on_arg_id(next_arg_id_++); }
+  FMT_CONSTEXPR int on_arg_id(int id) {
     if (id >= args_.size) on_error("argument index out of range");
     arg_ = args_.data[id];
+    return id;
   }
-  void on_arg_id(string_view) { on_error("invalid format"); }
+  FMT_CONSTEXPR int on_arg_id(string_view id) {
+    if (id.data()) on_error("invalid format");
+    return 0;
+  }
 
-  void on_replacement_field(const char*) {
+  void on_replacement_field(int, const char*) {
     auto it = scan_ctx_.begin(), end = scan_ctx_.end();
     switch (arg_.type) {
     case scan_type::int_type:
@@ -208,24 +217,24 @@ struct scan_handler : error_handler {
     }
   }
 
-  const char* on_format_specs(const char* begin, const char*) {
+  const char* on_format_specs(int, const char* begin, const char*) {
     if (arg_.type != scan_type::custom_type) return begin;
     parse_ctx_.advance_to(begin);
     arg_.custom.scan(arg_.custom.value, parse_ctx_, scan_ctx_);
     return parse_ctx_.begin();
   }
 };
-}  // namespace internal
+}  // namespace detail
 
 template <typename... Args>
-std::array<internal::scan_arg, sizeof...(Args)> make_scan_args(Args&... args) {
+std::array<detail::scan_arg, sizeof...(Args)> make_scan_args(Args&... args) {
   return {{args...}};
 }
 
 string_view::iterator vscan(string_view input, string_view format_str,
                             scan_args args) {
-  internal::scan_handler h(format_str, input, args);
-  internal::parse_format_string<false>(format_str, h);
+  detail::scan_handler h(format_str, input, args);
+  detail::parse_format_string<false>(format_str, h);
   return input.begin() + (h.pos() - &*input.begin());
 }
 

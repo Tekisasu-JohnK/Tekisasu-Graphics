@@ -11,6 +11,7 @@
 
 #include "app/ui/layer_frame_comboboxes.h"
 
+#include "app/i18n/strings.h"
 #include "app/restore_visible_layers.h"
 #include "app/site.h"
 #include "doc/anidir.h"
@@ -56,12 +57,15 @@ std::string LayerListItem::buildName(const doc::Layer* layer)
     name.insert(0, layer->name());
     layer = layer->parent();
   }
-  name.insert(0, isGroup ? "Group: ": "Layer: ");
+  const std::string namePrefix =
+    (isGroup ? Strings::layer_combo_group() :
+               Strings::layer_combo_layer()) + " ";
+  name.insert(0, namePrefix);
   return name;
 }
 
 FrameListItem::FrameListItem(doc::Tag* tag)
-  : ListItem("Tag: " + tag->name())
+  : ListItem(Strings::frame_combo_tag() + " " + tag->name())
   , m_tag(tag)
 {
   setValue(m_tag->name());
@@ -87,31 +91,36 @@ void fill_area_combobox(const doc::Sprite* sprite, ui::ComboBox* area, const std
   }
 }
 
-void fill_layers_combobox(const doc::Sprite* sprite, ui::ComboBox* layers, const std::string& defLayer)
+void fill_layers_combobox(const doc::Sprite* sprite, ui::ComboBox* layers, const std::string& defLayer, const int defLayerIndex)
 {
-  int i = layers->addItem("Visible layers");
+  int i = layers->addItem(Strings::layer_combo_visible_layers());
   dynamic_cast<ui::ListItem*>(layers->getItem(i))->setValue(kAllLayers);
 
-  i = layers->addItem("Selected layers");
+  i = layers->addItem(Strings::layer_combo_selected_layers());
   dynamic_cast<ui::ListItem*>(layers->getItem(i))->setValue(kSelectedLayers);
   if (defLayer == kSelectedLayers)
     layers->setSelectedItemIndex(i);
+
+  assert(layers->getItemCount() == kLayersComboboxExtraInitialItems);
+  static_assert(kLayersComboboxExtraInitialItems == 2,
+                "Update kLayersComboboxExtraInitialItems value to match the number of initial items in layers combobox");
 
   doc::LayerList layersList = sprite->allLayers();
   for (auto it=layersList.rbegin(), end=layersList.rend(); it!=end; ++it) {
     doc::Layer* layer = *it;
     i = layers->addItem(new LayerListItem(layer));
-    if (defLayer == layer->name())
+    if (defLayer == layer->name() && (defLayerIndex == -1 ||
+                                      defLayerIndex == i-kLayersComboboxExtraInitialItems))
       layers->setSelectedItemIndex(i);
   }
 }
 
 void fill_frames_combobox(const doc::Sprite* sprite, ui::ComboBox* frames, const std::string& defFrame)
 {
-  int i = frames->addItem("All frames");
+  int i = frames->addItem(Strings::frame_combo_all_frames());
   dynamic_cast<ui::ListItem*>(frames->getItem(i))->setValue(kAllFrames);
 
-  i = frames->addItem("Selected frames");
+  i = frames->addItem(Strings::frame_combo_selected_frames());
   dynamic_cast<ui::ListItem*>(frames->getItem(i))->setValue(kSelectedFrames);
   if (defFrame == kSelectedFrames)
     frames->setSelectedItemIndex(i);
@@ -132,16 +141,19 @@ void fill_anidir_combobox(ui::ComboBox* anidir, doc::AniDir defAnidir)
   static_assert(
     int(doc::AniDir::FORWARD) == 0 &&
     int(doc::AniDir::REVERSE) == 1 &&
-    int(doc::AniDir::PING_PONG) == 2, "doc::AniDir has changed");
+    int(doc::AniDir::PING_PONG) == 2 &&
+    int(doc::AniDir::PING_PONG_REVERSE) == 3, "doc::AniDir has changed");
 
-  anidir->addItem("Forward");
-  anidir->addItem("Reverse");
-  anidir->addItem("Ping-pong");
+  anidir->addItem(Strings::anidir_combo_forward());
+  anidir->addItem(Strings::anidir_combo_reverse());
+  anidir->addItem(Strings::anidir_combo_ping_pong());
+  anidir->addItem(Strings::anidir_combo_ping_pong_reverse());
   anidir->setSelectedItemIndex(int(defAnidir));
 }
 
 void calculate_visible_layers(const Site& site,
                               const std::string& layersValue,
+                              const int layersIndex,
                               RestoreVisibleLayers& layersVisibility)
 {
   if (layersValue == kSelectedLayers) {
@@ -154,10 +166,13 @@ void calculate_visible_layers(const Site& site,
       layersVisibility.showLayer(const_cast<Layer*>(site.layer()));
     }
   }
-  else if (layersValue != kAllFrames) {
+  else if (layersValue != kAllLayers) {
+    int i = site.sprite()->allLayersCount();
     // TODO add a getLayerByName
     for (doc::Layer* layer : site.sprite()->allLayers()) {
-      if (layer->name() == layersValue) {
+      i--;
+      if (layer->name() == layersValue && (layersIndex == -1 ||
+                                           layersIndex == i)) {
         layersVisibility.showLayer(layer);
         break;
       }

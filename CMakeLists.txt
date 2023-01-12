@@ -65,6 +65,7 @@ option(ENABLE_WEBSOCKET    "Compile with websocket support" on)
 option(ENABLE_TESTS        "Compile unit tests" off)
 option(ENABLE_BENCHMARKS   "Compile benchmarks" off)
 option(ENABLE_TRIAL_MODE   "Compile the trial version" off)
+option(ENABLE_DRM          "Compile the DRM-enabled version (e.g. for automatic updates)" off)
 option(ENABLE_STEAM        "Compile with Steam library" off)
 option(ENABLE_DEVMODE      "Compile vesion for developers" off)
 option(ENABLE_UI           "Compile UI (turn off to compile CLI-only version)" on)
@@ -80,13 +81,24 @@ set(CUSTOM_WEBSITE_URL "" CACHE STRING "Enable custom local webserver to check u
 
 if(ENABLE_SENTRY)
   set(SENTRY_DIR "" CACHE STRING "Sentry native location")
-  set(SENTRY_DNS "" CACHE STRING "Sentry DNS URL")
+  set(SENTRY_DSN "" CACHE STRING "Sentry Data Source Name URL")
+  set(SENTRY_ENV "development" CACHE STRING "Sentry environment (production, testing, development, etc.)")
 endif()
 
-if(ENABLE_NEWS OR ENABLE_UPDATER)
+if(ENABLE_NEWS OR ENABLE_UPDATER OR ENABLE_DRM)
   set(REQUIRE_CURL ON)
 else()
   set(REQUIRE_CURL OFF)
+endif()
+
+# Select libcurl's TLS backend according to target platform
+if(REQUIRE_CURL AND ENABLE_DRM)
+  if(APPLE)
+    option(CMAKE_USE_SECTRANSP "enable Apple OS native SSL/TLS" ON)
+  endif()
+  if(WIN32)
+    set(CMAKE_USE_SCHANNEL "enable Windows native SSL/TLS" ON)
+  endif()
 endif()
 
 if(NOT LAF_OS_BACKEND)
@@ -105,6 +117,10 @@ if(LAF_OS_WITH_GTK)
   if(NOT USE_SHARED_HARFBUZZ)
     message(FATAL_ERROR "Cannot compile with gtk and static HarfBuzz, set USE_SHARED_HARFBUZZ=ON")
   endif()
+endif()
+
+if(ENABLE_DRM AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/drm/CMakeLists.txt)
+  message(FATAL_ERROR "Your Tekisasu-Graphics repository is incomplete, clone the drm repository")
 endif()
 
 ######################################################################
@@ -228,13 +244,6 @@ endif()
 include_directories(${PNG_INCLUDE_DIRS})
 add_definitions(-DPNG_NO_MMX_CODE) # Do not use MMX optimizations in PNG code
 
-# libwebp
-if(ENABLE_WEBP)
-  set(WEBP_LIBRARIES webp webpdemux libwebpmux)
-  set(WEBP_INCLUDE_DIR ${LIBWEBP_DIR}/src)
-  include_directories(${WEBP_INCLUDE_DIR})
-endif()
-
 # tinyxml
 if(USE_SHARED_TINYXML)
   find_library(TINYXML_LIBRARY NAMES tinyxml)
@@ -331,7 +340,26 @@ endif()
 set(LAF_WITH_TESTS ${ENABLE_TESTS} CACHE BOOL "Enable LAF tests")
 set(UNDO_TESTS     ${ENABLE_TESTS} CACHE BOOL "Enable undo tests")
 
+if(ENABLE_DRM)
+  add_subdirectory(drm)
+endif()
 add_subdirectory(laf)
+
+# libwebp
+if(ENABLE_WEBP)
+  # Use libwebp from Skia
+  if(LAF_BACKEND STREQUAL "skia")
+    find_library(WEBP_LIBRARIES webp
+      NAMES libwebp # required for Windows
+      PATHS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH)
+    set(WEBP_INCLUDE_DIR "${SKIA_DIR}/third_party/externals/libwebp/src")
+  else()
+    set(WEBP_LIBRARIES webp webpdemux libwebpmux)
+    set(WEBP_INCLUDE_DIR ${LIBWEBP_DIR}/src)
+  endif()
+  include_directories(${WEBP_INCLUDE_DIR})
+endif()
+message(STATUS "aseprite libwebp: ${WEBP_LIBRARIES}")
 
 # LAF libraries + Aseprite are compiled with config.h
 target_include_directories(laf-base PUBLIC src)

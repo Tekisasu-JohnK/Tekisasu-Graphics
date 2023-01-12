@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -27,13 +27,15 @@ namespace os {
   os::Ref<os::MenuItemOSX> original;
 }
 + (NSMenuItemOSX*)alloc:(const os::Ref<os::MenuItemOSX>&)original;
+- (void)dealloc;
 - (void)executeMenuItem:(id)sender;
-- (void)validateMenuItem;
+- (void)validateLafMenuItem;
 @end
 
 namespace os {
 
 extern bool g_keyEquivalentUsed;
+NSMenuItem* g_standardEditMenuItem = nullptr;
 
 class MenuItemOSX : public MenuItem {
 public:
@@ -44,6 +46,7 @@ public:
   void setEnabled(bool state) override;
   void setChecked(bool state) override;
   void setShortcut(const Shortcut& shortcut) override;
+  void setAsStandardEditMenuItem() override;
   NSMenuItem* handle() { return m_handle; }
 
   // Called by NSMenuItemOSX.executeMenuItem
@@ -90,6 +93,10 @@ private:
   item->original = original;
   return item;
 }
+- (void)dealloc
+{
+  original = nullptr;
+}
 - (void)executeMenuItem:(id)sender
 {
   // Execute menu item option in a synchronized way from the events
@@ -106,9 +113,10 @@ private:
   ev.setCallback([self]{ original->execute(); });
   os::queue_event(ev);
 }
-- (void)validateMenuItem
+- (void)validateLafMenuItem
 {
-  original->validate();
+  if (original)
+    original->validate();
 }
 @end
 
@@ -189,8 +197,13 @@ MenuItemOSX::~MenuItemOSX()
   if (m_submenu)
     m_submenu.reset();
 
-  if (m_handle.parentItem)
-    [m_handle.parentItem.submenu removeItem:m_handle];
+  if (m_handle) {
+    if (m_handle == g_standardEditMenuItem)
+      g_standardEditMenuItem = nullptr;
+
+    if (m_handle.parentItem)
+      [m_handle.parentItem.submenu removeItem:m_handle];
+  }
 }
 
 void MenuItemOSX::setText(const std::string& text)
@@ -247,6 +260,11 @@ void MenuItemOSX::setShortcut(const Shortcut& shortcut)
 
   m_handle.keyEquivalent = keyStr;
   m_handle.keyEquivalentModifierMask = nsFlags;
+}
+
+void MenuItemOSX::setAsStandardEditMenuItem()
+{
+  g_standardEditMenuItem = m_handle;
 }
 
 void MenuItemOSX::execute()

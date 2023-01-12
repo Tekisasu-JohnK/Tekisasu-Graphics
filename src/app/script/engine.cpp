@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -30,6 +30,7 @@
 #include "doc/blend_mode.h"
 #include "doc/color_mode.h"
 #include "filters/target.h"
+#include "ui/cursor_type.h"
 #include "ui/mouse_button.h"
 
 #include <fstream>
@@ -159,6 +160,7 @@ void register_color_class(lua_State* L);
 void register_color_space_class(lua_State* L);
 #ifdef ENABLE_UI
 void register_dialog_class(lua_State* L);
+void register_graphics_context_class(lua_State* L);
 #endif
 void register_events_class(lua_State* L);
 void register_frame_class(lua_State* L);
@@ -174,6 +176,7 @@ void register_palette_class(lua_State* L);
 void register_palettes_class(lua_State* L);
 void register_plugin_class(lua_State* L);
 void register_point_class(lua_State* L);
+void register_properties_class(lua_State* L);
 void register_range_class(lua_State* L);
 void register_rect_class(lua_State* L);
 void register_selection_class(lua_State* L);
@@ -185,6 +188,8 @@ void register_sprite_class(lua_State* L);
 void register_sprites_class(lua_State* L);
 void register_tag_class(lua_State* L);
 void register_tags_class(lua_State* L);
+void register_theme_classes(lua_State* L);
+void register_tile_class(lua_State* L);
 void register_tileset_class(lua_State* L);
 void register_tilesets_class(lua_State* L);
 void register_tool_class(lua_State* L);
@@ -275,6 +280,7 @@ Engine::Engine()
   setfield_integer(L, "FORWARD", doc::AniDir::FORWARD);
   setfield_integer(L, "REVERSE", doc::AniDir::REVERSE);
   setfield_integer(L, "PING_PONG", doc::AniDir::PING_PONG);
+  setfield_integer(L, "PING_PONG_REVERSE", doc::AniDir::PING_PONG_REVERSE);
   lua_pop(L, 1);
 
   lua_newtable(L);
@@ -370,6 +376,29 @@ Engine::Engine()
 
   lua_newtable(L);
   lua_pushvalue(L, -1);
+  lua_setglobal(L, "MouseCursor");
+  setfield_integer(L, "NONE",   (int)ui::kNoCursor);
+  setfield_integer(L, "ARROW", (int)ui::kArrowCursor);
+  setfield_integer(L, "CROSSHAIR", (int)ui::kCrosshairCursor);
+  setfield_integer(L, "POINTER", (int)ui::kHandCursor);
+  setfield_integer(L, "NOT_ALLOWED", (int)ui::kForbiddenCursor);
+  setfield_integer(L, "GRAB", (int)ui::kScrollCursor);
+  setfield_integer(L, "GRABBING", (int)ui::kScrollCursor);
+  setfield_integer(L, "MOVE", (int)ui::kMoveCursor);
+  setfield_integer(L, "NS_RESIZE", (int)ui::kSizeNSCursor);
+  setfield_integer(L, "WE_RESIZE", (int)ui::kSizeWECursor);
+  setfield_integer(L, "N_RESIZE", (int)ui::kSizeNCursor);
+  setfield_integer(L, "NE_RESIZE", (int)ui::kSizeNECursor);
+  setfield_integer(L, "E_RESIZE", (int)ui::kSizeECursor);
+  setfield_integer(L, "SE_RESIZE", (int)ui::kSizeSECursor);
+  setfield_integer(L, "S_RESIZE", (int)ui::kSizeSCursor);
+  setfield_integer(L, "SW_RESIZE", (int)ui::kSizeSWCursor);
+  setfield_integer(L, "W_RESIZE", (int)ui::kSizeWCursor);
+  setfield_integer(L, "NW_RESIZE", (int)ui::kSizeNWCursor);
+  lua_pop(L, 1);
+
+  lua_newtable(L);
+  lua_pushvalue(L, -1);
   lua_setglobal(L, "MouseButton");
   setfield_integer(L, "NONE",   (int)ui::kButtonNone);
   setfield_integer(L, "LEFT",   (int)ui::kButtonLeft);
@@ -411,6 +440,7 @@ Engine::Engine()
   register_color_space_class(L);
 #ifdef ENABLE_UI
   register_dialog_class(L);
+  register_graphics_context_class(L);
 #endif
   register_events_class(L);
   register_frame_class(L);
@@ -426,6 +456,7 @@ Engine::Engine()
   register_palettes_class(L);
   register_plugin_class(L);
   register_point_class(L);
+  register_properties_class(L);
   register_range_class(L);
   register_rect_class(L);
   register_selection_class(L);
@@ -437,6 +468,8 @@ Engine::Engine()
   register_sprites_class(L);
   register_tag_class(L);
   register_tags_class(L);
+  register_theme_classes(L);
+  register_tile_class(L);
   register_tileset_class(L);
   register_tilesets_class(L);
   register_tool_class(L);

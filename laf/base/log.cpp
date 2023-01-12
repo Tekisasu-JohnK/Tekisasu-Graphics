@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -76,7 +76,7 @@ static void LOGva(const char* format, va_list ap)
   std::vsnprintf(&buf[0], buf.size(), format, ap);
 
   {
-    std::lock_guard<std::mutex> lock(log_mutex);
+    std::lock_guard lock(log_mutex);
     ASSERT(log_ostream);
     log_ostream->write(&buf[0], size);
     log_ostream->flush();

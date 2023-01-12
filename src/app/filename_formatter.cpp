@@ -1,4 +1,5 @@
 // Aseprite
+// Copyright (C) 2022  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -73,6 +74,29 @@ bool get_frame_info_from_filename_format(
     return false;
 }
 
+bool is_template_in_filename(const std::string& format)
+{
+  std::vector<std::string> formats{
+    "{fullname}",
+    "{path}",
+    "{name}",
+    "{title}",
+    "{extension}",
+    "{layer}",
+    "{tag}",
+    "{innertag}",
+    "{outertag}",
+    "{frame}",
+    "{tagframe}"
+  };
+  for (int i = 0; i < formats.size(); i++) {
+    if (format.find(formats[i]) != std::string::npos) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool is_tag_in_filename_format(const std::string& format)
 {
   return (format.find("{tag}") != std::string::npos);
@@ -112,12 +136,12 @@ std::string filename_formatter(
   base::replace_string(output, "{layer}", info.layerName());
   base::replace_string(output, "{group}", info.groupName());
   base::replace_string(output, "{slice}", info.sliceName());
-  base::replace_string(output, "{duration}", std::to_string(info.duration()));
 
   if (replaceFrame) {
     base::replace_string(output, "{tag}", info.innerTagName());
     base::replace_string(output, "{innertag}", info.innerTagName());
     base::replace_string(output, "{outertag}", info.outerTagName());
+    base::replace_string(output, "{duration}", std::to_string(info.duration()));
     replace_frame("{frame", info.frame(), output);
     replace_frame("{tagframe", info.tagFrame(), output);
   }
@@ -214,6 +238,11 @@ std::string get_default_filename_format_for_sheet(
 
   format += ".{extension}";
   return format;
+}
+
+std::string get_default_tagname_format_for_sheet()
+{
+  return "{tag}";
 }
 
 } // namespace app

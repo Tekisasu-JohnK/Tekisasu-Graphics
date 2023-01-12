@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (c) 2019-2021  Igara Studio S.A.
+// Copyright (c) 2019-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -13,6 +13,7 @@
 #include "doc/object.h"
 #include "doc/tile.h"
 #include "doc/tileset_hash_table.h"
+#include "doc/with_user_data.h"
 
 #include <string>
 #include <vector>
@@ -22,9 +23,11 @@ namespace doc {
   class Remap;
   class Sprite;
 
-  class Tileset : public Object {
+  class Tileset : public WithUserData {
+    static UserData kNoUserData;
   public:
     typedef std::vector<ImageRef> Tiles;
+    typedef std::vector<UserData> Datas;
     typedef Tiles::iterator iterator;
     typedef Tiles::const_iterator const_iterator;
 
@@ -35,6 +38,7 @@ namespace doc {
             const Grid& grid,
             const tileset_index ntiles);
 
+    static Tileset* MakeCopyWithoutImages(const Tileset* tileset);
     static Tileset* MakeCopyWithSameImages(const Tileset* tileset);
     static Tileset* MakeCopyCopyingImages(const Tileset* tileset);
 
@@ -66,9 +70,20 @@ namespace doc {
     void set(const tile_index ti,
              const ImageRef& image);
 
-    tile_index add(const ImageRef& image);
+    UserData& getTileData(const tile_index ti) const {
+      if (ti >= 0 && ti < size())
+        return const_cast<UserData&>(m_datas[ti]);
+      else
+        return kNoUserData;
+    }
+    void setTileData(const tile_index ti,
+                     const UserData& userData);
+
+    tile_index add(const ImageRef& image,
+                   const UserData& userData = UserData());
     void insert(const tile_index ti,
-                const ImageRef& image);
+                const ImageRef& image,
+                const UserData& userData = UserData());
     void erase(const tile_index ti);
 
     // Linked with an external file
@@ -124,6 +139,7 @@ namespace doc {
     Sprite* m_sprite;
     Grid m_grid;
     Tiles m_tiles;
+    Datas m_datas;
     TilesetHashTable m_hash;
     std::string m_name;
     int m_baseIndex = 1;

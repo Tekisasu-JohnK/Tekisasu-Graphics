@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -20,7 +20,6 @@
 #include "app/doc_api.h"
 #include "app/doc_range.h"
 #include "app/doc_range_ops.h"
-#include "app/modules/editors.h"
 #include "app/modules/gfx.h"
 #include "app/modules/gui.h"
 #include "app/pref/preferences.h"
@@ -59,11 +58,15 @@ namespace {
     }
 
     void observeUIContext() {
+#ifdef ENABLE_UI
       UIContext::instance()->documents().add_observer(this);
+#endif
     }
 
     void unobserveUIContext() {
+#ifdef ENABLE_UI
       UIContext::instance()->documents().remove_observer(this);
+#endif
     }
 
     bool valid() const {
@@ -232,7 +235,7 @@ void Clipboard::setData(Image* image,
     }
     // Copy non-tilemap images to the native clipboard
     else {
-      color_t oldMask;
+      color_t oldMask = 0;
       if (image) {
         oldMask = image->maskColor();
         if (!image_source_is_transparent)
@@ -376,7 +379,9 @@ void Clipboard::cut(ContextWriter& writer)
       tx.commit();
     }
     writer.document()->generateMaskBoundaries();
+#ifdef ENABLE_UI
     update_screen_for_document(writer.document());
+#endif
   }
 }
 
@@ -407,9 +412,11 @@ void Clipboard::copyRange(const ContextReader& reader, const DocRange& range)
   clearContent();
   m_data->range.setRange(writer.document(), range);
 
+#ifdef ENABLE_UI
   // TODO Replace this with a signal, because here the timeline
   // depends on the clipboard and the clipboard on the timeline.
   App::instance()->timeline()->activateClipboardRange();
+#endif
 }
 
 void Clipboard::copyImage(const Image* image,
@@ -466,6 +473,11 @@ void Clipboard::paste(Context* ctx,
   if (!dstSpr)
     return;
 
+#ifdef ENABLE_UI
+  Editor* editor = Editor::activeEditor();
+#endif
+  bool updateDstDoc = false;
+
   switch (format()) {
 
     case ClipboardFormat::Image: {
@@ -499,17 +511,20 @@ void Clipboard::paste(Context* ctx,
             0));
       }
 
-      if (current_editor && interactive) {
+#ifdef ENABLE_UI
+      if (editor && interactive) {
         // TODO we don't support pasting in multiple cels at the
         //      moment, so we clear the range here (same as in
         //      PasteTextCommand::onExecute())
         App::instance()->timeline()->clearAndInvalidateRange();
 
         // Change to MovingPixelsState
-        current_editor->pasteImage(src_image.get(),
-                                   m_data->mask.get());
+        editor->pasteImage(src_image.get(),
+                           m_data->mask.get());
       }
-      else {
+      else
+#endif
+      {
         // Non-interactive version (just copy the image to the cel)
         Layer* dstLayer = site.layer();
         ASSERT(dstLayer);
@@ -544,15 +559,18 @@ void Clipboard::paste(Context* ctx,
     }
 
     case ClipboardFormat::Tilemap: {
-      if (current_editor && interactive) {
+#ifdef ENABLE_UI
+      if (editor && interactive) {
         // TODO match both tilesets?
         // TODO add post-command parameters (issue #2324)
 
         // Change to MovingTilemapState
-        current_editor->pasteImage(m_data->tilemap.get(),
-                                   m_data->mask.get());
+        editor->pasteImage(m_data->tilemap.get(),
+                           m_data->mask.get());
       }
-      else {
+      else
+#endif
+      {
         // TODO non-interactive version (for scripts)
       }
       break;
@@ -586,11 +604,11 @@ void Clipboard::paste(Context* ctx,
           // cels in the same document.
           if (srcDoc == dstDoc) {
             // This is the app::copy_range (not clipboard::copy_range()).
-            if (srcRange.layers() == dstRange.layers())
+            if (srcRange.layers() == dstRange.layers()) {
               app::copy_range(srcDoc, srcRange, dstRange, kDocRangeBefore);
-            if (current_editor)
-              current_editor->invalidate(); // TODO check if this is necessary
-            return;
+              updateDstDoc = true;
+            }
+            break;
           }
 
           Tx tx(ctx, "Paste Cels");
@@ -635,8 +653,7 @@ void Clipboard::paste(Context* ctx,
           }
 
           tx.commit();
-          if (current_editor)
-            current_editor->invalidate(); // TODO check if this is necessary
+          updateDstDoc = true;
           break;
         }
 
@@ -650,6 +667,7 @@ void Clipboard::paste(Context* ctx,
             dstRange.startRange(nullptr, dstFrame, DocRange::kFrames);
             dstRange.endRange(nullptr, dstFrame);
             app::copy_range(srcDoc, srcRange, dstRange, kDocRangeBefore);
+            updateDstDoc = true;
             break;
           }
 
@@ -688,8 +706,7 @@ void Clipboard::paste(Context* ctx,
           }
 
           tx.commit();
-          if (current_editor)
-            current_editor->invalidate(); // TODO check if this is necessary
+          updateDstDoc = true;
           break;
         }
 
@@ -740,8 +757,7 @@ void Clipboard::paste(Context* ctx,
           }
 
           tx.commit();
-          if (current_editor)
-            current_editor->invalidate(); // TODO check if this is necessary
+          updateDstDoc = true;
           break;
         }
       }
@@ -749,6 +765,10 @@ void Clipboard::paste(Context* ctx,
     }
 
   }
+
+  // Update all editors/views showing this document
+  if (updateDstDoc)
+    dstDoc->notifyGeneralUpdate();
 }
 
 ImageRef Clipboard::getImage(Palette* palette)

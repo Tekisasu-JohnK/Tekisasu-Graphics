@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -10,9 +10,9 @@
 #pragma once
 
 #include "base/disable_copying.h"
-#include "base/mutex.h"
 
 #include <atomic>
+#include <mutex>
 
 namespace base {
 
@@ -63,7 +63,7 @@ namespace base {
 
   private:
     // Mutex to modify the 'locked' flag.
-    mutable base::mutex m_mutex;
+    mutable std::mutex m_mutex;
 
     // True if some thread is writing the object.
     bool m_write_lock;

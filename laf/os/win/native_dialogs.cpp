@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2021  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -139,7 +139,7 @@ private:
     if (m_type != Type::OpenFolder && !m_filters.empty()) {
       std::vector<COMDLG_FILTERSPEC> specs;
       getFiltersForIFileDialog(specs);
-      hr = dlg->SetFileTypes(specs.size(), &specs[0]);
+      hr = dlg->SetFileTypes(UINT(specs.size()), &specs[0]);
       freeFiltersForIFileDialog(specs);
 
       if (SUCCEEDED(hr))

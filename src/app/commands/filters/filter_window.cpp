@@ -13,8 +13,8 @@
 
 #include "app/commands/filters/filter_manager_impl.h"
 #include "app/commands/filters/filter_worker.h"
+#include "app/i18n/strings.h"
 #include "app/ini_file.h"
-#include "app/modules/editors.h"
 #include "app/modules/gui.h"
 #include "app/pref/preferences.h"
 #include "app/ui/editor/editor.h"
@@ -35,12 +35,14 @@ FilterWindow::FilterWindow(const char* title, const char* cfgSection,
   , m_hbox(HORIZONTAL)
   , m_vbox(VERTICAL)
   , m_container(VERTICAL)
-  , m_okButton("&OK")
-  , m_cancelButton("&Cancel")
+  , m_okButton(Strings::filters_ok())
+  , m_cancelButton(Strings::filters_cancel())
   , m_preview(filterMgr)
   , m_targetButton(filterMgr->pixelFormat(), (withChannels == WithChannelsSelector))
-  , m_showPreview("&Preview")
-  , m_tiledCheck(withTiled == WithTiledCheckBox ? new CheckBox("&Tiled") : NULL)
+  , m_showPreview(Strings::filters_preview())
+  , m_tiledCheck(withTiled == WithTiledCheckBox ?
+                   new CheckBox(Strings::filters_tiled()) :
+                   nullptr)
 {
   m_okButton.processMnemonicFromText();
   m_cancelButton.processMnemonicFromText();

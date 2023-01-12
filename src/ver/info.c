@@ -8,7 +8,7 @@
 #include "generated_version.h"  /* It defines the VERSION macro */
 
 #define PACKAGE                 "Tekisasu-Graphics"
-#define COPYRIGHT               "Copyright (C) 2021-2022 Tekisasu, Copyright (C) 2001-2022 Igara Studio S.A."
+#define COPYRIGHT               "Copyright (C) 2021-2023 Tekisasu, Copyright (C) 2001-2023 Igara Studio S.A."
 
 #if defined(_WIN32) || defined(__APPLE__)
   #define HTTP                  "https"

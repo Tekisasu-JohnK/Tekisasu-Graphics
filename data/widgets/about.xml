@@ -5,7 +5,7 @@
 <window id="about" text="About">
   <vbox>
     <label text="" id="title" />
-    <label text="Tekisasu Toolchain 4" />
+    <label text="Tekisasu Toolchain" />
     <hbox homogeneous="true">
       <hbox>
 	<vbox expansive="true">

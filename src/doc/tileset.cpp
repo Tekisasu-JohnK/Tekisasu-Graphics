@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (c) 2019-2021  Igara Studio S.A.
+// Copyright (c) 2019-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -20,13 +20,17 @@
 
 namespace doc {
 
+// static
+UserData Tileset::kNoUserData;
+
 Tileset::Tileset(Sprite* sprite,
                  const Grid& grid,
                  const tileset_index ntiles)
-  : Object(ObjectType::Tileset)
+  : WithUserData(ObjectType::Tileset)
   , m_sprite(sprite)
   , m_grid(grid)
   , m_tiles(ntiles)
+  , m_datas(ntiles)
 {
   // The origin of tileset grids must be 0,0 (the origin is then
   // specified by each cel position)
@@ -45,17 +49,26 @@ Tileset::Tileset(Sprite* sprite,
 }
 
 // static
-Tileset* Tileset::MakeCopyWithSameImages(const Tileset* tileset)
+Tileset* Tileset::MakeCopyWithoutImages(const Tileset* tileset)
 {
   std::unique_ptr<Tileset> copy(
     new Tileset(tileset->sprite(),
                 tileset->grid(),
                 tileset->size()));
   copy->setName(tileset->name());
+  copy->setUserData(tileset->userData());
+  return copy.release();
+}
+
+// static
+Tileset* Tileset::MakeCopyWithSameImages(const Tileset* tileset)
+{
+  std::unique_ptr<Tileset> copy(MakeCopyWithoutImages(tileset));
   for (tile_index ti=0; ti<copy->size(); ++ti) {
     ImageRef image = tileset->get(ti);
     ASSERT(image);
     copy->set(ti, image);
+    copy->setTileData(ti, tileset->getTileData(ti));
   }
   return copy.release();
 }
@@ -63,16 +76,13 @@ Tileset* Tileset::MakeCopyWithSameImages(const Tileset* tileset)
 // static
 Tileset* Tileset::MakeCopyCopyingImages(const Tileset* tileset)
 {
-  std::unique_ptr<Tileset> copy(
-    new Tileset(tileset->sprite(),
-                tileset->grid(),
-                tileset->size()));
-  copy->setName(tileset->name());
+  std::unique_ptr<Tileset> copy(MakeCopyWithoutImages(tileset));
   for (tile_index ti=0; ti<copy->size(); ++ti) {
     ImageRef image = tileset->get(ti);
     ASSERT(image);
     // TODO can we avoid making a copy of this image
     copy->set(ti, ImageRef(Image::createCopy(image.get())));
+    copy->setTileData(ti, tileset->getTileData(ti));
   }
   return copy.release();
 }
@@ -91,6 +101,7 @@ void Tileset::resize(const tile_index ntiles)
 {
   int oldSize = m_tiles.size();
   m_tiles.resize(ntiles);
+  m_datas.resize(ntiles);
   for (tile_index ti=oldSize; ti<ntiles; ++ti)
     m_tiles[ti] = makeEmptyTile();
 }
@@ -98,6 +109,7 @@ void Tileset::resize(const tile_index ntiles)
 void Tileset::remap(const Remap& remap)
 {
   Tiles tmp = m_tiles;
+  Datas tmpUD = m_datas;
 
   // The notile cannot be remapped
   ASSERT(remap[0] == 0);
@@ -112,10 +124,18 @@ void Tileset::remap(const Remap& remap)
       ASSERT(remap[ti] != notile);
 
       m_tiles[remap[ti]] = tmp[ti];
+      m_datas[remap[ti]] = tmpUD[ti];
     }
   }
 
   rehash();
+}
+
+void Tileset::setTileData(const tile_index ti,
+                          const UserData& userData)
+{
+  if (ti >= 0 && ti < size())
+    m_datas[ti] = userData;
 }
 
 void Tileset::set(const tile_index ti,
@@ -140,7 +160,8 @@ void Tileset::set(const tile_index ti,
     hashImage(ti, image);
 }
 
-tile_index Tileset::add(const ImageRef& image)
+tile_index Tileset::add(const ImageRef& image,
+                        const UserData& userData)
 {
   ASSERT(image);
   ASSERT(image->width() == m_grid.tileSize().w);
@@ -148,6 +169,7 @@ tile_index Tileset::add(const ImageRef& image)
 
   preprocess_transparent_pixels(image.get());
   m_tiles.push_back(image);
+  m_datas.push_back(userData);
 
   const tile_index newIndex = tile_index(m_tiles.size()-1);
   if (!m_hash.empty())
@@ -156,7 +178,8 @@ tile_index Tileset::add(const ImageRef& image)
 }
 
 void Tileset::insert(const tile_index ti,
-                     const ImageRef& image)
+                     const ImageRef& image,
+                     const UserData& userData)
 {
   ASSERT(image);
   ASSERT(image->width() == m_grid.tileSize().w);
@@ -171,6 +194,7 @@ void Tileset::insert(const tile_index ti,
   ASSERT(ti >= 0 && ti <= m_tiles.size()+1);
   preprocess_transparent_pixels(image.get());
   m_tiles.insert(m_tiles.begin()+ti, image);
+  m_datas.insert(m_datas.begin()+ti, userData);
 
   if (!m_hash.empty()) {
     // Fix all indexes in the hash that are greater than "ti"
@@ -190,6 +214,7 @@ void Tileset::erase(const tile_index ti)
   //removeFromHash(ti, true);
 
   m_tiles.erase(m_tiles.begin()+ti);
+  m_datas.erase(m_datas.begin()+ti);
   rehash();
 }
 

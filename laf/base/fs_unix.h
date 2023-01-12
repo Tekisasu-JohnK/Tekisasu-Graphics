@@ -13,6 +13,7 @@
 #include <climits>              // Required for PATH_MAX
 #include <cstdio>               // Required for rename()
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <stdexcept>
 #include <vector>
@@ -45,9 +46,9 @@ bool is_directory(const std::string& path)
 void make_directory(const std::string& path)
 {
   int result = mkdir(path.c_str(), 0777);
-  if (result < 0) {
-    // TODO add errno into the exception
-    throw std::runtime_error("Error creating directory");
+  if (result != 0) {
+    throw std::runtime_error("Error creating directory: " +
+                             std::string(std::strerror(errno)));
   }
 }
 
@@ -61,8 +62,8 @@ void move_file(const std::string& src, const std::string& dst)
 {
   int result = std::rename(src.c_str(), dst.c_str());
   if (result != 0)
-    // TODO add errno into the exception
-    throw std::runtime_error("Error moving file");
+    throw std::runtime_error("Error moving file: " +
+                             std::string(std::strerror(errno)));
 }
 
 void copy_file(const std::string& src, const std::string& dst, bool overwrite)
@@ -74,8 +75,8 @@ void delete_file(const std::string& path)
 {
   int result = unlink(path.c_str());
   if (result != 0)
-    // TODO add errno into the exception
-    throw std::runtime_error("Error deleting file");
+    throw std::runtime_error("Error deleting file: " +
+                             std::string(std::strerror(errno)));
 }
 
 bool has_readonly_attr(const std::string& path)
@@ -91,8 +92,8 @@ void remove_readonly_attr(const std::string& path)
   if (result == 0) {
     result = chmod(path.c_str(), sts.st_mode | S_IWUSR);
     if (result != 0)
-      // TODO add errno into the exception
-      throw std::runtime_error("Error removing read-only attribute");
+      throw std::runtime_error("Error removing read-only attribute: " +
+                               std::string(std::strerror(errno)));
   }
 }
 
@@ -113,10 +114,9 @@ Time get_modification_time(const std::string& path)
 void remove_directory(const std::string& path)
 {
   int result = rmdir(path.c_str());
-  if (result != 0) {
-    // TODO add errno into the exception
-    throw std::runtime_error("Error removing directory");
-  }
+  if (result != 0)
+    throw std::runtime_error("Error removing directory: " +
+                             std::string(std::strerror(errno)));
 }
 
 std::string get_current_path()

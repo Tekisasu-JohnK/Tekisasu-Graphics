@@ -17,6 +17,7 @@
 #include "app/commands/params.h"
 #include "app/doc_api.h"
 #include "app/ini_file.h"
+#include "app/i18n/strings.h"
 #include "app/modules/gui.h"
 #include "app/modules/palettes.h"
 #include "app/sprite_job.h"
@@ -80,7 +81,7 @@ class SpriteSizeJob : public SpriteJob {
 public:
 
   SpriteSizeJob(const ContextReader& reader, int new_width, int new_height, ResizeMethod resize_method)
-    : SpriteJob(reader, "Sprite Size") {
+    : SpriteJob(reader, Strings::sprite_size_title().c_str()) {
     m_new_width = new_width;
     m_new_height = new_height;
     m_resize_method = resize_method;
@@ -124,6 +125,8 @@ protected:
 
         auto newTileset = new doc::Tileset(sprite(), newGrid, tileset->size());
         doc::tile_index idx = 0;
+        newTileset->setName(tileset->name());
+        newTileset->setUserData(tileset->userData());
         for (doc::ImageRef tileImg : *tileset) {
           if (idx != 0) {
             doc::ImageRef newTileImg(
@@ -135,6 +138,7 @@ protected:
                 sprite()->rgbMap(0)));   // TODO first frame?
 
             newTileset->set(idx, newTileImg);
+            newTileset->setTileData(idx, tileset->getTileData(idx));
           }
 
           jobProgress((float)progress / img_count);
@@ -263,9 +267,9 @@ public:
                   doc::algorithm::RESIZE_METHOD_BILINEAR == 1 &&
                   doc::algorithm::RESIZE_METHOD_ROTSPRITE == 2,
                   "ResizeMethod enum has changed");
-    method()->addItem("Nearest-neighbor");
-    method()->addItem("Bilinear");
-    method()->addItem("RotSprite");
+    method()->addItem(Strings::sprite_size_method_nearest_neighbor());
+    method()->addItem(Strings::sprite_size_method_bilinear());
+    method()->addItem(Strings::sprite_size_method_rotsprite());
     int resize_method;
     if (params.method.isSet())
       resize_method = (int)params.method();

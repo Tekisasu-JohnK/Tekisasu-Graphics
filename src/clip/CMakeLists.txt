@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.1.2)
 
-project(clip)
+project(clip LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +23,9 @@ endif()
 set(CLIP_SOURCES clip.cpp image.cpp)
 
 if(WIN32)
-  add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+  if(MSVC)
+    add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+  endif()
   list(APPEND CLIP_SOURCES clip_win.cpp)
 elseif(APPLE)
   add_definitions(-fobjc-arc)

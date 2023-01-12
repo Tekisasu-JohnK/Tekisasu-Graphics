@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -17,7 +17,6 @@
 #include "app/doc_api.h"
 #include "app/doc_range.h"
 #include "app/i18n/strings.h"
-#include "app/modules/editors.h"
 #include "app/modules/gui.h"
 #include "app/sprite_job.h"
 #include "app/tools/tool_box.h"
@@ -46,8 +45,10 @@ class RotateJob : public SpriteJob {
 
 public:
 
-  RotateJob(const ContextReader& reader, int angle, const CelList& cels, bool rotateSprite)
-    : SpriteJob(reader, "Rotate Canvas")
+  RotateJob(const ContextReader& reader,
+            const std::string& jobName,
+            int angle, const CelList& cels, bool rotateSprite)
+    : SpriteJob(reader, jobName.c_str())
     , m_cels(cels)
     , m_rotateSprite(rotateSprite) {
     m_angle = angle;
@@ -207,7 +208,8 @@ void RotateCommand::onExecute(Context* context)
         if (tools::Tool* tool = App::instance()->toolBox()
             ->getToolById(tools::WellKnownTools::RectangularMarquee)) {
           ToolBar::instance()->selectTool(tool);
-          current_editor->startSelectionTransformation(gfx::Point(0, 0), m_angle);
+          if (auto editor = Editor::activeEditor())
+            editor->startSelectionTransformation(gfx::Point(0, 0), m_angle);
           return;
         }
       }
@@ -237,7 +239,7 @@ void RotateCommand::onExecute(Context* context)
 
     ContextReader reader(context);
     {
-      RotateJob job(reader, m_angle, cels, rotateSprite);
+      RotateJob job(reader, friendlyName(), m_angle, cels, rotateSprite);
       job.startJob();
       job.waitJob();
     }

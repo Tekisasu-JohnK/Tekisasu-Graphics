@@ -49,7 +49,7 @@ namespace app {
 class SaveFileJob : public Job, public IFileOpProgress {
 public:
   SaveFileJob(FileOp* fop)
-    : Job("Saving file")
+    : Job(Strings::save_file_saving().c_str())
     , m_fop(fop)
   {
   }
@@ -202,6 +202,10 @@ void SaveFileBaseCommand::saveDocumentInBackground(
       case AniDir::PING_PONG:
         m_selFrames = m_selFrames.makePingPong();
         break;
+      case AniDir::PING_PONG_REVERSE:
+        m_selFrames = m_selFrames.makePingPong();
+        m_selFrames = m_selFrames.makeReverse();
+        break;
     }
   }
 
@@ -254,7 +258,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
 #ifdef ENABLE_UI
     if (context->isUIAvailable() && params().ui()) {
       StatusBar::instance()->setStatusText(
-        2000, fmt::format("File <{}> saved.",
+        2000, fmt::format(Strings::save_file_saved(),
                           base::get_file_name(filename)));
     }
 #endif
@@ -298,7 +302,7 @@ void SaveFileCommand::onExecute(Context* context)
   // save-as dialog to the user to select for first time the file-name
   // for this document.
   else {
-    saveAsDialog(context, "Save File",
+    saveAsDialog(context, Strings::save_file_title(),
                  (params().filename.isSet() ? params().filename():
                                               document->filename()),
                  MarkAsSaved::On);
@@ -321,7 +325,7 @@ SaveFileAsCommand::SaveFileAsCommand()
 void SaveFileAsCommand::onExecute(Context* context)
 {
   Doc* document = context->activeDocument();
-  saveAsDialog(context, "Save As",
+  saveAsDialog(context, Strings::save_file_save_as(),
                (params().filename.isSet() ? params().filename():
                                             document->filename()),
                MarkAsSaved::On);
@@ -349,6 +353,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
   Doc* doc = context->activeDocument();
   std::string outputFilename = params().filename();
   std::string layers = kAllLayers;
+  int layersIndex = -1;
   std::string frames = kAllFrames;
   bool applyPixelRatio = false;
   double scale = params().scale();
@@ -365,7 +370,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
       [this, &win, &askOverwrite, context, doc]() -> std::string {
         std::string result =
           saveAsDialog(
-            context, "Export",
+            context, Strings::save_file_export(),
             win.outputFilenameValue(),
             MarkAsSaved::Off,
             SaveInBackground::Off,
@@ -422,6 +427,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
     win.savePref();
 
     layers = win.layersValue();
+    layersIndex = win.layersIndex();
     frames = win.framesValue();
     scale = win.resizeValue();
     params().slice(win.areaValue()); // Set slice
@@ -481,6 +487,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
       // Selected layers to export
       calculate_visible_layers(site,
                                layers,
+                               layersIndex,
                                layersVisibility);
 
       // m_selFrames is not empty if fromFrame/toFrame parameters are

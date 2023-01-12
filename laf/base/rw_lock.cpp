@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (C) 2020  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2001-2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,7 +16,6 @@
 //#define DEBUG_OBJECT_LOCKS
 
 #include "base/debug.h"
-#include "base/scoped_lock.h"
 #include "base/thread.h"
 
 #include <algorithm>
@@ -39,7 +38,7 @@ RWLock::~RWLock()
 
 bool RWLock::canWriteLockFromRead() const
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   // If only we are reading (one lock) and nobody is writting, we can
   // lock for writting..
@@ -50,7 +49,7 @@ bool RWLock::lock(LockType lockType, int timeout)
 {
   while (timeout >= 0) {
     {
-      scoped_lock lock(m_mutex);
+      std::lock_guard lock(m_mutex);
 
       switch (lockType) {
 
@@ -116,7 +115,7 @@ bool RWLock::lock(LockType lockType, int timeout)
 
 void RWLock::downgradeToRead()
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   ASSERT(m_read_locks == 0);
   ASSERT(m_write_lock);
@@ -127,7 +126,7 @@ void RWLock::downgradeToRead()
 
 void RWLock::unlock()
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   if (m_write_lock) {
     m_write_lock = false;
@@ -142,7 +141,7 @@ void RWLock::unlock()
 
 bool RWLock::weakLock(std::atomic<WeakLock>* weak_lock_flag)
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   if (m_weak_lock ||
       m_write_lock)
@@ -155,7 +154,7 @@ bool RWLock::weakLock(std::atomic<WeakLock>* weak_lock_flag)
 
 void RWLock::weakUnlock()
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   ASSERT(m_weak_lock);
   ASSERT(*m_weak_lock != WeakLock::WeakUnlocked);
@@ -171,7 +170,7 @@ bool RWLock::upgradeToWrite(int timeout)
 {
   while (timeout >= 0) {
     {
-      scoped_lock lock(m_mutex);
+      std::lock_guard lock(m_mutex);
 
       // Check that there is no weak lock
       if (m_weak_lock) {

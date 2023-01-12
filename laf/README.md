@@ -8,12 +8,7 @@ A library to create Windows, macOS, and Linux applications.
 This library is under active development so we don't provide API or
 ABI compatibility at this moment.
 
-## Modules
-
-* [base](base): Base functions for any kind of application.
-* [gfx](gfx): Generic graphics classes (rectangle, point, region, etc.)
-* [ft](ft): FreeType wrapper used by the `os` module (requires `freetype` library as dependency)
-* [os](os): Functions to create windows in your Operating System.
+* [Documentation](https://aseprite.github.io/laf/)
 
 ## Dependencies
 
@@ -70,13 +65,6 @@ ninja
 ctest
 ```
 
-## Defined Macros
-
-* `LAF_WINDOWS`: Compiling on Windows platform
-* `LAF_MACOS`: Compiling on macOS platform
-* `LAF_LINUX`: Compiling on Linux platform
-* `LAF_SKIA`: When we compile with `LAF_BACKEND=skia` (Skia library is available)
-
 ## License
 
 *laf* is distributed under the terms of [the MIT license](LICENSE.txt).
@@ -93,5 +81,6 @@ include these license notices when you distribute your software):
   and several other [third-party libraries/licenses](https://github.com/aseprite/skia/tree/master/third_party).
 * `gfx::Region` uses the pixman library if you are not compiling with
   the Skia backend (e.g. a if you want to create only Command Line
-  utilities that uses the `gfx::Region` class). Pixman is distributed
-  under the [MIT License](https://cgit.freedesktop.org/pixman/tree/COPYING).
+  utilities that uses the `gfx::Region` class) on Linux or macOS. On
+  Windows we use an alternative implementation with [HRGN](https://learn.microsoft.com/en-us/windows/win32/gdi/regions).
+  Pixman is distributed under the [MIT License](https://cgit.freedesktop.org/pixman/tree/COPYING).

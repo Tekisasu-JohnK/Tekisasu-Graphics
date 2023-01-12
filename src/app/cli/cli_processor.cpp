@@ -390,35 +390,49 @@ int CliProcessor::process(Context* ctx)
           if (m_exporter)
             m_exporter->setFilenameFormat(cof.filenameFormat);
         }
+        // --tagname-format
+        else if (opt == &m_options.tagnameFormat()) {
+          cof.tagnameFormat = value.value();
+          if (m_exporter)
+            m_exporter->setTagnameFormat(cof.tagnameFormat);
+        }
         // --save-as <filename>
         else if (opt == &m_options.saveAs()) {
           if (lastDoc) {
             std::string fn = value.value();
 
-            // Automatic --split-layer, --split-tags, --split-slices
-            // in case the output filename already contains {layer},
-            // {tag}, or {slice} template elements.
-            bool hasLayerTemplate = (is_layer_in_filename_format(fn) ||
-                                     is_group_in_filename_format(fn));
-            bool hasTagTemplate = is_tag_in_filename_format(fn);
-            bool hasSliceTemplate = is_slice_in_filename_format(fn);
+            // Automatic --filename-format
+            // in case the output filename already contains template elements.
+            if (is_template_in_filename(fn)) {
+              cof.filenameFormat = fn;
+              // Automatic --split-layer, --split-tags, --split-slices
+              // in case the output filename already contains {layer},
+              // {tag}, or {slice} template elements.
+              bool hasLayerTemplate = (is_layer_in_filename_format(fn) ||
+                                      is_group_in_filename_format(fn));
+              bool hasTagTemplate = is_tag_in_filename_format(fn);
+              bool hasSliceTemplate = is_slice_in_filename_format(fn);
 
-            if (hasLayerTemplate || hasTagTemplate || hasSliceTemplate) {
-              cof.splitLayers = (cof.splitLayers || hasLayerTemplate);
-              cof.splitTags = (cof.splitTags || hasTagTemplate);
-              cof.splitSlices = (cof.splitSlices || hasSliceTemplate);
-              cof.filenameFormat =
-                get_default_filename_format(
-                  fn,
-                  true,                                   // With path
-                  (lastDoc->sprite()->totalFrames() > 1), // Has frames
-                  false,                                  // Has layer
-                  false);                                 // Has frame tag
+              if (hasLayerTemplate || hasTagTemplate || hasSliceTemplate) {
+                cof.splitLayers = (cof.splitLayers || hasLayerTemplate);
+                cof.splitTags = (cof.splitTags || hasTagTemplate);
+                cof.splitSlices = (cof.splitSlices || hasSliceTemplate);
+              }
+
+              // Save all documents
+              for (auto doc : ctx->documents()) {
+                ctx->setActiveDocument(doc);
+                cof.filename = doc->filename();
+                cof.document = doc;
+                saveFile(ctx, cof);
+              }
+              ctx->setActiveDocument(lastDoc);
             }
-
-            cof.document = lastDoc;
-            cof.filename = fn;
-            saveFile(ctx, cof);
+            else {
+              cof.filename = fn;
+              cof.document = lastDoc;
+              saveFile(ctx, cof);
+            }
           }
           else
             console.printf("A document is needed before --save-as argument\n");
@@ -429,7 +443,7 @@ int CliProcessor::process(Context* ctx)
             ASSERT(cof.document == lastDoc);
 
             std::string filename = value.value();
-            m_delegate->loadPalette(ctx, cof, filename);
+            m_delegate->loadPalette(ctx, filename);
           }
           else {
             console.printf("You need to load a document to change its palette with --palette\n");

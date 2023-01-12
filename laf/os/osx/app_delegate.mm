@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2021  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -60,7 +60,7 @@
 @end
 
 @protocol ValidateMenuItemProtocolOSX
-- (void)validateMenuItem;
+- (void)validateLafMenuItem;
 @end
 
 @implementation AppDelegateOSX
@@ -127,8 +127,9 @@
 
 - (BOOL)validateMenuItem:(NSMenuItem*)menuItem
 {
-  if ([menuItem respondsToSelector:@selector(validateMenuItem)]) {
-    [((id<ValidateMenuItemProtocolOSX>)menuItem) validateMenuItem];
+  if (menuItem &&
+      [menuItem respondsToSelector:@selector(validateLafMenuItem)]) {
+    [((id<ValidateMenuItemProtocolOSX>)menuItem) validateLafMenuItem];
     return menuItem.enabled;
   }
   else

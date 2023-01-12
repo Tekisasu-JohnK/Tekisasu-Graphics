@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2021  Igara Studio S.A.
+// Copyright (C) 2020-2022  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,17 +15,130 @@
 #include "os/osx/native_dialogs.h"
 #include "os/window.h"
 
+#include <map>
+
+namespace {
+
+// macOS does a super strange thing to handle the keyboard shortcuts
+// when a NSSavePanel is open: it sends all the Command+key
+// combinations to the main menu to handle the most basic shortcuts
+// like Command+C (to run the copy: selector), or Command+V (paste:),
+// etc.
+//
+// So what we have to do if the main menu doesn't provide the standard
+// Edit selectors? (which is our case with our MenuItemOSX and MenuOSX
+// implementations):
+//
+// 1. Before we open the NSSavePanel, find the Edit menu that was
+//    specified by the user with os::MenuItem::setAsStandardEditMenuItem()
+// 2. Replace the Edit menu with a custom made one with the
+//    standard Edit menu prepared especially with selectors
+//    (undo:, redo:, cut:, etc.)
+// 3. Each menu item that contains a standard keyboard shortcut
+//    (Command+C, Command+V, etc.) must be modified, because those
+//    shortcuts are now used by this new Edit menu. So we remove the
+//    keyEquivalent of each one. This is necessary only when one of
+//    those items are outside the replaced Edit menu (e.g. if we have
+//    Command+A to select all in other menu like Select > All, instead
+//    of Edit > Select All)
+// 4. After the NSSavePanel is closed, we restore all keyEquivalent
+//    shortcuts and the old Edit menu.
+//
+class OSXEditMenuHack {
+public:
+  OSXEditMenuHack(NSMenuItem* currentEditMenuItem)
+    : m_editMenuItem(currentEditMenuItem) {
+    if (!m_editMenuItem)
+      return;
+
+    auto editMenu = [NSMenu new];
+
+    // Check MenuItemOSX::syncTitle(), but basically on macOS the
+    // NSMenu title is the one displayed for NSMenuItem with submenus.
+    editMenu.title = currentEditMenuItem.title;
+
+    [editMenu addItem:newItem(@"Undo", @selector(undo:), @"z", NSEventModifierFlagCommand)];
+    [editMenu addItem:newItem(@"Redo", @selector(redo:), @"Z", NSEventModifierFlagCommand)];
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    [editMenu addItem:newItem(@"Cut", @selector(cut:), @"x", NSEventModifierFlagCommand)];
+    [editMenu addItem:newItem(@"Copy", @selector(copy:), @"c", NSEventModifierFlagCommand)];
+    [editMenu addItem:newItem(@"Paste", @selector(paste:), @"v", NSEventModifierFlagCommand)];
+    [editMenu addItem:newItem(@"Delete", @selector(delete:), @"", 0)];
+    [editMenu addItem:newItem(@"Select All", @selector(selectAll:), @"a", NSEventModifierFlagCommand)];
+
+    m_submenu = m_editMenuItem.submenu;
+    m_editMenuItem.submenu = editMenu;
+  }
+
+  ~OSXEditMenuHack() {
+    if (!m_editMenuItem)
+      return;
+
+    // Restore all key equivalents
+    for (auto& kv : m_restoreKeys)
+      kv.first.keyEquivalent = kv.second;
+
+    m_editMenuItem.submenu = m_submenu;
+  }
+
+private:
+  NSMenuItem* newItem(NSString* title, SEL sel,
+                      NSString* key,
+                      NSEventModifierFlags flags) {
+    auto item = [[NSMenuItem alloc] initWithTitle:title
+                 action:sel
+                 keyEquivalent:key];
+    if (flags)
+      item.keyEquivalentModifierMask = flags;
+
+    // Search for menu items in the main menu that already contain the
+    // same keyEquivalent, and disable them temporarily.
+    disableMenuItemsWithKeyEquivalent(
+      [[NSApplication sharedApplication] mainMenu],
+      key, flags);
+
+    return item;
+  }
+
+  void disableMenuItemsWithKeyEquivalent(NSMenu* menu,
+                                         NSString* key,
+                                         NSEventModifierFlags flags) {
+    for (NSMenuItem* item in menu.itemArray) {
+      if ([item.keyEquivalent isEqualToString:key] &&
+          item.keyEquivalentModifierMask == flags) {
+        m_restoreKeys[item] = item.keyEquivalent;
+        item.keyEquivalent = @"";
+      }
+      if (item.submenu)
+        disableMenuItemsWithKeyEquivalent(item.submenu, key, flags);
+    }
+  }
+
+  NSMenuItem* m_editMenuItem = nullptr;
+  NSMenu* m_submenu = nullptr;
+  std::map<NSMenuItem*, NSString*> m_restoreKeys;
+};
+
+} // anonymous namespace
+
+namespace os {
+extern NSMenuItem* g_standardEditMenuItem;
+}
+
 @interface OpenSaveHelper : NSObject {
 @private
   NSSavePanel* panel;
   os::Window* window;
   int result;
+  std::function<void()> fileTypeChangeObserver;
 }
 - (id)init;
 - (void)setPanel:(NSSavePanel*)panel;
 - (void)setWindow:(os::Window*)window;
 - (void)runModal;
 - (int)result;
+- (void)fileTypeChange;
+- (void)setFileTypeChangeObserver:(std::function<void()>)observer;
 @end
 
 @implementation OpenSaveHelper
@@ -51,9 +164,11 @@
 // This is executed in the main thread.
 - (void)runModal
 {
-  [[[NSApplication sharedApplication] mainMenu] setAutoenablesItems:NO];
   os::NativeCursor oldCursor = window->nativeCursor();
   window->setCursor(os::NativeCursor::Arrow);
+
+  OSXEditMenuHack hack(os::g_standardEditMenuItem);
+  [[[NSApplication sharedApplication] mainMenu] setAutoenablesItems:NO];
 
 #ifndef __MAC_10_6              // runModalForTypes is deprecated in 10.6
   if ([panel isKindOfClass:[NSOpenPanel class]]) {
@@ -78,6 +193,17 @@
 - (int)result
 {
   return result;
+}
+
+- (void)fileTypeChange
+{
+  if (fileTypeChangeObserver)
+    fileTypeChangeObserver();
+}
+
+- (void)setFileTypeChangeObserver:(std::function<void()>)observer
+{
+  fileTypeChangeObserver = observer;
 }
 
 @end
@@ -121,14 +247,27 @@ public:
 
       if (m_type != Type::OpenFolder && !m_filters.empty()) {
         NSMutableArray* types = [[NSMutableArray alloc] init];
-        // The first extension in the array is used as the default one.
-        if (!m_defExtension.empty())
-          [types addObject:[NSString stringWithUTF8String:m_defExtension.c_str()]];
+
+        if (m_type == Type::OpenFile ||
+            m_type == Type::OpenFiles) {
+          // Empty item so we can show all the allowed file types again
+          [types addObject:@""];
+        }
+        else if (m_type == Type::SaveFile) {
+          // The first extension in the array is used as the default one.
+          if (!m_defExtension.empty())
+            [types addObject:[NSString stringWithUTF8String:m_defExtension.c_str()]];
+        }
+
         for (const auto& filter : m_filters)
           [types addObject:[NSString stringWithUTF8String:filter.first.c_str()]];
+
         [panel setAllowedFileTypes:types];
         if (m_type == Type::SaveFile)
           [panel setAllowsOtherFileTypes:NO];
+
+        // Create accessory view to select file type
+        [panel setAccessoryView:createAccessoryView(panel)];
       }
 
       // Always show the extension
@@ -144,6 +283,46 @@ public:
       OpenSaveHelper* helper = [OpenSaveHelper new];
       [helper setPanel:panel];
       [helper setWindow:window];
+
+      // Configure the file type popup/combobox.
+      if (m_popup) {
+        [m_popup setTarget:helper];
+        [m_popup setAction:@selector(fileTypeChange)];
+
+        // Select the file type item depending on the extension of
+        // m_filename.
+        if (!m_filename.empty()) {
+          auto ext = base::get_file_extension(m_filename);
+          if (ext.empty())
+            ext = m_defExtension;
+          int i = 0;
+          for (NSMenuItem* item in m_popup.itemArray) {
+            if (ext == item.title.UTF8String) {
+              [m_popup selectItemAtIndex:i];
+              break;
+            }
+            ++i;
+          }
+        }
+
+        // Function to be called when user selects another file type
+        // from the combobox.
+        [helper setFileTypeChangeObserver:[this, panel](){
+          NSString* extension = m_popup.selectedItem.title;
+          if (extension.length == 0) {
+            NSMutableArray* allTypes = [[NSMutableArray alloc] init];
+            for (NSMenuItem* item in m_popup.itemArray) {
+              if (item.title.length != 0)
+                [allTypes addObject:item.title];
+            }
+            [panel setAllowedFileTypes:allTypes];
+          }
+          else {
+            [panel setAllowedFileTypes:@[extension]];
+          }
+        }];
+      }
+
       [helper performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
 
       if ([helper result] == NSFileHandlingPanelOKButton) {
@@ -160,14 +339,52 @@ public:
         }
         retValue = true;
       }
+
+      m_popup = nullptr;
     }
     return retValue;
   }
 
 private:
 
+  // The accessory view is any extra NSView that we want to show in
+  // the NSSavePanel/NSOpenPanel, in our case, we want to show a
+  // combobox (NSPopUpButton) with the available file formats.
+  NSView* createAccessoryView(NSSavePanel* panel) {
+    auto label = [NSTextField labelWithString:@"File Format:"];
+
+    if ([NSFont respondsToSelector:@selector(smallSystemFontSize)])
+      label.font = [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
+    if ([NSColor respondsToSelector:@selector(secondaryLabelColor)])
+      label.textColor = [NSColor secondaryLabelColor];
+
+    // Combobox with file formats
+    auto popup = [[NSPopUpButton alloc] initWithFrame:NSZeroRect
+                                            pullsDown:false];
+    popup.autoenablesItems = false; // All items enabled
+    for (NSString* item in panel.allowedFileTypes) {
+      [popup addItemWithTitle:item];
+    }
+    m_popup = popup;
+
+    auto hbox = [[NSStackView alloc] initWithFrame:NSZeroRect];
+    [hbox addView:label inGravity:NSStackViewGravityCenter];
+    [hbox addView:popup inGravity:NSStackViewGravityCenter];
+
+    auto accessoryView = [[NSStackView alloc] initWithFrame:NSZeroRect];
+    [accessoryView addView:hbox inGravity:NSStackViewGravityCenter];
+    accessoryView.edgeInsets = NSEdgeInsetsMake(10, 0, 10, 0);
+
+    return accessoryView;
+  }
+
   std::string m_filename;
   base::paths m_filenames;
+
+  // Keeps a pointer to the list/combobox of file types so we use it
+  // easily (configuring its target/action properties + accessing its
+  // selected item).
+  NSPopUpButton* m_popup = nullptr;
 };
 
 NativeDialogsOSX::NativeDialogsOSX()

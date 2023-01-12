@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -15,7 +15,7 @@
 #include "app/commands/commands.h"
 #include "app/console.h"
 #include "app/context_access.h"
-#include "app/modules/editors.h"
+#include "app/i18n/strings.h"
 #include "app/tools/active_tool.h"
 #include "app/tools/ink.h"
 #include "app/tools/tool_box.h"
@@ -46,7 +46,7 @@ protected:
   void onQuickboxCancel(Editor* editor) override;
 
   std::string onGetContextBarHelp() override {
-    return "Select brush bounds | Right-click to cut";
+    return Strings::new_brush_context_bar_help();
   }
 
 private:
@@ -66,24 +66,26 @@ bool NewBrushCommand::onEnabled(Context* context)
 
 void NewBrushCommand::onExecute(Context* context)
 {
-  ASSERT(current_editor);
-  if (!current_editor)
+  auto editor = Editor::activeEditor();
+  ASSERT(editor);
+  if (!editor)
     return;
 
   // If there is no visible mask, the brush must be selected from the
   // current editor.
   if (!context->activeDocument()->isMaskVisible()) {
-    EditorStatePtr state = current_editor->getState();
+    EditorStatePtr state = editor->getState();
     if (dynamic_cast<SelectBoxState*>(state.get())) {
       // If already are in "SelectBoxState" state, in this way we
       // avoid creating a stack of several "SelectBoxState" states.
       return;
     }
 
-    current_editor->setState(
+    auto editor = Editor::activeEditor();
+    editor->setState(
       EditorStatePtr(
         new SelectBoxState(
-          this, current_editor->sprite()->bounds(),
+          this, editor->sprite()->bounds(),
           SelectBoxState::Flags(
             int(SelectBoxState::Flags::DarkOutside) |
             int(SelectBoxState::Flags::QuickBox)))));
@@ -173,7 +175,7 @@ void NewBrushCommand::createBrush(const Site& site, const Mask* mask)
     CommandId::ChangeBrush(), params);
   if (key && !key->accels().empty()) {
     std::string tooltip;
-    tooltip += "Shortcut: ";
+    tooltip += Strings::new_brush_shortcut() + " ";
     tooltip += key->accels().front().toString();
     StatusBar::instance()->showTip(2000, tooltip);
   }

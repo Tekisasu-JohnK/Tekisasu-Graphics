@@ -13,11 +13,11 @@
 
 #include "app/app.h"
 #include "app/app_menus.h"
+#include "app/commands/command.h"
 #include "app/commands/commands.h"
 #include "app/crash/data_recovery.h"
 #include "app/i18n/strings.h"
 #include "app/ini_file.h"
-#include "app/modules/editors.h"
 #include "app/notification_delegate.h"
 #include "app/pref/preferences.h"
 #include "app/ui/browser_view.h"
@@ -159,12 +159,7 @@ MainWindow::MainWindow()
 
   // When the language is change, we reload the menu bar strings and
   // relayout the whole main window.
-  Strings::instance()->LanguageChange.connect(
-    [this]{
-      m_menuBar->reload();
-      layout();
-      invalidate();
-    });
+  Strings::instance()->LanguageChange.connect([this] { onLanguageChange(); });
 }
 
 MainWindow::~MainWindow()
@@ -201,6 +196,22 @@ MainWindow::~MainWindow()
   // Remove the root-menu from the menu-bar (because the rootmenu
   // module should destroy it).
   m_menuBar->setMenu(NULL);
+}
+
+void MainWindow::onLanguageChange()
+{
+  auto commands = Commands::instance();
+  std::vector<std::string> commandIDs;
+  commands->getAllIds(commandIDs);
+
+  for (const auto& commandID : commandIDs) {
+    Command* command = commands->byId(commandID.c_str());
+    command->generateFriendlyName();
+  }
+
+  m_menuBar->reload();
+  layout();
+  invalidate();
 }
 
 DocView* MainWindow::getDocView()

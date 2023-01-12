@@ -1,5 +1,5 @@
 // Clip Library
-// Copyright (c) 2020 David Capello
+// Copyright (c) 2020-2022 David Capello
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -32,7 +32,7 @@ struct coinit {
 template<class T>
 class comptr {
 public:
-  comptr() : m_ptr(nullptr) { }
+  comptr() { }
   explicit comptr(T* ptr) : m_ptr(ptr) { }
   comptr(const comptr&) = delete;
   comptr& operator=(const comptr&) = delete;
@@ -50,7 +50,7 @@ public:
     }
   }
 private:
-  T* m_ptr;
+  T* m_ptr = nullptr;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -182,6 +182,11 @@ bool read_png(const uint8_t* buf,
     if (FAILED(hr))
       return false;
   }
+
+  // Can decoder be nullptr if hr is S_OK/successful? We've received
+  // some crash reports that might indicate this.
+  if (!decoder)
+    return false;
 
   hr = decoder->Initialize(stream.get(), WICDecodeMetadataCacheOnDemand);
   if (FAILED(hr))

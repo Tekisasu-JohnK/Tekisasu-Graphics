@@ -15,7 +15,6 @@
 #include "app/color.h"
 #include "app/color_utils.h"
 #include "app/commands/commands.h"
-#include "app/modules/editors.h"
 #include "app/modules/gfx.h"
 #include "app/modules/gui.h"
 #include "app/modules/palettes.h"
@@ -815,13 +814,15 @@ void PaletteView::onPaint(ui::PaintEvent& ev)
   if (m_delegate) {
     switch (m_style) {
 
-      case FgBgColors:
+      case FgBgColors: {
         fgIndex = findExactIndex(m_delegate->onPaletteViewGetForegroundIndex());
         bgIndex = findExactIndex(m_delegate->onPaletteViewGetBackgroundIndex());
 
-        if (current_editor && current_editor->sprite()->pixelFormat() == IMAGE_INDEXED)
-          transparentIndex = current_editor->sprite()->transparentColor();
+        auto editor = Editor::activeEditor();
+        if (editor && editor->sprite()->pixelFormat() == IMAGE_INDEXED)
+          transparentIndex = editor->sprite()->transparentColor();
         break;
+      }
 
       case FgBgTiles:
         fgIndex = m_delegate->onPaletteViewGetForegroundTile();
@@ -974,10 +975,12 @@ void PaletteView::onPaint(ui::PaintEvent& ev)
 
         IntersectClip clip(g, clipR);
         if (clip) {
-          CheckeredDrawMode checkered(g, getMarchingAntsOffset(),
-                                      gfx::rgba(0, 0, 0, 255),
-                                      gfx::rgba(255, 255, 255, 255));
-          g->drawRect(gfx::rgba(0, 0, 0), box);
+          ui::Paint paint;
+          paint.style(ui::Paint::Stroke);
+          ui::set_checkered_paint_mode(paint, getMarchingAntsOffset(),
+                                       gfx::rgba(0, 0, 0, 255),
+                                       gfx::rgba(255, 255, 255, 255));
+          g->drawRect(box, paint);
         }
       }
     }
@@ -1310,8 +1313,12 @@ int PaletteView::findExactIndex(const app::Color& color) const
 {
   switch (color.getType()) {
 
-    case Color::MaskType:
-      return (current_editor ? current_editor->sprite()->transparentColor(): -1);
+    case Color::MaskType: {
+      auto editor = Editor::activeEditor();
+      if (editor && editor->sprite()->pixelFormat() == IMAGE_INDEXED)
+        return editor->sprite()->transparentColor();
+      return currentPalette()->findMaskColor();
+    }
 
     case Color::RgbType:
     case Color::HsvType:

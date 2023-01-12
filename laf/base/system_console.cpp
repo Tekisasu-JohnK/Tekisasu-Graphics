@@ -67,8 +67,8 @@ void SystemConsole::prepareShell()
   if (withConsole)
     ::FreeConsole();
 
-  // In this case, for a better user experience, here we create a new
-  // console so he can write text in a synchronized way with the
+  // In this case, for a better user experience, we create a new
+  // console so we can write text in a synchronized way with the
   // console. (The parent console stdin is not reliable for
   // interactive command input in the current state, without doing
   // this the input from the cmd.exe would be executed by cmd.exe and

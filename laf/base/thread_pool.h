@@ -12,7 +12,7 @@
 #include <functional>
 #include <mutex>
 #include <queue>
-#include <thread>   // We want to replace base::thread with base::thread
+#include <thread>
 #include <vector>
 
 namespace base {

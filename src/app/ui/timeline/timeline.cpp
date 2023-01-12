@@ -28,7 +28,6 @@
 #include "app/doc_undo.h"
 #include "app/i18n/strings.h"
 #include "app/loop_tag.h"
-#include "app/modules/editors.h"
 #include "app/modules/gfx.h"
 #include "app/modules/gui.h"
 #include "app/thumbnails.h"
@@ -397,6 +396,9 @@ void Timeline::updateUsingEditor(Editor* editor)
 
 void Timeline::detachDocument()
 {
+  if (m_confPopup && m_confPopup->isVisible())
+    m_confPopup->closeWindow(nullptr);
+
   m_firstFrameConn.disconnect();
 
   if (m_document) {
@@ -513,7 +515,8 @@ void Timeline::setFrame(frame_t frame, bool byUser)
 
     if (isPlaying)
       m_editor->play(false,
-                     Preferences::instance().editor.playAll());
+                     Preferences::instance().editor.playAll(),
+                     Preferences::instance().editor.playSubtags());
   }
 }
 
@@ -584,7 +587,7 @@ void Timeline::activateClipboardRange()
 }
 
 Tag* Timeline::getTagByFrame(const frame_t frame,
-                                       const bool getLoopTagIfNone)
+                             const bool getLoopTagIfNone)
 {
   if (!m_sprite)
     return nullptr;
@@ -1926,6 +1929,12 @@ void Timeline::onTagRename(DocEvent& ev)
   invalidateHit(Hit(PART_TAGS));
 }
 
+void Timeline::onLayerCollapsedChanged(DocEvent& ev)
+{
+  regenerateRows();
+  invalidate();
+}
+
 void Timeline::onStateChanged(Editor* editor)
 {
   m_aniControls.updateUsingEditor(editor);
@@ -2069,11 +2078,12 @@ void Timeline::drawClipboardRange(ui::Graphics* g)
 
   IntersectClip clip(g, getRangeClipBounds(clipboard_range));
   if (clip) {
-    CheckeredDrawMode checkered(g, m_offset_count,
-                                gfx::rgba(0, 0, 0, 255),
-                                gfx::rgba(255, 255, 255, 255));
-    g->drawRect(gfx::rgba(0, 0, 0),
-                getRangeBounds(clipboard_range));
+    ui::Paint paint;
+    paint.style(ui::Paint::Stroke);
+    ui::set_checkered_paint_mode(paint, m_offset_count,
+                                 gfx::rgba(0, 0, 0, 255),
+                                 gfx::rgba(255, 255, 255, 255));
+    g->drawRect(getRangeBounds(clipboard_range), paint);
   }
 }
 
@@ -4126,11 +4136,6 @@ skin::SkinTheme* Timeline::skinTheme() const
   return SkinTheme::get(this);
 }
 
-gfx::Size Timeline::celBoxSize() const
-{
-  return gfx::Size(frameBoxWidth(), layerBoxHeight());
-}
-
 int Timeline::headerBoxWidth() const
 {
   return skinTheme()->dimensions.timelineBaseSize();
@@ -4441,9 +4446,7 @@ void Timeline::setLayerCollapsedFlag(const layer_t l, const bool state)
 
   if (layer->isGroup() && layer->isCollapsed() != state) {
     layer->setCollapsed(state);
-
-    regenerateRows();
-    invalidate();
+    m_document->notifyLayerGroupCollapseChange(layer);
   }
 }
 

@@ -29,6 +29,7 @@ struct ExportSpriteSheetParams : public NewParams {
   Param<std::string> dataFilename { this, std::string(), "dataFilename" };
   Param<SpriteSheetDataFormat> dataFormat { this, SpriteSheetDataFormat::Default, "dataFormat" };
   Param<std::string> filenameFormat { this, std::string(), "filenameFormat" };
+  Param<std::string> tagnameFormat { this, std::string(), "tagnameFormat" };
   Param<int> borderPadding { this, 0, "borderPadding" };
   Param<int> shapePadding { this, 0, "shapePadding" };
   Param<int> innerPadding { this, 0, "innerPadding" };
@@ -40,6 +41,12 @@ struct ExportSpriteSheetParams : public NewParams {
   Param<bool> mergeDuplicates { this, false, "mergeDuplicates" };
   Param<bool> openGenerated { this, false, "openGenerated" };
   Param<std::string> layer { this, std::string(), "layer" };
+  // TODO The layerIndex parameter is for internal use only, layers
+  //      are counted in the same order as they are displayed in the
+  //      Timeline or in the Export Sprite Sheet combobox. But this
+  //      index is different to the one specified in the .aseprite
+  //      file spec (where layers are counted from bottom to top).
+  Param<int> layerIndex { this, -1, "_layerIndex" };
   Param<std::string> tag { this, std::string(), "tag" };
   Param<bool> splitLayers { this, false, "splitLayers" };
   Param<bool> splitTags { this, false, "splitTags" };

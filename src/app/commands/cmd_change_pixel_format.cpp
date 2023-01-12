@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -18,7 +18,6 @@
 #include "app/extensions.h"
 #include "app/i18n/strings.h"
 #include "app/load_matrix.h"
-#include "app/modules/editors.h"
 #include "app/modules/gui.h"
 #include "app/modules/palettes.h"
 #include "app/sprite_job.h"
@@ -28,7 +27,6 @@
 #include "app/ui/editor/editor_render.h"
 #include "app/ui/rgbmap_algorithm_selector.h"
 #include "app/ui/skin/skin_theme.h"
-#include "base/thread.h"
 #include "doc/image.h"
 #include "doc/layer.h"
 #include "doc/sprite.h"
@@ -44,7 +42,9 @@
 #include "ui/size_hint_event.h"
 
 #include "color_mode.xml.h"
+
 #include <string>
+#include <thread>
 
 namespace app {
 
@@ -162,7 +162,7 @@ private:
   bool m_running;
   bool m_stopFlag;
   double m_progress;
-  base::thread m_thread;
+  std::thread m_thread;
 };
 
 #ifdef ENABLE_UI
@@ -171,17 +171,13 @@ class ConversionItem : public ListItem {
 public:
   ConversionItem(const doc::PixelFormat pixelFormat)
     : m_pixelFormat(pixelFormat) {
+    std::string toMode;
     switch (pixelFormat) {
-      case IMAGE_RGB:
-        setText("-> RGB");
-        break;
-      case IMAGE_GRAYSCALE:
-        setText("-> Grayscale");
-        break;
-      case IMAGE_INDEXED:
-        setText("-> Indexed");
-        break;
+      case IMAGE_RGB:       toMode = Strings::commands_ChangePixelFormat_RGB();       break;
+      case IMAGE_GRAYSCALE: toMode = Strings::commands_ChangePixelFormat_Grayscale(); break;
+      case IMAGE_INDEXED:   toMode = Strings::commands_ChangePixelFormat_Indexed();   break;
     }
+    setText(fmt::format("-> {}", toMode));
   }
   doc::PixelFormat pixelFormat() const { return m_pixelFormat; }
 private:
@@ -204,11 +200,13 @@ public:
     const doc::PixelFormat from = m_editor->sprite()->pixelFormat();
 
     // Add the color mode in the window title
+    std::string fromMode;
     switch (from) {
-      case IMAGE_RGB: setText(text() + ": RGB"); break;
-      case IMAGE_GRAYSCALE: setText(text() + ": Grayscale"); break;
-      case IMAGE_INDEXED: setText(text() + ": Indexed"); break;
+      case IMAGE_RGB:       fromMode = Strings::commands_ChangePixelFormat_RGB();       break;
+      case IMAGE_GRAYSCALE: fromMode = Strings::commands_ChangePixelFormat_Grayscale(); break;
+      case IMAGE_INDEXED:   fromMode = Strings::commands_ChangePixelFormat_Indexed();   break;
     }
+    setText(fmt::format("{}: {}", text(), fromMode));
 
     // Add conversion items
     if (from != IMAGE_RGB)
@@ -618,7 +616,7 @@ void ChangePixelFormatCommand::onExecute(Context* context)
 
 #ifdef ENABLE_UI
   if (m_useUI) {
-    ColorModeWindow window(current_editor);
+    ColorModeWindow window(Editor::activeEditor());
 
     window.remapWindow();
     window.centerWindow();
@@ -646,7 +644,7 @@ void ChangePixelFormatCommand::onExecute(Context* context)
 
   {
     const ContextReader reader(context);
-    SpriteJob job(reader, "Color Mode Change");
+    SpriteJob job(reader, Strings::color_mode_title().c_str());
     Sprite* sprite(job.sprite());
 
     // TODO this was moved in the main UI thread because

@@ -41,7 +41,6 @@ set(BASE_SOURCES
   mem_utils.cpp
   memory.cpp
   memory_dump.cpp
-  mutex.cpp
   platform.cpp
   process.cpp
   program_options.cpp

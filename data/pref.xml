@@ -180,6 +180,7 @@
       <option id="straight_line_preview" type="bool" default="true" />
       <option id="play_once" type="bool" default="false" />
       <option id="play_all" type="bool" default="false" />
+      <option id="play_subtags" type="bool" default="false" />
       <!-- TODO this would be nice to be "true" but we have to fix
            some performance issue rendering huge sprites with small
            zoom levels -->
@@ -211,6 +212,7 @@
     <section id="preview" text="Preview">
       <option id="play_once" type="bool" default="false" />
       <option id="play_all" type="bool" default="false" />
+      <option id="play_subtags" type="bool" default="false" />
     </section>
     <section id="theme" text="Theme">
       <option id="selected" type="std::string" default="&quot;default&quot;" />
@@ -221,11 +223,11 @@
       <option id="api" type="std::string" />
     </section>
     <section id="experimental" text="Experimental">
-      <option id="multiple_windows" type="bool" default="true" />
+      <option id="multiple_windows" type="bool" default="false" />
       <option id="new_render_engine" type="bool" default="true" />
       <option id="new_blend" type="bool" default="true" />
       <option id="use_native_clipboard" type="bool" default="true" />
-      <option id="use_native_file_dialog" type="bool" default="false" />
+      <option id="use_native_file_dialog" type="bool" default="true" />
       <option id="use_shaders_for_color_selectors" type="bool" default="true" />
       <option id="hue_with_sat_value_for_color_selector" type="bool" default="false" />
       <option id="one_finger_as_mouse_movement" type="bool" default="true" />
@@ -510,6 +512,7 @@
       <option id="resize_scale" type="double" default="1" />
       <option id="area" type="std::string" />
       <option id="layer" type="std::string" />
+      <option id="layer_index" type="int" default ="-1" />
       <option id="frame_tag" type="std::string" />
       <option id="ani_dir" type="doc::AniDir" default="doc::AniDir::FORWARD" />
       <option id="apply_pixel_ratio" type="bool" default="false" />
@@ -526,6 +529,7 @@
       <option id="data_filename" type="std::string" />
       <option id="data_format" type="SpriteSheetDataFormat" default="SpriteSheetDataFormat::Default" />
       <option id="filename_format" type="std::string" />
+      <option id="tagname_format" type="std::string" />
       <option id="border_padding" type="int" default="0" />
       <option id="shape_padding" type="int" default="0" />
       <option id="inner_padding" type="int" default="0" />
@@ -537,6 +541,7 @@
       <option id="ignore_empty" type="bool" default="false" />
       <option id="open_generated" type="bool" default="false" />
       <option id="layer" type="std::string" />
+      <option id="layer_index" type="int" default ="-1" />
       <option id="frame_tag" type="std::string" />
       <option id="split_layers" type="bool" default="false" />
       <option id="split_tags" type="bool" default="false" />

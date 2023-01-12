@@ -18,7 +18,6 @@
 #include "app/doc_access.h"
 #include "app/doc_api.h"
 #include "app/i18n/strings.h"
-#include "app/modules/editors.h"
 #include "app/modules/gui.h"
 #include "app/modules/palettes.h"
 #include "app/pref/preferences.h"
@@ -70,10 +69,10 @@ public:
       (int)app::SpriteSheetType::Columns == 4,
       "SpriteSheetType enum changed");
 
-    sheetType()->addItem("Horizontal Strip");
-    sheetType()->addItem("Vertical Strip");
-    sheetType()->addItem("By Rows");
-    sheetType()->addItem("By Columns");
+    sheetType()->addItem(Strings::import_sprite_sheet_type_horz());
+    sheetType()->addItem(Strings::import_sprite_sheet_type_vert());
+    sheetType()->addItem(Strings::import_sprite_sheet_type_rows());
+    sheetType()->addItem(Strings::import_sprite_sheet_type_cols());
     sheetType()->setSelectedItemIndex((int)app::SpriteSheetType::Rows-1);
 
     sheetType()->Change.connect([this]{ onSheetTypeChange(); });
@@ -251,7 +250,7 @@ protected:
   }
 
   std::string onGetContextBarHelp() override {
-    return "Select bounds to identify sprite frames";
+    return Strings::import_sprite_sheet_context_bar_help();
   }
 
 private:
@@ -310,7 +309,7 @@ private:
     if (m_document && !m_editor) {
       m_rect = getRectFromEntries();
       m_padding = getPaddingFromEntries();
-      m_editor = current_editor;
+      m_editor = Editor::activeEditor();
       m_editorState.reset(
         new SelectBoxState(
           this, m_rect,
@@ -513,11 +512,13 @@ void ImportSpriteSheetCommand::onExecute(Context* context)
     // The following steps modify the sprite, so we wrap all
     // operations in a undo-transaction.
     ContextWriter writer(context);
-    Tx tx(writer.context(), "Import Sprite Sheet", ModifyDocument);
+    Tx tx(
+      writer.context(), Strings::import_sprite_sheet_title(), ModifyDocument);
     DocApi api = document->getApi(tx);
 
     // Add the layer in the sprite.
-    LayerImage* resultLayer = api.newLayer(sprite->root(), "Sprite Sheet");
+    LayerImage* resultLayer =
+      api.newLayer(sprite->root(), Strings::import_sprite_sheet_layer_name());
 
     // Add all frames+cels to the new layer
     for (size_t i=0; i<animation.size(); ++i) {

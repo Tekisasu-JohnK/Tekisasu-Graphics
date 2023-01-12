@@ -31,10 +31,6 @@ void draw_text_with_shaper(
   const TextAlign textAlign,
   DrawTextDelegate* delegate)
 {
-  SkPaint skPaint;
-  if (paint)
-    to_skia(*paint, skPaint);
-
   // SkFont skFont(SkTypeface::MakeFromFile("/Library/Fonts/Arial Unicode.ttf"), SkIntToScalar(24));
   SkFont skFont(SkTypeface::MakeDefault(), SkIntToScalar(24));
   sk_sp<SkTextBlob> textBlob;
@@ -53,7 +49,8 @@ void draw_text_with_shaper(
       .drawTextBlob(
         textBlob,
         SkIntToScalar(pos.x),
-        SkIntToScalar(pos.y), skPaint);
+        SkIntToScalar(pos.y),
+        (paint ? paint->skPaint(): SkPaint()));
 }
 
 } // namespace os

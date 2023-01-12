@@ -165,6 +165,7 @@ namespace app {
     void onRemoveTag(DocEvent& ev) override;
     void onTagChange(DocEvent& ev) override;
     void onTagRename(DocEvent& ev) override;
+    void onLayerCollapsedChanged(DocEvent& ev) override;
 
     // app::Context slots.
     void onBeforeCommandExecution(CommandExecutionEvent& ev);
@@ -351,7 +352,6 @@ namespace app {
 
     // Theme/dimensions
     skin::SkinTheme* skinTheme() const;
-    gfx::Size celBoxSize() const;
     int headerBoxWidth() const;
     int headerBoxHeight() const;
     int layerBoxHeight() const;

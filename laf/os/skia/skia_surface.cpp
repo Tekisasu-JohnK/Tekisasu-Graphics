@@ -177,6 +177,11 @@ bool SkiaSurface::clipRect(const gfx::Rect& rc)
   return !m_canvas->isClipEmpty();
 }
 
+void SkiaSurface::clipPath(const gfx::Path& path)
+{
+  m_canvas->clipPath(path.skPath());
+}
+
 void SkiaSurface::save()
 {
   m_canvas->save();
@@ -205,48 +210,6 @@ void SkiaSurface::restore()
 gfx::Matrix SkiaSurface::matrix() const
 {
   return m_canvas->getTotalMatrix();
-}
-
-void SkiaSurface::setDrawMode(DrawMode mode, int param,
-                              const gfx::Color a,
-                              const gfx::Color b)
-{
-  switch (mode) {
-    case DrawMode::Solid:
-      m_paint.setBlendMode(SkBlendMode::kSrcOver);
-      m_paint.setShader(nullptr);
-      break;
-    case DrawMode::Xor:
-      m_paint.setBlendMode(SkBlendMode::kXor);
-      m_paint.setShader(nullptr);
-      break;
-    case DrawMode::Checkered: {
-      m_paint.setBlendMode(SkBlendMode::kSrcOver);
-      {
-        SkBitmap bitmap;
-        if (!bitmap.tryAllocPixels(
-              SkImageInfo::MakeN32(8, 8, kOpaque_SkAlphaType, skColorSpace()))) {
-          throw base::Exception("Cannot create temporary Skia surface");
-        }
-
-        {
-          SkPMColor A = SkPreMultiplyARGB(gfx::geta(a), gfx::getr(a), gfx::getg(a), gfx::getb(a));
-          SkPMColor B = SkPreMultiplyARGB(gfx::geta(b), gfx::getr(b), gfx::getg(b), gfx::getb(b));
-          int offset = 7 - (param & 7);
-          for (int y=0; y<8; y++)
-            for (int x=0; x<8; x++)
-              *bitmap.getAddr32(x, y) = (((x+y+offset)&7) < 4 ? B: A);
-        }
-
-        sk_sp<SkShader> shader(
-          bitmap.makeShader(SkTileMode::kRepeat,
-                            SkTileMode::kRepeat,
-                            SkSamplingOptions()));
-        m_paint.setShader(shader);
-      }
-      break;
-    }
-  }
 }
 
 void SkiaSurface::lock()
@@ -421,8 +384,7 @@ void SkiaSurface::drawLine(const float x0, const float y0,
                            const float x1, const float y1,
                            const Paint& paint)
 {
-  to_skia(paint, m_paint);
-  m_canvas->drawLine(x0, y0, x1, y1, m_paint);
+  m_canvas->drawLine(x0, y0, x1, y1, paint.skPaint());
 }
 
 void SkiaSurface::drawRect(const gfx::RectF& rc,
@@ -431,28 +393,23 @@ void SkiaSurface::drawRect(const gfx::RectF& rc,
   if (rc.isEmpty())
     return;
 
-  to_skia(paint, m_paint);
-  if (paint.style() == Paint::Style::Stroke) {
-    m_canvas->drawRect(to_skia_fix(rc), m_paint);
-  }
-  else {
-    m_canvas->drawRect(to_skia(rc), m_paint);
-  }
+  if (paint.style() == Paint::Style::Stroke)
+    m_canvas->drawRect(to_skia_fix(rc), paint.skPaint());
+  else
+    m_canvas->drawRect(to_skia(rc), paint.skPaint());
 }
 
 void SkiaSurface::drawCircle(const float cx, const float cy,
                              const float radius,
                              const Paint& paint)
 {
-  to_skia(paint, m_paint);
-  m_canvas->drawCircle(cx, cy, radius, m_paint);
+  m_canvas->drawCircle(cx, cy, radius, paint.skPaint());
 }
 
 void SkiaSurface::drawPath(const gfx::Path& path,
                            const Paint& paint)
 {
-  to_skia(paint, m_paint);
-  m_canvas->drawPath(path.skPath(), m_paint);
+  m_canvas->drawPath(path.skPath(), paint.skPaint());
 }
 
 void SkiaSurface::blitTo(Surface* _dst, int srcx, int srcy, int dstx, int dsty, int width, int height) const
@@ -538,8 +495,9 @@ void SkiaSurface::scrollTo(const gfx::Rect& rc, int dx, int dy)
 void SkiaSurface::drawSurface(const Surface* src, int dstx, int dsty)
 {
   gfx::Clip clip(dstx, dsty, 0, 0, src->width(), src->height());
-  if (!clip.clip(width(), height(), clip.size.w, clip.size.h))
-    return;
+  // Don't call clip.clip() and left the clipping to the Skia library
+  // (mainly because Skia knows how to handle clipping even when a
+  // matrix is set).
 
   SkPaint paint;
   paint.setBlendMode(SkBlendMode::kSrc);
@@ -556,11 +514,8 @@ void SkiaSurface::drawSurface(const Surface* src,
                               const Sampling& sampling,
                               const os::Paint* paint)
 {
-  SkPaint skPaint;
-  if (paint)
-    to_skia(*paint, skPaint);
-  else
-    skPaint.setBlendMode(SkBlendMode::kSrc);
+  SkPaint skSrcPaint;
+  skSrcPaint.setBlendMode(SkBlendMode::kSrc);
 
   SkSamplingOptions skSampling;
   to_skia(sampling, skSampling);
@@ -570,14 +525,12 @@ void SkiaSurface::drawSurface(const Surface* src,
     srcRect,
     dstRect,
     skSampling,
-    skPaint);
+    (paint ? paint->skPaint(): skSrcPaint));
 }
 
 void SkiaSurface::drawRgbaSurface(const Surface* src, int dstx, int dsty)
 {
   gfx::Clip clip(dstx, dsty, 0, 0, src->width(), src->height());
-  if (!clip.clip(width(), height(), clip.size.w, clip.size.h))
-    return;
 
   SkPaint paint;
   paint.setBlendMode(SkBlendMode::kSrcOver);
@@ -591,8 +544,6 @@ void SkiaSurface::drawRgbaSurface(const Surface* src, int dstx, int dsty)
 void SkiaSurface::drawRgbaSurface(const Surface* src, int srcx, int srcy, int dstx, int dsty, int w, int h)
 {
   gfx::Clip clip(dstx, dsty, srcx, srcy, w, h);
-  if (!clip.clip(width(), height(), src->width(), src->height()))
-    return;
 
   SkPaint paint;
   paint.setBlendMode(SkBlendMode::kSrcOver);
@@ -606,8 +557,6 @@ void SkiaSurface::drawRgbaSurface(const Surface* src, int srcx, int srcy, int ds
 void SkiaSurface::drawColoredRgbaSurface(const Surface* src, gfx::Color fg, gfx::Color bg, const gfx::Clip& clipbase)
 {
   gfx::Clip clip(clipbase);
-  if (!clip.clip(width(), height(), src->width(), src->height()))
-    return;
 
   SkRect srcRect = SkRect::Make(SkIRect::MakeXYWH(clip.src.x, clip.src.y, clip.size.w, clip.size.h));
   SkRect dstRect = SkRect::Make(SkIRect::MakeXYWH(clip.dst.x, clip.dst.y, clip.size.w, clip.size.h));
@@ -636,11 +585,11 @@ void SkiaSurface::drawColoredRgbaSurface(const Surface* src, gfx::Color fg, gfx:
 
 void SkiaSurface::drawSurfaceNine(os::Surface* surface,
                                   const gfx::Rect& src,
-                                  const gfx::Rect& _center,
+                                  const gfx::Rect& center,
                                   const gfx::Rect& dst,
+                                  const bool drawCenter,
                                   const os::Paint* paint)
 {
-  gfx::Rect center(_center);
   SkIRect srcRect = SkIRect::MakeXYWH(src.x, src.y, src.w, src.h);
   SkRect dstRect = SkRect::Make(SkIRect::MakeXYWH(dst.x, dst.y, dst.w, dst.h));
 
@@ -660,9 +609,8 @@ void SkiaSurface::drawSurfaceNine(os::Surface* surface,
       SkCanvas::Lattice::kDefault,
       SkCanvas::Lattice::kDefault,
       SkCanvas::Lattice::kDefault,
-      (paint && paint->hasFlags(Paint::kNineWithoutCenter) ?
-       SkCanvas::Lattice::kTransparent:
-       SkCanvas::Lattice::kDefault),
+      (drawCenter ? SkCanvas::Lattice::kDefault:
+                    SkCanvas::Lattice::kTransparent),
       SkCanvas::Lattice::kDefault,
       SkCanvas::Lattice::kDefault,
       SkCanvas::Lattice::kDefault,

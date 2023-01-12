@@ -27,10 +27,6 @@ void draw_text(
   const TextAlign textAlign,
   DrawTextDelegate* delegate)
 {
-  SkPaint skPaint;
-  if (paint)
-    to_skia(*paint, skPaint);
-
   SkFont skFont;                // wrap SkFont with os::Font
   SkTextUtils::Draw(
     &static_cast<SkiaSurface*>(surface)->canvas(),
@@ -38,7 +34,7 @@ void draw_text(
     SkTextEncoding::kUTF8,
     SkIntToScalar(pos.x),
     SkIntToScalar(pos.y),
-    skFont, skPaint,
+    skFont, (paint ? paint->skPaint(): SkPaint()),
     (SkTextUtils::Align)textAlign);
 }
 

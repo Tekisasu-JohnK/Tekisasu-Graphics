@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2021 Igara Studio S.A.
+// Copyright (c) 2021-2022 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -20,8 +20,7 @@ namespace base {
   template<class T>
   class ComPtr {
   public:
-    ComPtr() : m_ptr(nullptr) {
-    }
+    ComPtr() { }
 
     ComPtr<T>(const ComPtr<T>& p) : m_ptr(p.m_ptr) {
       if (m_ptr)
@@ -67,7 +66,7 @@ namespace base {
     }
 
   private:
-    T* m_ptr;
+    T* m_ptr = nullptr;
   };
 
 } // namespace base

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2022  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -14,12 +14,9 @@
 #include "app/console.h"
 #include "app/i18n/strings.h"
 #include "app/ini_file.h"
-#include "app/modules/editors.h"
 #include "app/modules/gui.h"
 #include "app/ui/editor/editor.h"
 #include "app/ui/status_bar.h"
-#include "base/mutex.h"
-#include "base/scoped_lock.h"
 #include "base/thread.h"
 #include "doc/sprite.h"
 #include "ui/ui.h"
@@ -27,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <mutex>
 #include <thread>
 
 namespace app {
@@ -97,7 +95,7 @@ private:
 #endif
 
   FilterManagerImpl* m_filterMgr; // Effect to be applied.
-  base::mutex m_mutex;          // Mutex to access to 'pos', 'done' and 'cancelled' fields in different threads.
+  std::mutex m_mutex;           // Mutex to access to 'pos', 'done' and 'cancelled' fields in different threads.
   float m_pos;                  // Current progress position
   bool m_done;                  // Was the effect completely applied?
   bool m_cancelled;             // Was the effect cancelled by the user?
@@ -153,7 +151,7 @@ void FilterWorker::run()
   }
 
   {
-    scoped_lock lock(m_mutex);
+    std::lock_guard lock(m_mutex);
     if (m_done && m_filterMgr->isTransaction())
       m_filterMgr->commitTransaction();
     else
@@ -170,8 +168,8 @@ void FilterWorker::run()
     console.printf("A problem has occurred.\n\nDetails:\n%s", m_error.c_str());
   }
   else if (m_cancelled && !m_filterMgr->isTransaction()) {
-    StatusBar::instance()
-      ->showTip(2500, "No unlocked layers to apply filter");
+    StatusBar::instance()->showTip(2500,
+      Strings::statusbar_tips_filter_no_unlocked_layer());
   }
 #endif // ENABLE_UI
 }
@@ -182,7 +180,7 @@ void FilterWorker::run()
 //
 void FilterWorker::reportProgress(float progress)
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
   m_pos = progress;
 }
 
@@ -194,7 +192,7 @@ bool FilterWorker::isCancelled()
 {
   bool cancelled;
 
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
   cancelled = (m_cancelled || m_abort);
 
   return cancelled;
@@ -211,7 +209,7 @@ void FilterWorker::applyFilterInBackground()
     m_filterMgr->applyToTarget();
 
     // Mark the work as 'done'.
-    scoped_lock lock(m_mutex);
+    std::lock_guard lock(m_mutex);
     m_done = true;
   }
   catch (std::exception& e) {
@@ -226,7 +224,7 @@ void FilterWorker::applyFilterInBackground()
 // every 100 milliseconds).
 void FilterWorker::onMonitoringTick()
 {
-  scoped_lock lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   if (m_alert) {
     m_alert->setProgress(m_pos);

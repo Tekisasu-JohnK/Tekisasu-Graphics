@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -46,6 +46,13 @@ int Layer_cel(lua_State* L)
     push_docobj<Cel>(L, cel);
   else
     lua_pushnil(L);
+  return 1;
+}
+
+int Layer_get_id(lua_State* L)
+{
+  auto layer = get_docobj<Layer>(L, 1);
+  lua_pushinteger(L, layer->id());
   return 1;
 }
 
@@ -383,6 +390,7 @@ const luaL_Reg Layer_methods[] = {
 };
 
 const Property Layer_properties[] = {
+  { "id", Layer_get_id, nullptr },
   { "sprite", Layer_get_sprite, nullptr },
   { "parent", Layer_get_parent, Layer_set_parent },
   { "layers", Layer_get_layers, nullptr },
@@ -406,6 +414,7 @@ const Property Layer_properties[] = {
   { "cels", Layer_get_cels, nullptr },
   { "color", UserData_get_color<Layer>, UserData_set_color<Layer> },
   { "data", UserData_get_text<Layer>, UserData_set_text<Layer> },
+  { "properties", UserData_get_properties<Layer>, UserData_set_properties<Layer> },
   { "tileset", Layer_get_tileset, nullptr },
   { nullptr, nullptr, nullptr }
 };

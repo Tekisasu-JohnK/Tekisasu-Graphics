@@ -13,7 +13,7 @@
 
 #include "app/commands/command.h"
 #include "app/commands/commands.h"
-#include "app/modules/editors.h"
+#include "app/i18n/strings.h"
 #include "app/ui/editor/editor.h"
 #include "app/ui/keyboard_shortcuts.h"
 #include "app/ui/skin/skin_theme.h"
@@ -82,8 +82,10 @@ void AniControls::onClickButton()
 
   Command* cmd = Commands::instance()->byId(getCommandId(item));
   if (cmd) {
+    auto editor = Editor::activeEditor();
+
     UIContext::instance()->executeCommandFromMenuOrShortcut(cmd);
-    updateUsingEditor(current_editor);
+    updateUsingEditor(editor);
   }
 }
 
@@ -91,10 +93,13 @@ void AniControls::onRightClick(Item* item)
 {
   ButtonSet::onRightClick(item);
 
-  if (item == getItem(ACTION_PLAY) && current_editor)
-    current_editor->showAnimationSpeedMultiplierPopup(
+  auto editor = Editor::activeEditor();
+  if (item == getItem(ACTION_PLAY) && editor) {
+    editor->showAnimationSpeedMultiplierPopup(
       Preferences::instance().editor.playOnce,
-      Preferences::instance().editor.playAll, true);
+      Preferences::instance().editor.playAll,
+      Preferences::instance().editor.playSubtags, true);
+  }
 }
 
 const char* AniControls::getCommandId(int index) const
@@ -124,12 +129,12 @@ std::string AniControls::getTooltipFor(int index) const
                                                    Params(),
                                                    KeyContext::Normal);
     if (key && !key->accels().empty()) {
-      tooltip += "\n\nShortcut: ";
+      tooltip += "\n\n" + Strings::ani_controls_shortcut() + " ";
       tooltip += key->accels().front().toString();
     }
 
     if (index == ACTION_PLAY) {
-      tooltip += "\n\nRight-click: Show playback options";
+      tooltip += "\n\n" + Strings::ani_controls_right_click();
     }
   }
 
