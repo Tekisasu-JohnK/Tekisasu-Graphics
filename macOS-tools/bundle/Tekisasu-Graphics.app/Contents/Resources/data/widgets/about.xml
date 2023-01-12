@@ -1,0 +1,46 @@
+<!-- Aseprite -->
+<!-- Copyright (C) 2018-2022  Igara Studio S.A. -->
+<!-- Copyright (C) 2018  David Capello -->
+<gui i18nwarnings="false">
+<window id="about" text="About">
+  <vbox>
+    <label text="" id="title" />
+    <label text="Tekisasu Toolchain" />
+    <hbox homogeneous="true">
+      <hbox>
+	<vbox expansive="true">
+          <separator text="Developer Team" horizontal="true" />
+          <link text="John Knight" url="https://dev.tekisasu.com" />
+          <link text="David Capello" url="https://twitter.com/davidcapello" />
+          <link text="Gaspar Capello" url="https://twitter.com/Gasparoken" />
+          <link text="Martín Capello" url="https://twitter.com/martincapell0" />
+	  <vbox minheight="8" />
+	</vbox>
+	<separator vertical="true" />
+      </hbox>
+      <vbox>
+        <separator text="Credits" horizontal="true" cell_hspan="2" />
+        <link text="Contributors" url="" id="credits" />
+        <link text="Open Source Projects" url="" id="licenses" />
+      </vbox>
+    </hbox>
+    <separator horizontal="true" />
+    <hbox>
+      <label text="Copyright (C) 2021-2022" />
+      <link text="Tekisasu" url="https://tekisasu.com/" />
+    </hbox>
+    <link text="https://dev.tekisasu.com/" url="https://dev.tekisasu.com/" />
+    <separator horizontal="true" />
+    <hbox>
+      <label text="Copyright (C) 2001-2022" />
+      <link text="Igara Studio S.A." url="https://igara.com/" />
+    </hbox>
+    <link text="https://www.aseprite.org/" url="https://www.aseprite.org/" />
+    <hbox>
+      <boxfiller />
+      <button text="@general.close" closewindow="true" id="ok" magnet="true" minwidth="60" />
+      <boxfiller />
+    </hbox>
+  </vbox>
+</window>
+</gui>
