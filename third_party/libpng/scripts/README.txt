@@ -13,7 +13,7 @@ pnglibconf.h.prebuilt  =>  Configuration settings
  makefile.atari    =>  Atari makefile
  makefile.bc32     =>  32-bit Borland C++ (all modules compiled in C mode)
  makefile.beos     =>  BeOS makefile
- makefile.cegcc    =>  minge32ce for Windows CE makefile
+ makefile.clang    =>  Generic clang makefile
  makefile.darwin   =>  Darwin makefile, for macOS (formerly Mac OS X)
  makefile.dec      =>  DEC Alpha UNIX makefile
  makefile.dj2      =>  DJGPP 2 makefile
@@ -74,10 +74,6 @@ Other supporting scripts:
  intprefix.dfn     =>  Used by autoconf tools
  macro.lst         =>  Used by autoconf tools
  prefix.dfn        =>  Used by autoconf tools
-
- ci_autotools.sh   =>  Continuous integration utility for the Autotools build
- ci_cmake.sh       =>  Continuous integration utility for the CMake build
- ci_legacy.sh      =>  Continuous integration utility for the legacy makefiles
 
 Further information can be found in comments in the individual scripts and
 makefiles.

@@ -33,7 +33,14 @@ task::~task()
 
 task_token& task::start(thread_pool& pool)
 {
+  // Cannot start the task if it's already running
+  ASSERT(!m_running);
+
+  // Reset flags for a running task
   m_running = true;
+  m_completed = false;
+  m_token.reset();
+
   pool.execute([this]{ in_worker_thread(); });
   return m_token;
 }

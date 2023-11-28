@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -67,7 +67,7 @@ namespace app {
     ColorBar(int align, ui::TooltipManager* tooltipManager);
     ~ColorBar();
 
-    void setPixelFormat(PixelFormat pixelFormat);
+    void setPixelFormat(doc::PixelFormat pixelFormat);
 
     app::Color getFgColor() const;
     app::Color getBgColor() const;
@@ -94,7 +94,7 @@ namespace app {
     void setTilemapMode(TilemapMode mode);
 
     TilesetMode tilesetMode() const;
-    void setTilesetMode(const TilesetMode mode);
+    void setTilesetMode(TilesetMode mode);
 
     ColorButton* fgColorButton() { return &m_fgColor; }
     ColorButton* bgColorButton() { return &m_bgColor; }
@@ -105,6 +105,7 @@ namespace app {
     // DocObserver impl
     void onGeneralUpdate(DocEvent& ev) override;
     void onTilesetChanged(DocEvent& ev) override;
+    void onTileManagementPluginChange(DocEvent& ev) override;
 
     // InputChainElement impl
     void onNewInputPriority(InputChainElement* element,
@@ -133,6 +134,7 @@ namespace app {
     void onTilesButtonClick();
     void onTilesButtonRightClick();
     void onTilesetModeButtonClick();
+    void onTilesetModeButtonRightClick();
     void onTilesetOptionsClick();
     void onRemapPalButtonClick();
     void onRemapTilesButtonClick();
@@ -150,7 +152,7 @@ namespace app {
     void onPickSpectrum(const app::Color& color, ui::MouseButton button);
     void onReverseColors();
     void onSortBy(doc::SortPaletteBy channel);
-    void onGradient(GradientType gradientType);
+    void onGradient(doc::GradientType gradientType);
     void onFixWarningClick(ColorButton* colorButton, ui::Button* warningIcon);
     void onTimerTick();
     void setAscending(bool ascending);
@@ -160,7 +162,7 @@ namespace app {
     void onPaletteViewIndexChange(int index, ui::MouseButton button) override;
     void onPaletteViewModification(const doc::Palette* newPalette, PaletteViewModification mod) override;
     void onPaletteViewChangeSize(PaletteView* paletteView, int boxsize) override;
-    void onPaletteViewPasteColors(const Palette* fromPal, const doc::PalettePicks& from, const doc::PalettePicks& to) override;
+    void onPaletteViewPasteColors(const doc::Palette* fromPal, const doc::PalettePicks& from, const doc::PalettePicks& to) override;
     app::Color onPaletteViewGetForegroundIndex() override;
     app::Color onPaletteViewGetBackgroundIndex() override;
     doc::tile_index onPaletteViewGetForegroundTile() override;
@@ -190,6 +192,7 @@ namespace app {
     void showPalettePresets();
     void showPaletteOptions();
     bool canEditTiles() const;
+    bool customTileManagement() const;
     void updateFromTilemapMode();
     static void fixColorIndex(ColorButton& color);
 

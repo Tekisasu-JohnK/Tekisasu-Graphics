@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -11,6 +11,7 @@
 
 #include "app/doc_exporter.h"
 
+#include "app/app.h"
 #include "app/cmd/set_pixel_format.h"
 #include "app/console.h"
 #include "app/context.h"
@@ -865,8 +866,8 @@ int DocExporter::addTilesetsSamples(
       Tileset* ts = dynamic_cast<LayerTilemap*>(layer)->tileset();
 
       if (alreadyExported.find(ts->id()) == alreadyExported.end()) {
-        for (const ImageRef& image : *ts) {
-          addImage(doc, image);
+        for (const auto& tile : *ts) {
+          addImage(doc, tile.image);
           ++items;
         }
         alreadyExported.insert(ts->id());
@@ -1068,6 +1069,13 @@ void DocExporter::captureSamples(Samples& samples,
           alreadyTrimmed = true;
         }
       }
+      // If "Ignore Empty" is checked and the item is a tile...
+      else if (m_ignoreEmptyCels && item.isOneImageOnly()) {
+        // Skip empty tile
+        if (is_empty_image(item.image.get()))
+          continue;
+      }
+
       if (!alreadyTrimmed && m_trimSprite)
         sample.setTrimmedBounds(spriteBounds);
 
@@ -1173,10 +1181,22 @@ Doc* DocExporter::createEmptyTexture(const Samples& samples,
                                      base::task_token& token) const
 {
   ColorMode colorMode = ColorMode::INDEXED;
-  Palette* palette = nullptr;
+  Palette palette(0, 0);
   int maxColors = 256;
   gfx::ColorSpaceRef colorSpace;
   color_t transparentColor = 0;
+
+  // We generate a palette for file formats that support a color
+  // palette inside, or if the UI/preview is available/required.
+  //
+  // As a side note, here we cannot use a possible
+  // ctx->isUIAvailable() (instead of App::instance()->isGui())
+  // because when the sprite sheet is generated from the UI, a
+  // temporal non-UI context is created in a background thread.
+  const bool paletteRequiredByUIPreview = App::instance()->isGui();
+  const bool textureSupportsPalette =
+    format_supports_palette(m_textureFilename) ||
+    paletteRequiredByUIPreview;
 
   for (const auto& sample : samples) {
     if (token.canceled())
@@ -1203,14 +1223,21 @@ Doc* DocExporter::createEmptyTexture(const Samples& samples,
       else if (sample.sprite()->getPalettes().size() > 1) {
         colorMode = ColorMode::RGB;
       }
-      else if (palette &&
-               palette->countDiff(sample.sprite()->palette(frame_t(0)),
-                                  nullptr, nullptr) > 0) {
+      else if (palette.size() > 0 &&
+               palette.countDiff(sample.sprite()->palette(frame_t(0)),
+                                 nullptr, nullptr) > 0) {
         colorMode = ColorMode::RGB;
       }
-      else if (!palette) {
-        palette = sample.sprite()->palette(frame_t(0));
+      else if (palette.size() == 0) {
+        palette = *sample.sprite()->palette(frame_t(0));
         transparentColor = sample.sprite()->transparentColor();
+      }
+      if (colorMode == ColorMode::RGB &&
+          textureSupportsPalette &&
+          sample.sprite() &&
+          sample.sprite()->getPalettes()[0]) {
+        Palette* samplePalette = sample.sprite()->getPalettes()[0];
+        palette.addNonRepeatedColors(samplePalette);
       }
     }
   }
@@ -1229,8 +1256,8 @@ Doc* DocExporter::createEmptyTexture(const Samples& samples,
       maxColors,
       m_docBuf));
 
-  if (palette)
-    sprite->setPalette(palette, false);
+  if (palette.size() > 0)
+    sprite->setPalette(&palette, false);
 
   std::unique_ptr<Doc> document(new Doc(sprite.get()));
   sprite.release();
@@ -1295,7 +1322,11 @@ void DocExporter::trimTexture(const Samples& samples,
         sample.isEmpty())
       continue;
 
-    bounds |= sample.inTextureBounds();
+    // We add the border padding in the sample size to do an union
+    // between full bounds and sample's inTextureBounds (it
+    // shouldn't make full bounds bigger).
+    bounds |= gfx::Rect(
+      sample.inTextureBounds()).inflate(m_borderPadding);
   }
 
   if (m_textureWidth == 0) {
@@ -1518,7 +1549,8 @@ void DocExporter::createDataFile(const Samples& samples,
       layer->getCels(cels);
       bool someCelWithData = false;
       for (const Cel* cel : cels) {
-        if (!cel->data()->userData().isEmpty()) {
+        if (cel->zIndex() != 0 ||
+            !cel->data()->userData().isEmpty()) {
           someCelWithData = true;
           break;
         }
@@ -1529,15 +1561,21 @@ void DocExporter::createDataFile(const Samples& samples,
 
         os << ", \"cels\": [";
         for (const Cel* cel : cels) {
-          if (!cel->data()->userData().isEmpty()) {
+          if (cel->zIndex() != 0 ||
+              !cel->data()->userData().isEmpty()) {
             if (firstCel)
               firstCel = false;
             else
               os << ", ";
 
-            os << "{ \"frame\": " << cel->frame()
-               << cel->data()->userData()
-               << " }";
+            os << "{ \"frame\": " << cel->frame();
+            if (cel->zIndex() != 0) {
+              os << ", \"zIndex\": " << cel->zIndex();
+            }
+            if (!cel->data()->userData().isEmpty()) {
+              os << cel->data()->userData();
+            }
+            os << " }";
           }
         }
         os << "]";

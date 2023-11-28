@@ -496,7 +496,7 @@ generate_row(png_bytep row, size_t rowbytes, unsigned int y, int color_type,
          case 32:
          case 48:
          case 64:
-            /* The rows are filled by an alogorithm similar to the above, in the
+            /* The rows are filled by an algorithm similar to the above, in the
              * first row pixel bytes are all equal, increasing from 0 by 1 for
              * each pixel.  In the second row the bytes within a pixel are
              * incremented 1,3,5,7,... from the previous row byte.  Using an odd
@@ -1876,7 +1876,7 @@ main(int argc, char **argv)
          }
    }
 
-   /* small and colors are incomparible (will probably crash if both are used at
+   /* small and colors are incompatible (will probably crash if both are used at
     * the same time!)
     */
    if (small && colors[0] != 0)

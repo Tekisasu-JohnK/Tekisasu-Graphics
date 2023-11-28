@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -13,7 +13,9 @@
 #include "app/cmd/set_layer_blend_mode.h"
 #include "app/cmd/set_layer_name.h"
 #include "app/cmd/set_layer_opacity.h"
+#include "app/cmd/set_layer_tileset.h"
 #include "app/cmd/set_tileset_base_index.h"
+#include "app/cmd/set_tileset_match_flags.h"
 #include "app/cmd/set_tileset_name.h"
 #include "app/cmd/set_user_data.h"
 #include "app/commands/command.h"
@@ -36,6 +38,7 @@
 #include "doc/layer_tilemap.h"
 #include "doc/sprite.h"
 #include "doc/tileset.h"
+#include "doc/tilesets.h"
 #include "doc/user_data.h"
 #include "ui/ui.h"
 
@@ -243,7 +246,7 @@ private:
     if (!m_layer)
       return;
 
-    base::ScopedValue<bool> switchSelf(m_selfUpdate, true, false);
+    base::ScopedValue switchSelf(m_selfUpdate, true);
 
     m_timer.stop();
 
@@ -355,11 +358,12 @@ private:
 
     // Information about the tileset to be used for new tilemaps
     TilesetSelector::Info tilesetInfo;
-    tilesetInfo.enabled = false;
+    tilesetInfo.allowNewTileset = false;
     tilesetInfo.newTileset = false;
     tilesetInfo.grid = tileset->grid();
     tilesetInfo.name = tileset->name();
     tilesetInfo.baseIndex = tileset->baseIndex();
+    tilesetInfo.matchFlags = tileset->matchFlags();
     tilesetInfo.tsi = tilemap->tilesetIndex();
 
     try {
@@ -370,16 +374,28 @@ private:
       if (window.closer() != window.ok())
         return;
 
+      // Save "advanced" options
+      tilesetSel.saveAdvancedPreferences();
+
       tilesetInfo = tilesetSel.getInfo();
 
       if (tileset->name() != tilesetInfo.name ||
-          tileset->baseIndex() != tilesetInfo.baseIndex) {
+          tileset->baseIndex() != tilesetInfo.baseIndex ||
+          tileset->matchFlags() != tilesetInfo.matchFlags ||
+          tilesetInfo.tsi != tilemap->tilesetIndex()) {
         ContextWriter writer(UIContext::instance());
         Tx tx(writer.context(), "Set Tileset Properties");
+        // User changed tilemap's tileset
+        if (tilesetInfo.tsi != tilemap->tilesetIndex()) {
+          tileset = tilemap->sprite()->tilesets()->get(tilesetInfo.tsi);
+          tx(new cmd::SetLayerTileset(tilemap, tilesetInfo.tsi));
+        }
         if (tileset->name() != tilesetInfo.name)
           tx(new cmd::SetTilesetName(tileset, tilesetInfo.name));
         if (tileset->baseIndex() != tilesetInfo.baseIndex)
           tx(new cmd::SetTilesetBaseIndex(tileset, tilesetInfo.baseIndex));
+        if (tileset->matchFlags() != tilesetInfo.matchFlags)
+          tx(new cmd::SetTilesetMatchFlags(tileset, tilesetInfo.matchFlags));
         // TODO catch the tileset base index modification from the editor
         App::instance()->mainWindow()->invalidate();
         tx.commit();
@@ -396,7 +412,7 @@ private:
 
     m_timer.stop(); // Cancel current editions (just in case)
 
-    base::ScopedValue<bool> switchSelf(m_selfUpdate, true, false);
+    base::ScopedValue switchSelf(m_selfUpdate, true);
 
     const bool tilemapVisibility = (m_layer && m_layer->isTilemap());
     if (m_layer) {

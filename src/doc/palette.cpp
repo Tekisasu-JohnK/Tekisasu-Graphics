@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (c) 2020-2022  Igara Studio S.A.
+// Copyright (c) 2020-2023 Igara Studio S.A.
 // Copyright (c) 2001-2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -95,11 +95,11 @@ Palette* Palette::createGrayscale()
   return graypal;
 }
 
-void Palette::resize(int ncolors)
+void Palette::resize(int ncolors, color_t color)
 {
   ASSERT(ncolors >= 0);
 
-  m_colors.resize(ncolors, doc::rgba(0, 0, 0, 255));
+  m_colors.resize(ncolors, color);
   ++m_modifications;
 }
 
@@ -173,6 +173,22 @@ int Palette::countDiff(const Palette* other, int* from, int* to) const
   }
 
   return diff;
+}
+
+void Palette::addNonRepeatedColors(const Palette* palette,
+                                   const int max)
+{
+  ASSERT(palette);
+  if (!palette || size() >= max)
+    return;
+  for (int i=0; i < palette->size(); i++) {
+    color_t newColor = palette->getEntry(i);
+    if (!findExactMatch(newColor)) {
+      addEntry(newColor);
+      if (size() >= max)
+        return;
+    }
+  }
 }
 
 bool Palette::isBlack() const

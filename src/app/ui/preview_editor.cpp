@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -114,11 +114,11 @@ private:
     setupIcons();
   }
 
-  void onClick(Event& ev) override {
+  void onClick() override {
     m_isPlaying = !m_isPlaying;
     setupIcons();
 
-    Button::onClick(ev);
+    Button::onClick();
   }
 
   void onSetDecorativeWidgetBounds() override {
@@ -183,6 +183,7 @@ PreviewEditorWindow::PreviewEditorWindow()
   , m_refFrame(0)
   , m_aniSpeed(1.0)
   , m_relatedEditor(nullptr)
+  , m_opening(false)
 {
   setAutoRemap(false);
   setWantFocus(false);
@@ -332,13 +333,7 @@ void PreviewEditorWindow::onPopupSpeed()
   if (!miniEditor || !miniEditor->document())
     return;
 
-  auto& pref = Preferences::instance();
-
-  miniEditor->showAnimationSpeedMultiplierPopup(
-    pref.preview.playOnce,
-    pref.preview.playAll,
-    pref.preview.playSubtags,
-    false);
+  miniEditor->showAnimationSpeedMultiplierPopup();
   m_aniSpeed = miniEditor->getAnimationSpeedMultiplier();
 }
 
@@ -349,6 +344,9 @@ Editor* PreviewEditorWindow::previewEditor() const
 
 void PreviewEditorWindow::updateUsingEditor(Editor* editor)
 {
+  if (m_opening)
+    return;
+
   if (!m_isEnabled || !editor) {
     hideWindow();
     m_relatedEditor = nullptr;
@@ -363,8 +361,11 @@ void PreviewEditorWindow::updateUsingEditor(Editor* editor)
   Doc* document = editor->document();
   Editor* miniEditor = (m_docView ? m_docView->editor(): nullptr);
 
-  if (!isVisible())
+  if (!isVisible()) {
+    m_opening = true;
     openWindow();
+    m_opening = false;
+  }
 
   // Document preferences used to store the preferred zoom/scroll point
   auto& docPref = Preferences::instance().document(document);

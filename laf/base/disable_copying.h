@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2023 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -8,9 +9,8 @@
 #define BASE_DISABLE_COPYING_H_INCLUDED
 #pragma once
 
-#define DISABLE_COPYING(ClassName)              \
-  private:                                      \
-    ClassName(const ClassName&);                \
-    ClassName& operator=(const ClassName&);
+#define DISABLE_COPYING(ClassName)                       \
+  ClassName(const ClassName&) = delete;                  \
+  ClassName& operator=(const ClassName&) = delete;
 
 #endif

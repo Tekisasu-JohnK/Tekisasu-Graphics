@@ -1,4 +1,5 @@
 // Aseprite
+// Copyright (C) 2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -10,6 +11,7 @@
 
 #include "doc/color.h"
 #include "doc/pixel_format.h"
+#include "doc/tile.h"
 
 #include <string>
 
@@ -20,8 +22,6 @@ namespace doc {
 
 namespace app {
 
-  using namespace doc;
-
   class Color {
   public:
     enum Type {
@@ -31,6 +31,7 @@ namespace app {
       HslType,
       GrayType,
       IndexType,
+      TileType,
     };
 
     enum HumanReadableString {
@@ -47,14 +48,16 @@ namespace app {
     static Color fromHsl(double h, double s, double l, int a = 255); // h=[0,360], s=[0,1], v=[0,1]
     static Color fromGray(int g, int a = 255);
     static Color fromIndex(int index);
+    static Color fromTile(doc::tile_t tile);
 
-    static Color fromImage(PixelFormat pixelFormat, color_t c);
-    static Color fromImageGetPixel(Image* image, int x, int y);
+    static Color fromImage(doc::PixelFormat pixelFormat, doc::color_t c);
+    static Color fromImageGetPixel(doc::Image* image, int x, int y);
     static Color fromString(const std::string& str);
 
     Color toRgb() const;
     std::string toString() const;
-    std::string toHumanReadableString(PixelFormat format, HumanReadableString type) const;
+    std::string toHumanReadableString(doc::PixelFormat format,
+                                      HumanReadableString type) const;
 
     bool operator==(const Color& other) const;
     bool operator!=(const Color& other) const {
@@ -79,6 +82,7 @@ namespace app {
     double getHslLightness() const;
     int getGray() const;
     int getIndex() const;
+    doc::tile_t getTile() const;
     int getAlpha() const;
 
     // Setters
@@ -107,6 +111,7 @@ namespace app {
         int g, a;
       } gray;
       int index;
+      doc::tile_t tile;
     } m_value;
   };
 

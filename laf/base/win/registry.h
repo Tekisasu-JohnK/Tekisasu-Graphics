@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2021 Igara Studio S.A.
+// Copyright (c) 2021-2023 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -43,6 +43,8 @@ public:
   hkey open(const std::string& subkey, const access a);
   hkey create(const std::string& subkey);
   void close();
+
+  bool exists(const std::string& name);
 
   std::string string(const std::string& name);
   void string(const std::string& name, const std::string& value);

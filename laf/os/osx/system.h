@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2021  Igara Studio S.A.
+// Copyright (C) 2020-2023  Igara Studio S.A.
 // Copyright (C) 2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -30,6 +30,7 @@ void osx_set_async_view(bool state);
 class SystemOSX : public CommonSystem {
 public:
   SystemOSX() : m_menus(nullptr) { }
+  ~SystemOSX();
 
   void setAppMode(AppMode appMode) override {
     AppOSX::instance()->setAppMode(appMode);

@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <climits>              // Required for PATH_MAX
 #include <cstdio>               // Required for rename()
 #include <cstdlib>

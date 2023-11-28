@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -91,6 +91,7 @@ namespace os {
     void clearDelayedTouchEvents();
     void killTouchTimer();
     void checkColorSpaceChange();
+    void checkDarkModeChange();
 
     void openWintabCtx();
     void closeWintabCtx();

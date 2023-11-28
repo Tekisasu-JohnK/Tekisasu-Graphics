@@ -298,3 +298,21 @@ void operator delete[](void* ptr) LAF_NOEXCEPT
 }
 
 #endif
+
+void* base_aligned_alloc(std::size_t bytes, std::size_t alignment)
+{
+#if LAF_WINDOWS
+  return _aligned_malloc(bytes, alignment);
+#else
+  return aligned_alloc(alignment, bytes);
+#endif
+}
+
+void base_aligned_free(void* mem)
+{
+#if LAF_WINDOWS
+  _aligned_free(mem);
+#else
+  free(mem);
+#endif
+}

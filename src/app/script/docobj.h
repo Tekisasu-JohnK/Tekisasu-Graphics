@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 //
 // This program is distributed under the terms of
 // the End-User License Agreement for Aseprite.
@@ -10,6 +10,7 @@
 
 #include "app/script/luacpp.h"
 #include "doc/object.h"
+#include "fmt/format.h"
 
 namespace app {
 namespace script {
@@ -41,7 +42,10 @@ template <typename T> T* check_docobj(lua_State* L, T* obj) {
   if (obj)
     return obj;
   else {
-    luaL_error(L, "Using a nil '%s' object", get_mtname<T>());
+    luaL_traceback(L, L, fmt::format("Tried to access a deleted '{}'",
+                   get_mtname<T>()).c_str(), 1);
+    const char* traceback = lua_tostring(L, -1);
+    luaL_error(L, traceback ? traceback: "");
     ASSERT(false);              // unreachable code
     return nullptr;
   }

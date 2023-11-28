@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (c) 2020-2021  Igara Studio S.A.
+// Copyright (c) 2020-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -29,6 +29,11 @@ public:
 private:
   NSCursor* m_nsCursor;
 };
+
+SystemOSX::~SystemOSX()
+{
+  destroyInstance();
+}
 
 CursorRef SystemOSX::makeCursor(const Surface* surface,
                                 const gfx::Point& focus,

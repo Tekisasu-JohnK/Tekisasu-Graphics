@@ -9,6 +9,7 @@
 #define DOC_USER_DATA_H_INCLUDED
 #pragma once
 
+#include "base/uuid.h"
 #include "doc/color.h"
 #include "fixmath/fixmath.h"
 #include "gfx/point.h"
@@ -16,6 +17,7 @@
 #include "gfx/rect.h"
 
 #include <cstddef>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -41,6 +43,7 @@
 #define USER_DATA_PROPERTY_TYPE_RECT        0x0010
 #define USER_DATA_PROPERTY_TYPE_VECTOR      0x0011
 #define USER_DATA_PROPERTY_TYPE_PROPERTIES  0x0012
+#define USER_DATA_PROPERTY_TYPE_UUID        0x0013
 
 namespace doc {
 
@@ -70,7 +73,8 @@ namespace doc {
                                      gfx::Size,
                                      gfx::Rect,
                                      Vector,
-                                     Properties>;
+                                     Properties,
+                                     base::Uuid>;
 
     struct Variant : public VariantBase {
       Variant() = default;
@@ -109,14 +113,6 @@ namespace doc {
     Properties& properties() { return properties(std::string()); }
     Properties& properties(const std::string& groupKey) { return m_propertiesMaps[groupKey]; }
 
-    size_t countNonEmptyPropertiesMaps() const {
-      size_t i = 0;
-      for (const auto& it : m_propertiesMaps)
-        if (!it.second.empty())
-          ++i;
-      return i;
-    }
-
     void setText(const std::string& text) { m_text = text; }
     void setColor(color_t color) { m_color = color; }
 
@@ -154,6 +150,28 @@ namespace doc {
       throw std::runtime_error("bad_variant_access");
     return *value;
   }
+
+  template<typename T, typename U>
+  inline bool is_compatible_int(const U u) {
+    static_assert(sizeof(U) > sizeof(T), "T type must be smaller than U type");
+    return (u >= std::numeric_limits<T>::min() &&
+            u <= std::numeric_limits<T>::max());
+  }
+
+  inline bool is_reducible_int(const UserData::Variant& variant) {
+    return (variant.type() >= USER_DATA_PROPERTY_TYPE_INT16 &&
+            variant.type() <= USER_DATA_PROPERTY_TYPE_UINT64);
+  }
+
+  size_t count_nonempty_properties_maps(const UserData::PropertiesMaps& propertiesMaps);
+
+  // If all the elements of vector have the same type, returns that type, also
+  // if this type is an integer, it tries to reduce it to the minimum int type
+  // capable of storing all the vector values.
+  // If all the elements of vector doesn't have the same type, returns 0.
+  uint16_t all_elements_of_same_type(const UserData::Vector& vector);
+  UserData::Variant cast_to_smaller_int_type(const UserData::Variant& value, uint16_t type);
+  UserData::Variant reduce_int_type_size(const UserData::Variant& value);
 
 } // namespace doc
 

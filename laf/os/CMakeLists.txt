@@ -1,5 +1,5 @@
 # LAF OS
-# Copyright (C) 2018-2022  Igara Studio S.A.
+# Copyright (C) 2018-2023  Igara Studio S.A.
 # Copyright (C) 2012-2018  David Capello
 
 ######################################################################
@@ -43,14 +43,11 @@ else()
   list(APPEND LAF_OS_SOURCES
     x11/event_queue.cpp
     x11/keys.cpp
+    x11/native_dialogs.cpp
     x11/system.cpp
     x11/window.cpp
     x11/x11.cpp
     x11/xinput.cpp)
-  if(LAF_OS_WITH_GTK)
-    list(APPEND LAF_OS_SOURCES
-      gtk/native_dialogs.cpp)
-  endif()
 endif()
 
 ######################################################################
@@ -143,17 +140,6 @@ else()
   list(APPEND LAF_OS_PLATFORM_LIBS ${X11_Xcursor_LIB})
 
   check_library_exists(X11 XOpenIM "${X11_LIB_SEARCH_PATH}" XIM_FOUND)
-
-  if(LAF_OS_WITH_GTK)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GTK gtk+-3.0)
-    if(GTK_LIBRARY_DIRS)
-      target_link_directories(laf-os ${GTK_LIBRARY_DIRS})
-    endif()
-    target_link_libraries(laf-os ${GTK_LIBRARIES})
-    target_include_directories(laf-os PRIVATE ${GTK_INCLUDE_DIRS})
-    target_compile_definitions(laf-os PRIVATE LAF_OS_WITH_GTK)
-  endif()
 
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(laf-os PRIVATE -Werror=suggest-override)

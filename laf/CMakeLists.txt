@@ -32,9 +32,6 @@ option(LAF_WITH_EXAMPLES "Enable LAF examples" ON)
 option(LAF_WITH_TESTS "Enable LAF tests" ON)
 set(LAF_BACKEND ${LAF_DEFAULT_BACKEND} CACHE STRING "Select laf backend")
 set_property(CACHE LAF_BACKEND PROPERTY STRINGS "none" "skia")
-if(NOT APPLE AND UNIX)
-option(LAF_OS_WITH_GTK "Use GTK library for native dialogs" OFF)
-endif()
 
 # Testing
 if(LAF_WITH_TESTS)

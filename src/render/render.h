@@ -1,5 +1,5 @@
 // Aseprite Render Library
-// Copyright (c) 2019-2022 Igara Studio S.A.
+// Copyright (c) 2019-2023 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,12 +9,13 @@
 #define RENDER_RENDER_H_INCLUDED
 #pragma once
 
-#include "doc/doc.h"
 #include "doc/anidir.h"
 #include "doc/blend_mode.h"
 #include "doc/color.h"
+#include "doc/doc.h"
 #include "doc/frame.h"
 #include "doc/pixel_format.h"
+#include "doc/tile.h"
 #include "gfx/clip.h"
 #include "gfx/point.h"
 #include "gfx/size.h"
@@ -28,6 +29,7 @@ namespace doc {
   class Image;
   class Layer;
   class Palette;
+  class RenderPlan;
   class Sprite;
   class Tileset;
 }
@@ -44,7 +46,8 @@ namespace render {
     const BlendMode blendMode,
     const double sx,
     const double sy,
-    const bool newBlend);
+    const bool newBlend,
+    const tile_flags tileFlags);
 
   class Render {
     enum Flags {
@@ -158,16 +161,15 @@ namespace render {
       const frame_t frame,
       const CompositeImageFunc compositeImage);
 
-    void renderLayer(
-      const Layer* layer,
+    void renderPlan(
+      doc::RenderPlan& plan,
       Image* image,
       const gfx::Clip& area,
       const frame_t frame,
       const CompositeImageFunc compositeImage,
       const bool render_background,
       const bool render_transparent,
-      const BlendMode blendMode,
-      bool isSelected);
+      const BlendMode blendMode);
 
     void renderCel(
       Image* dst_image,
@@ -187,14 +189,16 @@ namespace render {
       const Palette* pal,
       const gfx::RectF& celBounds,
       const gfx::Clip& area,
-      const CompositeImageFunc compositeImage,
+      CompositeImageFunc compositeImage,
       const int opacity,
-      const BlendMode blendMode);
+      const BlendMode blendMode,
+      const tile_flags tileFlags = notile);
 
     CompositeImageFunc getImageComposition(
       const PixelFormat dstFormat,
       const PixelFormat srcFormat,
-      const Layer* layer);
+      const Layer* layer,
+      const tile_flags tileFlags = notile);
 
     bool checkIfWeShouldUsePreview(const Cel* cel) const;
 

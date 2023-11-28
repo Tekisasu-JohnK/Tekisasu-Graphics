@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -144,7 +144,7 @@ void Widget::setTextf(const char *format, ...)
     va_list ap;
     va_start(ap, format);
     char buf[4096];
-    vsprintf(buf, format, ap);
+    std::vsnprintf(buf, sizeof(buf), format, ap);
     va_end(ap);
 
     setText(buf);
@@ -203,6 +203,8 @@ void Widget::setStyle(Style* style)
   m_style = style;
   m_border = m_theme->calcBorder(this, style);
   m_bgColor = m_theme->calcBgColor(this, style);
+  m_minSize = m_theme->calcMinSize(this, style);
+  m_maxSize = m_theme->calcMaxSize(this, style);
   if (style->font())
     m_font = AddRef(style->font());
 }
@@ -580,9 +582,13 @@ void Widget::removeChild(const WidgetsList::iterator& it)
   else
     return;
 
-  // Free child from manager
-  if (auto man = manager())
+  if (auto man = manager()) {
+    // Remove all paint messages for this widget.
+    man->removeMessagesFor(child, kPaintMessage);
+
+    // Free child from manager.
     man->freeWidget(child);
+  }
 
   child->m_parent = nullptr;
   child->m_parentIndex = -1;
@@ -966,15 +972,17 @@ void Widget::getTextIconInfo(
   // Box position
   if (align() & RIGHT)
     box_x = bounds.x2() - box_w - border().right();
-  else if (align() & CENTER)
-    box_x = (bounds.x+bounds.x2())/2 - box_w/2;
+  else if (align() & CENTER) {
+    box_x = CALC_FOR_CENTER(bounds.x + border().top(), bounds.w - border().width(), box_w);
+  }
   else
     box_x = bounds.x + border().left();
 
   if (align() & BOTTOM)
     box_y = bounds.y2() - box_h - border().bottom();
-  else if (align() & MIDDLE)
-    box_y = (bounds.y+bounds.y2())/2 - box_h/2;
+  else if (align() & MIDDLE) {
+    box_y = CALC_FOR_CENTER(bounds.y + border().left(), bounds.h - border().height(), box_h);
+  }
   else
     box_y = bounds.y + border().top();
 
@@ -986,8 +994,8 @@ void Widget::getTextIconInfo(
       icon_x = box_x + box_w - icon_w;
     }
     else if (icon_align & CENTER) {
-      text_x = box_x + box_w/2 - text_w/2;
-      icon_x = box_x + box_w/2 - icon_w/2;
+      text_x = CALC_FOR_CENTER(box_x, box_w, text_w);
+      icon_x = CALC_FOR_CENTER(box_x, box_w, icon_w);
     }
     else {
       text_x = box_x + box_w - text_w;
@@ -1000,8 +1008,8 @@ void Widget::getTextIconInfo(
       icon_y = box_y + box_h - icon_h;
     }
     else if (icon_align & MIDDLE) {
-      text_y = box_y + box_h/2 - text_h/2;
-      icon_y = box_y + box_h/2 - icon_h/2;
+      text_y = CALC_FOR_CENTER(box_y, box_h, text_h);
+      icon_y = CALC_FOR_CENTER(box_y, box_h, icon_h);
     }
     else {
       text_y = box_y + box_h - text_h;
@@ -1032,6 +1040,15 @@ void Widget::setMaxSize(const gfx::Size& sz)
   ASSERT(sz.w >= m_minSize.w);
   ASSERT(sz.h >= m_minSize.h);
   m_maxSize = sz;
+}
+
+void Widget::setMinMaxSize(const gfx::Size& minSz,
+                           const gfx::Size& maxSz)
+{
+  ASSERT(minSz.w <= maxSz.w);
+  ASSERT(minSz.h <= maxSz.h);
+  m_minSize = minSz;
+  m_maxSize = maxSz;
 }
 
 void Widget::resetMinSize()
@@ -1232,7 +1249,10 @@ bool Widget::isTransparent() const
 
 void Widget::setTransparent(bool transparent)
 {
-  enableFlags(TRANSPARENT);
+  if (transparent)
+    enableFlags(TRANSPARENT);
+  else
+    disableFlags(TRANSPARENT);
 }
 
 void Widget::invalidate()
@@ -1476,22 +1496,23 @@ bool Widget::offerCapture(ui::MouseMessage* mouseMsg, int widget_type)
   return false;
 }
 
-bool Widget::hasMouseOver() const
-{
-  return (this == pickFromScreenPos(get_mouse_position()));
-}
-
 gfx::Point Widget::mousePosInDisplay() const
 {
   return display()->nativeWindow()->pointFromScreen(get_mouse_position());
 }
 
-void Widget::setMnemonic(int mnemonic)
+void Widget::setMnemonic(const int mnemonic,
+                         const bool requireModifiers)
 {
-  m_mnemonic = mnemonic;
+  static_assert((kMnemonicCharMask & kMnemonicModifiersMask) == 0);
+  ASSERT((mnemonic & kMnemonicModifiersMask) == 0);
+  m_mnemonic =
+    (mnemonic & kMnemonicCharMask) |
+    (requireModifiers ? kMnemonicModifiersMask: 0);
 }
 
-void Widget::processMnemonicFromText(int escapeChar)
+void Widget::processMnemonicFromText(const int escapeChar,
+                                     const bool requireModifiers)
 {
   // Avoid calling setText() when the widget doesn't have the HAS_TEXT flag
   if (!hasText())
@@ -1509,7 +1530,7 @@ void Widget::processMnemonicFromText(int escapeChar)
         break;    // Ill-formed string (it ends with escape character)
       }
       else if (chr != escapeChar) {
-        setMnemonic(chr);
+        setMnemonic(chr, requireModifiers);
       }
     }
     newText.push_back(chr);
@@ -1670,7 +1691,14 @@ void Widget::onBroadcastMouseMessage(const gfx::Point& screenPos,
 
 void Widget::onInitTheme(InitThemeEvent& ev)
 {
-  for (auto child : children())
+  // Reset cached font
+  m_font = nullptr;
+  // Create a copy of the children list and iterate it, just in case a
+  // initTheme() modifies this list (e.g. this can happen in some
+  // strange cases with viewports, where scrollbars are added/removed
+  // while we init the theme if the UI scale changes).
+  auto children = m_children;
+  for (auto child : children)
     child->initTheme();
 
   if (m_theme) {

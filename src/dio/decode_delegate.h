@@ -1,4 +1,5 @@
 // Aseprite Document IO Library
+// Copyright (c) 2023 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -23,6 +24,10 @@ public:
   // Used to log errors
   virtual void error(const std::string& msg) { }
 
+  // Sets an error when an incompatibility issue is
+  // detected.
+  virtual void incompatibilityError(const std::string &msg) { }
+
   // Used to report progress of the whole operation
   virtual void progress(double fromZeroToOne) { }
 
@@ -43,6 +48,13 @@ public:
     // Discard the sprite, you should overwrite this behavior, use the
     // sprite and then discard it when you don't need it anymore.
     delete sprite;
+  }
+
+  // Returns true if we want to cache the read compressed data of
+  // tilesets exactly as they are in the disk (so we can save it
+  // without re-compressing).
+  virtual bool cacheCompressedTilesets() const {
+    return false;
   }
 };
 

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -16,6 +16,7 @@
 #include "app/tools/ink.h"
 #include "app/tools/tool.h"
 #include "base/fs.h"
+#include "base/platform.h"
 #include "doc/sprite.h"
 #include "os/system.h"
 #include "ui/system.h"
@@ -51,6 +52,18 @@ Preferences::Preferences()
   // The first time we execute the program, the configuration file
   // doesn't exist.
   const bool firstTime = (!base::is_file(fn));
+
+  // Don't use native dialogs on Linux or macOS 10.11 by default
+#if LAF_MACOS || LAF_LINUX
+  // We've received several bug reports about macOS 10.11 where the
+  // native file selector throws an unknown exception (probably we're
+  // using an API that wasn't yet supported in 10.11). So we disable
+  // the native file selector in this platform.
+  #if LAF_MACOS
+  if (base::get_osx_version() < base::Version(10, 11, 0, 0))
+  #endif
+    experimental.useNativeFileDialog.setDefaultValue(false);
+#endif
 
   load();
 
@@ -134,23 +147,29 @@ bool Preferences::isSet(OptionBase& opt) const
 
 ToolPreferences& Preferences::tool(tools::Tool* tool)
 {
-  ASSERT(tool != NULL);
+  std::string id;
 
-  auto it = m_tools.find(tool->getId());
+  // If tool == nullptr it means that the tool's options are shared with all tools.
+  if (tool)
+    id = tool->getId();
+  else
+    id = "shared";
+
+  auto it = m_tools.find(id);
   if (it != m_tools.end()) {
     return *it->second;
   }
   else {
-    std::string section = std::string("tool.") + tool->getId();
+    std::string section = std::string("tool.") + id;
     ToolPreferences* toolPref = new ToolPreferences(section);
 
     // Default size for eraser, blur, etc.
-    if (tool->getInk(0)->isEraser() ||
-        tool->getInk(0)->isEffect()) {
+    if (tool && (tool->getInk(0)->isEraser() ||
+                 tool->getInk(0)->isEffect())) {
       toolPref->brush.size.setDefaultValue(8);
     }
 
-    m_tools[tool->getId()] = toolPref;
+    m_tools[id] = toolPref;
     toolPref->load();
     return *toolPref;
   }
@@ -210,6 +229,9 @@ void Preferences::resetToolPreferences(tools::Tool* tool)
   del_config_section((section + ".brush").c_str());
   del_config_section((section + ".spray").c_str());
   del_config_section((section + ".floodfill").c_str());
+  del_config_section((section + ".dynamics").c_str());
+  std::string shared = "tool.shared";
+  del_config_section(shared.c_str());
 }
 
 void Preferences::removeDocument(Doc* doc)

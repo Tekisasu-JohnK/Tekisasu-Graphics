@@ -60,7 +60,7 @@ Entry::Entry(const int maxsize, const char* format, ...)
   if (format) {
     va_list ap;
     va_start(ap, format);
-    vsprintf(buf, format, ap);
+    std::vsnprintf(buf, sizeof(buf), format, ap);
     va_end(ap);
   }
   // empty string
@@ -545,7 +545,7 @@ gfx::Rect Entry::onGetEntryTextBounds() const
 {
   gfx::Rect bounds = clientBounds();
   bounds.x += border().left();
-  bounds.y += bounds.h/2 - textHeight()/2;
+  bounds.y += CALC_FOR_CENTER(0, bounds.h, textHeight());
   bounds.w -= border().width();
   bounds.h = textHeight();
   return bounds;

@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2023 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,6 +16,7 @@
 namespace base {
 
   class Sha1;
+  class Uuid;
 
   // Undefined convertion
   template<typename To, typename From>
@@ -33,6 +35,9 @@ namespace base {
 
   template<> Sha1 convert_to(const std::string& from);
   template<> std::string convert_to(const Sha1& from);
+
+  template<> Uuid convert_to(const std::string& from);
+  template<> std::string convert_to(const Uuid& from);
 
 }
 

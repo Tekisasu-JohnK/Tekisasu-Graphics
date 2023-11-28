@@ -49,23 +49,20 @@ public:
     m_initialDir = base::from_utf8(base::get_file_path(filename));
   }
 
-  bool show(Window* parent) override {
-    bool result = false;
+  Result show(Window* parent) override {
+    Result result = Result::Error;
     bool shown = false;
 
-    HRESULT hr = showWithNewAPI(parent, result, shown);
-    if (FAILED(hr) && !shown)
+    HRESULT hr = showWithNewAPI(parent, result);
+    if (FAILED(hr) || result == Result::Error)
       hr = showWithOldAPI(parent, result);
 
-    if (SUCCEEDED(hr))
-      return result;
-
-    return false;
+    return result;
   }
 
 private:
 
-  HRESULT showWithNewAPI(Window* parent, bool& result, bool& shown) {
+  HRESULT showWithNewAPI(Window* parent, Result& result) {
     base::ComPtr<IFileDialog> dlg;
     HRESULT hr = CoCreateInstance(
       (m_type == Type::SaveFile ? CLSID_FileSaveDialog:
@@ -150,13 +147,11 @@ private:
 
     hr = dlg->Show(parent ? (HWND)parent->nativeHandle(): nullptr);
     if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
-      shown = true;
-      result = false;
+      result = Result::Cancel;
       return S_OK;
     }
     if (FAILED(hr))
       return hr;
-    shown = true;
 
     if (m_type == Type::OpenFiles) {
       base::ComPtr<IFileOpenDialog> odlg;
@@ -201,11 +196,11 @@ private:
       CoTaskMemFree(fn);
     }
 
-    result = (hr == S_OK);
+    result = Result::OK;
     return S_OK;
   }
 
-  HRESULT showWithOldAPI(Window* parent, bool& result) {
+  HRESULT showWithOldAPI(Window* parent, Result& result) {
     std::wstring title = base::from_utf8(m_title);
     std::wstring defExt = base::from_utf8(m_defExtension);
     std::wstring filtersWStr = getFiltersForGetOpenFileName();
@@ -273,10 +268,11 @@ private:
         std::vector<char> buf(1024);
         sprintf(&buf[0], "Error using GetOpen/SaveFileName Win32 API. Code: %d", err);
         os::error_message(&buf[0]);
+        return E_FAIL;
       }
     }
 
-    result = (res != FALSE);
+    result = (res != FALSE ? Result::OK: Result::Cancel);
     return S_OK;
   }
 

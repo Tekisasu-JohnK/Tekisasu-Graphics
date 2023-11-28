@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2022  Igara Studio S.A.
+// Copyright (C) 2022-2023  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -11,6 +11,7 @@
 
 #include "app/commands/filters/filter_preview.h"
 #include "app/commands/filters/filter_target_buttons.h"
+#include "app/ui/editor/editor.h"
 #include "filters/tiled_mode.h"
 #include "ui/box.h"
 #include "ui/button.h"
@@ -23,7 +24,8 @@ namespace app {
 
   // A generic window to show parameters for a Filter with integrated
   // preview in the current editor.
-  class FilterWindow : public ui::Window {
+  class FilterWindow : public ui::Window,
+                       public EditorObserver {
   public:
     enum WithChannels { WithChannelsSelector, WithoutChannelsSelector };
     enum WithTiled { WithTiledCheckBox, WithoutTiledCheckBox };
@@ -49,12 +51,15 @@ namespace app {
     // which specified different targets for each matrix.
     void setNewTarget(Target target);
 
+    void onBroadcastMouseMessage(const gfx::Point& screenPos,
+                                 ui::WidgetsList& targets) override;
+
     // Returns the container where derived classes should put controls.
     ui::Widget* getContainer() { return &m_container; }
 
-    void onOk(ui::Event& ev);
-    void onCancel(ui::Event& ev);
-    void onShowPreview(ui::Event& ev);
+    void onOk();
+    void onCancel();
+    void onShowPreview();
     void onTargetButtonChange();
     void onTiledChange();
 
@@ -67,6 +72,10 @@ namespace app {
     void stopPreview();
 
   private:
+    // EditorObserver impl
+    void onScrollChanged(Editor* editor) override;
+    void onZoomChanged(Editor* editor) override;
+
     const char* m_cfgSection;
     FilterManagerImpl* m_filterMgr;
     ui::Box m_hbox;
@@ -78,6 +87,8 @@ namespace app {
     FilterTargetButtons m_targetButton;
     ui::CheckBox m_showPreview;
     ui::CheckBox* m_tiledCheck;
+    Editor* m_editor;
+    tools::Tool* m_oldTool;
   };
 
 } // namespace app

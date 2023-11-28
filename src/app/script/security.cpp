@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -73,7 +73,7 @@ int secure_io_open(lua_State* L)
 {
   int n = lua_gettop(L);
 
-  std::string absFilename = base::get_absolute_path(lua_tostring(L, 1));
+  std::string absFilename = base::get_absolute_path(luaL_checkstring(L, 1));
 
   FileAccessMode mode = FileAccessMode::Read; // Read is the default access
   if (lua_tostring(L, 2) &&
@@ -114,6 +114,26 @@ int secure_os_execute(lua_State* L)
   return 1;
 }
 
+int secure_package_loadlib(lua_State* L)
+{
+  int n = lua_gettop(L);
+  if (n == 0)
+    return 0;
+
+  const char* cmd = lua_tostring(L, 1);
+  if (!ask_access(L, cmd, FileAccessMode::LoadLib, ResourceType::File)) {
+    // Stop script
+    return luaL_error(L, "the script doesn't have access to execute the command: '%s'",
+                      cmd);
+  }
+
+  lua_pushvalue(L, lua_upvalueindex(1));
+  for (int i=1; i<=n; ++i)
+    lua_pushvalue(L, i);
+  lua_call(L, n, 1);
+  return 1;
+}
+
 bool ask_access(lua_State* L,
                 const char* filename,
                 const FileAccessMode mode,
@@ -136,13 +156,15 @@ bool ask_access(lua_State* L,
       return true;
 
     std::string allowButtonText =
-      mode == FileAccessMode::OpenSocket ?
-        Strings::script_access_allow_open_conn_access():
-      mode == FileAccessMode::Execute ?
-        Strings::script_access_allow_execute_access():
-      mode == FileAccessMode::Write ?
-        Strings::script_access_allow_write_access():
-        Strings::script_access_allow_read_access();
+      (mode == FileAccessMode::LoadLib ?
+         Strings::script_access_allow_load_lib_access() :
+       mode == FileAccessMode::OpenSocket ?
+         Strings::script_access_allow_open_conn_access() :
+       mode == FileAccessMode::Execute ?
+         Strings::script_access_allow_execute_access() :
+       mode == FileAccessMode::Write ?
+         Strings::script_access_allow_write_access() :
+         Strings::script_access_allow_read_access());
 
     app::gen::ScriptAccess dlg;
     dlg.script()->setText(script);
@@ -167,7 +189,7 @@ bool ask_access(lua_State* L,
       });
 
     dlg.full()->Click.connect(
-      [&dlg, &allowButtonText](ui::Event&){
+      [&dlg, &allowButtonText](){
         if (dlg.full()->isSelected()) {
           dlg.dontShow()->setSelected(true);
           dlg.dontShow()->setEnabled(false);

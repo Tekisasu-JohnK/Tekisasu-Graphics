@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -14,19 +14,13 @@
 #include "doc/cancel_io.h"
 #include "doc/grid_io.h"
 #include "doc/image_io.h"
+#include "doc/string_io.h"
 #include "doc/subobjects_io.h"
 #include "doc/tileset.h"
 #include "doc/user_data_io.h"
 #include "doc/util.h"
 
 #include <iostream>
-
-// Extra BYTE with special flags to check the tileset version.  This
-// field didn't exist in Aseprite v1.3-alpha3 (so read8() fails = 0)
-#define TILESET_VER1     1
-
-// Tileset has UserData now
-#define TILESET_VER2     2
 
 namespace doc {
 
@@ -48,15 +42,24 @@ bool write_tileset(std::ostream& os,
     write_image(os, tileset->get(ti).get(), cancel);
   }
 
-  write8(os, TILESET_VER2);
+  write8(os, TILESET_VER3);
   write_user_data(os, tileset->userData());
+  write_string(os, tileset->name());
+
+  for (tile_index ti=0; ti<tileset->size(); ++ti) {
+    if (cancel && cancel->isCanceled())
+      return false;
+
+    write_user_data(os, tileset->getTileData(ti));
+  }
   return true;
 }
 
 Tileset* read_tileset(std::istream& is,
                       Sprite* sprite,
                       bool setId,
-                      bool* isOldVersion)
+                      uint32_t* tilesetVer,
+                      const int docFormatVer)
 {
   ObjectId id = read32(is);
   tileset_index ntiles = read32(is);
@@ -72,24 +75,27 @@ Tileset* read_tileset(std::istream& is,
 
   // Read extra version byte after tiles
   uint32_t ver = read8(is);
-  if (ver == TILESET_VER1 ||
-      ver == TILESET_VER2) {
-    if (isOldVersion)
-      *isOldVersion = false;
-
+  if (tilesetVer)
+    *tilesetVer = ver;
+  if (ver >= TILESET_VER1) {
     tileset->setBaseIndex(1);
 
-    if (ver == TILESET_VER2) {
-      UserData userData = read_user_data(is);
+    if (ver >= TILESET_VER2) {
+      UserData userData = read_user_data(is, docFormatVer);
       tileset->setUserData(userData);
+
+      if (ver >= TILESET_VER3) {
+        tileset->setName(read_string(is));
+
+        for (tileset_index ti=0; ti<ntiles; ++ti) {
+          tileset->setTileData(ti, read_user_data(is, docFormatVer));
+        }
+      }
     }
   }
   // Old tileset used in internal versions (this was added to recover
   // old files, maybe in a future we could remove this code)
   else {
-    if (isOldVersion)
-      *isOldVersion = true;
-
     fix_old_tileset(tileset);
   }
 

@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -38,7 +38,7 @@
 
 namespace os {
 
-class SkiaSystem : public SkiaSystemBase {
+class SkiaSystem final : public SkiaSystemBase {
 public:
   SkiaSystem()
     : m_defaultWindow(nullptr)
@@ -47,7 +47,7 @@ public:
   }
 
   ~SkiaSystem() {
-    // Do nothing
+    destroyInstance();
   }
 
   Capabilities capabilities() const override {

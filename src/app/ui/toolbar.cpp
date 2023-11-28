@@ -156,6 +156,14 @@ bool ToolBar::onProcessMessage(Message* msg)
         bool state = preview->isPreviewEnabled();
         preview->setPreviewEnabled(!state);
       }
+
+      toolrc = getToolGroupBounds(TimelineVisibilityIndex);
+      if (mousePos.y >= toolrc.y &&
+          mousePos.y < toolrc.y + toolrc.h) {
+        // Toggle timeline visibility
+        bool state = App::instance()->mainWindow()->getTimelineVisibility();
+        App::instance()->mainWindow()->setTimelineVisibility(!state);
+      }
       break;
     }
 
@@ -191,6 +199,12 @@ bool ToolBar::onProcessMessage(Message* msg)
       if (mousePos.y >= toolrc.y &&
           mousePos.y < toolrc.y+toolrc.h) {
         new_hot_index = PreviewVisibilityIndex;
+      }
+
+      toolrc = getToolGroupBounds(TimelineVisibilityIndex);
+      if (mousePos.y >= toolrc.y &&
+          mousePos.y < toolrc.y + toolrc.h) {
+        new_hot_index = TimelineVisibilityIndex;
       }
 
       // hot button changed
@@ -299,13 +313,14 @@ void ToolBar::onPaint(ui::PaintEvent& ev)
   ToolGroupList::iterator it = toolbox->begin_group();
   int groups = toolbox->getGroupsCount();
   Rect toolrc;
+  SkinPartPtr nw;
+  os::Surface* icon;
 
   g->fillRect(theme->colors.tabActiveFace(), bounds);
 
   for (int c=0; c<groups; ++c, ++it) {
     ToolGroup* tool_group = *it;
     Tool* tool = m_selectedInGroup[tool_group];
-    SkinPartPtr nw;
 
     if (activeTool == tool || m_hotIndex == c) {
       nw = theme->parts.toolbuttonHot();
@@ -315,36 +330,27 @@ void ToolBar::onPaint(ui::PaintEvent& ev)
                                     theme->parts.toolbuttonLast();
     }
 
-    toolrc = getToolGroupBounds(c);
-    toolrc.offset(-origin());
-    theme->drawRect(g, toolrc, nw.get());
-
     // Draw the tool icon
-    os::Surface* icon = theme->getToolIcon(tool->getId().c_str());
-    if (icon) {
-      g->drawRgbaSurface(icon,
-        toolrc.x+toolrc.w/2-icon->width()/2,
-        toolrc.y+toolrc.h/2-icon->height()/2);
-    }
+    icon = theme->getToolIcon(tool->getId().c_str());
+    drawToolIcon(g, c, nw, icon);
   }
 
   // Draw button to show/hide preview
-  toolrc = getToolGroupBounds(PreviewVisibilityIndex);
-  toolrc.offset(-origin());
+  const auto mainWindow = App::instance()->mainWindow();
   bool isHot = (m_hotIndex == PreviewVisibilityIndex ||
-    App::instance()->mainWindow()->getPreviewEditor()->isPreviewEnabled());
-  theme->drawRect(
-    g,
-    toolrc,
-    (isHot ? theme->parts.toolbuttonHot().get():
-             theme->parts.toolbuttonLast().get()));
+                mainWindow->getPreviewEditor()->isPreviewEnabled());
+  nw = isHot ? theme->parts.toolbuttonHot():
+               theme->parts.toolbuttonNormal();
+  icon = theme->getToolIcon("minieditor");
+  drawToolIcon(g, PreviewVisibilityIndex, nw, icon);
 
-  os::Surface* icon = theme->getToolIcon("minieditor");
-  if (icon) {
-    g->drawRgbaSurface(icon,
-      toolrc.x+toolrc.w/2-icon->width()/2,
-      toolrc.y+toolrc.h/2-icon->height()/2);
-  }
+  // Draw button to show/hide timeline
+  isHot = (m_hotIndex == TimelineVisibilityIndex ||
+           mainWindow->getTimelineVisibility());
+  nw = isHot ? theme->parts.toolbuttonHot():
+               theme->parts.toolbuttonLast();
+  icon = theme->getToolIcon("timeline");
+  drawToolIcon(g, TimelineVisibilityIndex, nw, icon);
 }
 
 void ToolBar::onVisible(bool visible)
@@ -415,7 +421,7 @@ void ToolBar::openPopupWindow(int group_index, ToolGroup* tool_group)
 
   for (Tool* tool : *toolbox) {
     if (tool->getGroup() == tool_group)
-      w += bounds().w-border().width()-1;
+      w += bounds().w-border().width()-1*guiscale();
   }
 
   rc.x -= w;
@@ -453,6 +459,11 @@ Rect ToolBar::getToolGroupBounds(int group_index)
   switch (group_index) {
 
     case PreviewVisibilityIndex:
+      rc.y += rc.h - 2*iconsize.h - 2*guiscale();
+      rc.h = iconsize.h+2*guiscale();
+      break;
+
+    case TimelineVisibilityIndex:
       rc.y += rc.h - iconsize.h - 2*guiscale();
       rc.h = iconsize.h+2*guiscale();
       break;
@@ -516,6 +527,12 @@ void ToolBar::openTipWindow(int group_index, Tool* tool)
       tooltip = Strings::tools_preview_hide();
     else
       tooltip = Strings::tools_preview_show();
+  }
+  else if (group_index == TimelineVisibilityIndex) {
+    if (App::instance()->mainWindow()->getTimelineVisibility())
+      tooltip = Strings::tools_timeline_hide();
+    else
+      tooltip = Strings::tools_timeline_show();
   }
   else
     return;
@@ -584,6 +601,20 @@ void ToolBar::onClosePopup()
   m_currentStrip = NULL;
 
   invalidate();
+}
+
+void ToolBar::drawToolIcon(Graphics* g, int group_index, SkinPartPtr skin, os::Surface* icon) {
+  auto theme = SkinTheme::get(this);
+  Rect toolrc = getToolGroupBounds(group_index);
+  toolrc.offset(-origin());
+
+  theme->drawRect(g, toolrc, skin.get());
+
+  if (icon) {
+    g->drawRgbaSurface(icon,
+                       CALC_FOR_CENTER(toolrc.x, toolrc.w, icon->width()),
+                       CALC_FOR_CENTER(toolrc.y, toolrc.h, icon->height()));
+  }
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -722,8 +753,8 @@ void ToolBar::ToolStrip::onPaint(PaintEvent& ev)
       if (icon) {
         g->drawRgbaSurface(
           icon,
-          toolrc.x+toolrc.w/2-icon->width()/2,
-          toolrc.y+toolrc.h/2-icon->height()/2);
+          CALC_FOR_CENTER(toolrc.x, toolrc.w, icon->width()),
+          CALC_FOR_CENTER(toolrc.y, toolrc.h, icon->height()));
       }
     }
   }
@@ -734,7 +765,7 @@ Rect ToolBar::ToolStrip::getToolBounds(int index)
   const Rect& bounds(this->bounds());
   Size iconsize = getToolIconSize(this);
 
-  return Rect(bounds.x+index*(iconsize.w-1), bounds.y,
+  return Rect(bounds.x+index*(iconsize.w-1*guiscale()), bounds.y,
               iconsize.w, bounds.h);
 }
 

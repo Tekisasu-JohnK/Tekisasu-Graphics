@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -35,6 +35,7 @@
 #include "app/ui/zoom_entry.h"
 #include "app/ui_context.h"
 #include "app/util/range_utils.h"
+#include "app/util/tile_flags_utils.h"
 #include "base/fs.h"
 #include "base/string.h"
 #include "doc/image.h"
@@ -472,6 +473,11 @@ public:
   }
 
   IndicatorsGeneration& add(const app::Color& color) {
+    // For Color::TileType, use the tile version
+    if (color.getType() == app::Color::TileType) {
+      return add(color.getTile());
+    }
+
     auto theme = SkinTheme::get(m_indicators);
 
     // Eyedropper icon
@@ -519,9 +525,8 @@ public:
       else
         str += fmt::format("{}", ti + baseIndex - 1);
       if (tf) {
-        if (tf & doc::tile_f_flipx) str += " FlipX";
-        if (tf & doc::tile_f_flipy) str += " FlipY";
-        if (tf & doc::tile_f_90cw) str += " Rot90CW";
+        str += " Flip ";
+        build_tile_flags_string(tf, str);
       }
     }
     m_indicators->addTextIndicator(str.c_str());
@@ -911,9 +916,10 @@ void StatusBar::onInitTheme(ui::InitThemeEvent& ev)
   auto theme = SkinTheme::get(this);
   setBgColor(theme->colors.statusBarFace());
   setBorder(gfx::Border(6*guiscale(), 0, 6*guiscale(), 0));
-  setMinSize(Size(0, textHeight()+8*guiscale()));
-  setMaxSize(Size(std::numeric_limits<int>::max(),
-                  textHeight()+8*guiscale()));
+  setMinMaxSize(
+    Size(0, textHeight()+8*guiscale()),
+    Size(std::numeric_limits<int>::max(),
+         textHeight()+8*guiscale()));
 
   m_newFrame->setStyle(theme->styles.newFrameButton());
   m_commandsBox->setBorder(gfx::Border(2, 1, 2, 2)*guiscale());

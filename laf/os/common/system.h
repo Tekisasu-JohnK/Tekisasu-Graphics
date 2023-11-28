@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,8 +15,8 @@
   #include "os/osx/app.h"
   #include "os/osx/menus.h"
   #include "os/osx/native_dialogs.h"
-#elif LAF_OS_WITH_GTK
-  #include "os/gtk/native_dialogs.h"
+#elif LAF_LINUX
+  #include "os/x11/native_dialogs.h"
 #else
   #include "os/native_dialogs.h"
 #endif
@@ -38,20 +38,10 @@ class CommonSystem : public System {
 public:
   CommonSystem() { }
   ~CommonSystem() {
-    // We have to clear the list of all events to clear all possible
-    // living WindowRef (so all window destructors are called at this
-    // point, when the os::System instance is still alive).
-    //
-    // TODO Maybe the event queue should be inside the System instance
-    //      (so when the system is deleted, the queue is
-    //      deleted). Anyway we should still clear all the events
-    //      before set_instance(nullptr), and we're not sure if this
-    //      is possible on macOS, as some events are queued before the
-    //      System instance is even created (see
-    //      EventQueue::instance() comment on laf/os/event_queue.h).
-    eventQueue()->clearEvents();
-
-    set_instance(nullptr);
+    // destroyInstance() can be called multiple times by derived
+    // classes.
+    if (instance() == this)
+      destroyInstance();
   }
 
   void setAppName(const std::string& appName) override { }
@@ -80,11 +70,11 @@ public:
   NativeDialogs* nativeDialogs() override {
     if (!m_nativeDialogs) {
 #if LAF_WINDOWS
-      m_nativeDialogs.reset(new NativeDialogsWin);
+      m_nativeDialogs = Ref<NativeDialogs>(new NativeDialogsWin);
 #elif LAF_MACOS
-      m_nativeDialogs.reset(new NativeDialogsOSX);
-#elif LAF_OS_WITH_GTK
-      m_nativeDialogs.reset(new NativeDialogsGTK);
+      m_nativeDialogs = Ref<NativeDialogs>(new NativeDialogsOSX);
+#elif LAF_LINUX
+      m_nativeDialogs = Ref<NativeDialogs>(new NativeDialogsX11);
 #endif
     }
     return m_nativeDialogs.get();
@@ -128,6 +118,35 @@ public:
        (isKeyPressed(kKeySpace) ? kKeySpaceModifier: 0) |
        (isKeyPressed(kKeyLWin) ||
         isKeyPressed(kKeyRWin) ? kKeyWinModifier: 0));
+  }
+
+protected:
+  // This must be called in the final class that derived from
+  // CommonSystem, because clearing the list of events can generate
+  // events on windows that will depend on the platform-specific
+  // System.
+  //
+  // E.g. We've crash reports because WindowWin is receiving
+  // WM_ACTIVATE messages when we destroy the events queue, and the
+  // handler of that message is expecting the SystemWin instance (not
+  // a CommonSystem instance). That's why we cannot call this from
+  // ~CommonSystem() destructor and we have to call this from
+  // ~SystemWin (or other platform-specific System implementations).
+  void destroyInstance() {
+    // We have to reset the list of all events to clear all possible
+    // living WindowRef (so all window destructors are called at this
+    // point, when the os::System instance is still alive).
+    //
+    // TODO Maybe the event queue should be inside the System instance
+    //      (so when the system is deleted, the queue is
+    //      deleted). Anyway we should still clear all the events
+    //      before set_instance(nullptr), and we're not sure if this
+    //      is possible on macOS, as some events are queued before the
+    //      System instance is even created (see
+    //      EventQueue::instance() comment on laf/os/event_queue.h).
+    eventQueue()->clearEvents();
+
+    set_instance(nullptr);
   }
 
 private:

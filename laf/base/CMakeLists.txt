@@ -1,5 +1,5 @@
 # LAF Base Library
-# Copyright (c) 2019-2022 Igara Studio S.A.
+# Copyright (c) 2019-2023 Igara Studio S.A.
 # Copyright (c) 2001-2018 David Capello
 
 include(CheckIncludeFiles)
@@ -61,16 +61,19 @@ set(BASE_SOURCES
 if(WIN32)
   set(BASE_SOURCES ${BASE_SOURCES}
     platform_win.cpp
+    uuid_win.cpp
     win/registry.cpp
     win/ver_query_values.cpp
     win/win32_exception.cpp)
 elseif(APPLE)
   set(BASE_SOURCES ${BASE_SOURCES}
     fs_osx.mm
-    platform_osx.mm)
+    platform_osx.mm
+    uuid_osx.mm)
 else()
   set(BASE_SOURCES ${BASE_SOURCES}
-    platform_unix.cpp)
+    platform_unix.cpp
+    uuid_unix.cpp)
 endif()
 
 add_library(laf-base ${BASE_SOURCES})
@@ -91,7 +94,9 @@ if(WIN32)
   target_link_libraries(laf-base dbghelp shlwapi version)
 else()
   if(APPLE)
+    find_library(FOUNDATION_LIBRARY Foundation)
     target_compile_definitions(laf-base PUBLIC LAF_MACOS)
+    target_link_libraries(laf-base ${FOUNDATION_LIBRARY})
   else()
     target_compile_definitions(laf-base PUBLIC LAF_LINUX)
     target_link_libraries(laf-base pthread)

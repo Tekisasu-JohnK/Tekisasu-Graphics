@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -65,6 +65,7 @@ namespace app {
     virtual void onCelFrameChanged(DocEvent& ev) { }
     virtual void onCelPositionChanged(DocEvent& ev) { }
     virtual void onCelOpacityChange(DocEvent& ev) { }
+    virtual void onCelZIndexChange(DocEvent& ev) { }
 
     virtual void onUserDataChange(DocEvent& ev) { }
 
@@ -98,6 +99,22 @@ namespace app {
 
     // The tileset was remapped (e.g. when tiles are re-ordered).
     virtual void onRemapTileset(DocEvent& ev, const doc::Remap& remap) { }
+
+    // When the tile management plugin property is changed.
+    virtual void onTileManagementPluginChange(DocEvent& ev) { }
+
+    // When a new tilemap cel/tile is created in certain situations,
+    // like after drawing in an empty tilemap cel, or when we paste a
+    // cel into an empty tilemap cel, so a new tile is created.
+    //
+    // This is useful for a tile management plugin to know when a new
+    // tile is added automatically by the editor or the timeline
+    // through draw_image_into_new_tilemap_cel(), and the plugin can
+    // do some extra work with it.
+    //
+    // Warning: This must be triggered from the UI thread (because
+    // scripts will listen this event).
+    virtual void onAfterAddTile(DocEvent& ev) { }
 
   };
 

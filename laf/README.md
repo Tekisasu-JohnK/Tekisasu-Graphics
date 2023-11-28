@@ -15,7 +15,7 @@ ABI compatibility at this moment.
 *laf* can be compiled with two back-ends (`LAF_BACKEND`): `skia` or `none`.
 
 When `LAF_BACKEND=skia`, *laf* requires a compiled version of the [Skia library](https://skia.org/)
-from branch `aseprite-m96`. You can check the aseprite/skia fork
+from branch `aseprite-m102`. You can check the aseprite/skia fork
 which includes a [release with pre-built versions](https://github.com/aseprite/skia/releases), or
 the check the [instructions to compile skia](https://github.com/aseprite/skia#readme) from scratch.
 

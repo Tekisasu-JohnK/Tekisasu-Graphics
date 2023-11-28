@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2022  Igara Studio S.A.
+// Copyright (C) 2022-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -12,6 +12,7 @@
 #include "app/doc_range.h"
 #include "app/sprite_position.h"
 #include "base/disable_copying.h"
+#include "base/exception.h"
 #include "obs/observable.h"
 #include "undo/undo_history.h"
 
@@ -25,6 +26,15 @@ namespace app {
   class CmdTransaction;
   class Context;
   class DocUndoObserver;
+
+  // Exception thrown when we want to modify the sprite (add new
+  // app::Cmd objects) when we are undoing/redoing/moving throw the
+  // undo history.
+  class CannotModifyWhenUndoingException : public base::Exception {
+  public:
+    CannotModifyWhenUndoingException() throw()
+    : base::Exception("Cannot modify the sprite when we are undoing/redoing an action.") { }
+  };
 
   class DocUndo : public obs::observable<DocUndoObserver>,
                   public undo::UndoHistoryDelegate {
@@ -86,6 +96,8 @@ namespace app {
     const undo::UndoState* lastState() const    { return m_undoHistory.lastState(); }
     const undo::UndoState* currentState() const { return m_undoHistory.currentState(); }
 
+    bool isUndoing() const { return m_undoing; }
+
     void moveToState(const undo::UndoState* state);
 
   private:
@@ -99,6 +111,10 @@ namespace app {
     const undo::UndoState* m_savedState = nullptr;
     Context* m_ctx = nullptr;
     size_t m_totalUndoSize = 0;
+
+    // True when we are undoing/redoing. Used to avoid adding new undo
+    // information when we are moving through the undo history.
+    bool m_undoing = false;
 
     // True if the saved state was invalidated/corrupted/lost in some
     // way. E.g. If the save process fails.

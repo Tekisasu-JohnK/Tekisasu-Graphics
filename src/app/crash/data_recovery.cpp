@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -12,18 +12,19 @@
 #include "app/crash/data_recovery.h"
 
 #include "app/crash/backup_observer.h"
+#include "app/crash/log.h"
 #include "app/crash/session.h"
 #include "app/pref/preferences.h"
 #include "app/resource_finder.h"
 #include "base/fs.h"
+#include "base/thread.h"
 #include "base/time.h"
+#include "fmt/format.h"
 #include "ui/system.h"
 
 #include <algorithm>
 #include <chrono>
 #include <thread>
-
-#define RECO_TRACE(...) // TRACE
 
 namespace app {
 namespace crash {
@@ -55,10 +56,10 @@ DataRecovery::DataRecovery(Context* ctx)
   do {
     base::Time time = base::current_time();
 
-    char buf[1024];
-    sprintf(buf, "%04d%02d%02d-%02d%02d%02d-%d",
-      time.year, time.month, time.day,
-      time.hour, time.minute, time.second, pid);
+    std::string buf =
+      fmt::format("{:04}{:02}{:02}-{:02}{:02}{:02}-{}",
+                  time.year, time.month, time.day,
+                  time.hour, time.minute, time.second, pid);
 
     newSessionDir = base::join_path(m_sessionsDir, buf);
 
@@ -110,6 +111,7 @@ void DataRecovery::launchSearch()
 
   m_thread = std::thread(
     [this]{
+      base::this_thread::set_name("search-sessions");
       searchForSessions();
       m_searching = false;
     });

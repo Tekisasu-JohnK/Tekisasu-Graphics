@@ -14,6 +14,7 @@
 #include "app/cmd/set_pixel_format.h"
 #include "app/commands/command.h"
 #include "app/commands/params.h"
+#include "app/console.h"
 #include "app/context_access.h"
 #include "app/extensions.h"
 #include "app/i18n/strings.h"
@@ -244,7 +245,7 @@ public:
       factor()->Change.connect([this]{ onIndexParamChange(); });
 
       advancedCheck()->Click.connect(
-        [this](ui::Event&){
+        [this](){
           advanced()->setVisible(advancedCheck()->isSelected());
           expandWindow(sizeHint());
         });
@@ -533,8 +534,14 @@ void ChangePixelFormatCommand::onLoadParams(const Params& params)
     // Then, if the matrix doesn't exist we try to load it from a file
     else {
       render::DitheringMatrix ditMatrix;
-      if (!load_dithering_matrix_from_sprite(matrix, ditMatrix))
-        throw std::runtime_error("Invalid matrix name");
+      try {
+        load_dithering_matrix_from_sprite(matrix, ditMatrix);
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR, "%s\n", e.what());
+        Console::showException(e);
+      }
+
       m_dithering.matrix(ditMatrix);
     }
   }
@@ -703,7 +710,7 @@ std::string ChangePixelFormatCommand::onGetFriendlyName() const
             conversion = Strings::commands_ChangePixelFormat_Indexed_OldDithering();
             break;
           case render::DitheringAlgorithm::ErrorDiffusion:
-            conversion = Strings::commands_ChangePixelFormat_Indexed_ErrorDifussion();
+            conversion = Strings::commands_ChangePixelFormat_Indexed_ErrorDiffusion();
             break;
         }
         break;

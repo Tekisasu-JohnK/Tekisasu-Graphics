@@ -1,9 +1,5 @@
 # Welcome to libarchive!
 
-## Fixing for Tekisasu Graphics compile
-libarchive seems to be broken in the previous commit on GNU/Linux
-systems.  We have readded the current version.
-
 The libarchive project develops a portable, efficient C library that
 can read and write streaming archives in a variety of formats.  It
 also includes implementations of the common `tar`, `cpio`, and `zcat`

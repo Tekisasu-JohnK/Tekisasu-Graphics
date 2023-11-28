@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -22,6 +22,8 @@
 namespace os {
 
 class SpriteSheetFont : public Font {
+  static constexpr auto kRedColor = gfx::rgba(255, 0, 0);
+
 public:
   SpriteSheetFont() : m_sheet(nullptr) { }
   ~SpriteSheetFont() { }
@@ -56,7 +58,9 @@ public:
 
   bool hasCodePoint(int codepoint) const override {
     codepoint -= (int)' ';
-    return (codepoint >= 0 && codepoint < (int)m_chars.size());
+    return (codepoint >= 0 &&
+            codepoint < (int)m_chars.size() &&
+            !m_chars[codepoint].isEmpty());
   }
 
   Surface* sheetSurface() const {
@@ -79,9 +83,10 @@ public:
 
     SurfaceLock lock(sur.get());
     gfx::Rect bounds(0, 0, 1, 1);
+    gfx::Rect charBounds;
 
-    while (font->findChar(sur.get(), sur->width(), sur->height(), bounds)) {
-      font->m_chars.push_back(bounds);
+    while (font->findChar(sur.get(), sur->width(), sur->height(), bounds, charBounds)) {
+      font->m_chars.push_back(charBounds);
       bounds.x += bounds.w;
     }
 
@@ -90,7 +95,8 @@ public:
 
 private:
 
-  bool findChar(const Surface* sur, int width, int height, gfx::Rect& bounds) {
+  bool findChar(const Surface* sur, int width, int height,
+                gfx::Rect& bounds, gfx::Rect& charBounds) {
     gfx::Color keyColor = sur->getPixel(0, 0);
 
     while (sur->getPixel(bounds.x, bounds.y) == keyColor) {
@@ -104,6 +110,8 @@ private:
       }
     }
 
+    gfx::Color firstCharPixel = sur->getPixel(bounds.x, bounds.y);
+
     bounds.w = 0;
     while ((bounds.x+bounds.w < width) &&
            (sur->getPixel(bounds.x+bounds.w, bounds.y) != keyColor)) {
@@ -115,6 +123,13 @@ private:
            (sur->getPixel(bounds.x, bounds.y+bounds.h) != keyColor)) {
       bounds.h++;
     }
+
+    // Using red color in the first pixel of the char indicates that
+    // this glyph shouldn't be used as a valid one.
+    if (firstCharPixel != kRedColor)
+      charBounds = bounds;
+    else
+      charBounds = gfx::Rect();
 
     return !bounds.isEmpty();
   }

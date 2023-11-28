@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -14,11 +14,11 @@
 #include "app/file/file.h"
 #include "app/file/file_format.h"
 #include "app/file/format_options.h"
-#include "app/pref/preferences.h"
 #include "base/cfile.h"
 #include "base/exception.h"
 #include "base/file_handle.h"
 #include "base/fs.h"
+#include "base/mem_utils.h"
 #include "dio/aseprite_common.h"
 #include "dio/aseprite_decoder.h"
 #include "dio/decode_delegate.h"
@@ -33,6 +33,8 @@
 #include <cstdio>
 #include <deque>
 #include <variant>
+
+#define ASEFILE_TRACE(...) // TRACE(__VA_ARGS__)
 
 namespace app {
 
@@ -52,6 +54,10 @@ public:
     m_fop->setError(msg.c_str());
   }
 
+  void incompatibilityError(const std::string& msg) override {
+    m_fop->setIncompatibilityError(msg);
+  }
+
   void progress(double fromZeroToOne) override {
     m_fop->setProgress(fromZeroToOne);
   }
@@ -65,7 +71,7 @@ public:
   }
 
   doc::color_t defaultSliceColor() override {
-    auto color = Preferences::instance().slices.defaultColor();
+    auto color = m_fop->config().defaultSliceColor;
     return doc::rgba(color.getRed(),
                      color.getGreen(),
                      color.getBlue(),
@@ -78,6 +84,10 @@ public:
 
   doc::Sprite* sprite() { return m_sprite; }
 
+  bool cacheCompressedTilesets() const override {
+    return m_fop->config().cacheCompressedTilesets;
+  }
+
 private:
   FileOp* m_fop;
   doc::Sprite* m_sprite;
@@ -86,25 +96,23 @@ private:
 class ScanlinesGen {
 public:
   virtual ~ScanlinesGen() { }
-  virtual gfx::Size getImageSize() = 0;
-  virtual int getScanlineSize() = 0;
-  virtual const uint8_t* getScanlineAddress(int y) = 0;
+  virtual gfx::Size getImageSize() const = 0;
+  virtual int getScanlineSize() const = 0;
+  virtual const uint8_t* getScanlineAddress(int y) const = 0;
 };
 
 class ImageScanlines : public ScanlinesGen {
   const Image* m_image;
 public:
   ImageScanlines(const Image* image) : m_image(image) { }
-  gfx::Size getImageSize() override {
+  gfx::Size getImageSize() const override {
     return gfx::Size(m_image->width(),
                      m_image->height());
   }
-  int getScanlineSize() override {
-    return doc::calculate_rowstride_bytes(
-      m_image->pixelFormat(),
-      m_image->width());
+  int getScanlineSize() const override {
+    return m_image->widthBytes();
   }
-  const uint8_t* getScanlineAddress(int y) override {
+  const uint8_t* getScanlineAddress(int y) const override {
     return m_image->getPixelAddress(0, y);
   }
 };
@@ -113,16 +121,15 @@ class TilesetScanlines : public ScanlinesGen {
   const Tileset* m_tileset;
 public:
   TilesetScanlines(const Tileset* tileset) : m_tileset(tileset) { }
-  gfx::Size getImageSize() override {
+  gfx::Size getImageSize() const override {
     return gfx::Size(m_tileset->grid().tileSize().w,
                      m_tileset->grid().tileSize().h * m_tileset->size());
   }
-  int getScanlineSize() override {
-    return doc::calculate_rowstride_bytes(
-      m_tileset->sprite()->pixelFormat(),
-      m_tileset->grid().tileSize().w);
+  int getScanlineSize() const override {
+    return bytes_per_pixel_for_colormode(m_tileset->sprite()->colorMode())
+      * m_tileset->grid().tileSize().w;
   }
-  const uint8_t* getScanlineAddress(int y) override {
+  const uint8_t* getScanlineAddress(int y) const override {
     const int h = m_tileset->grid().tileSize().h;
     const tile_index ti = (y / h);
     ASSERT(ti >= 0 && ti < m_tileset->size());
@@ -205,8 +212,6 @@ static void ase_file_write_tileset_chunk(FILE* f, FileOp* fop,
                                          const dio::AsepriteExternalFiles& ext_files,
                                          const Tileset* tileset,
                                          const tileset_index si);
-static void ase_file_write_properties(FILE* f,
-                                      const UserData::Properties& properties);
 static void ase_file_write_properties_maps(FILE* f, FileOp* fop,
                                            const dio::AsepriteExternalFiles& ext_files,
                                             size_t nmaps,
@@ -816,14 +821,41 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 template<typename ImageTraits>
-static void write_raw_image(FILE* f, const Image* image)
+static void write_raw_image_templ(FILE* f, const ScanlinesGen* gen)
 {
+  const gfx::Size imgSize = gen->getImageSize();
   PixelIO<ImageTraits> pixel_io;
   int x, y;
 
-  for (y=0; y<image->height(); y++)
-    for (x=0; x<image->width(); x++)
-      pixel_io.write_pixel(f, get_pixel_fast<ImageTraits>(image, x, y));
+  for (y=0; y<imgSize.h; ++y) {
+    typename ImageTraits::address_t address =
+      (typename ImageTraits::address_t)gen->getScanlineAddress(y);
+
+    for (x=0; x<imgSize.w; ++x, ++address)
+      pixel_io.write_pixel(f, *address);
+  }
+}
+
+static void write_raw_image(FILE* f, ScanlinesGen* gen, PixelFormat pixelFormat)
+{
+  switch (pixelFormat) {
+
+    case IMAGE_RGB:
+      write_raw_image_templ<RgbTraits>(f, gen);
+      break;
+
+    case IMAGE_GRAYSCALE:
+      write_raw_image_templ<GrayscaleTraits>(f, gen);
+      break;
+
+    case IMAGE_INDEXED:
+      write_raw_image_templ<IndexedTraits>(f, gen);
+      break;
+
+    case IMAGE_TILEMAP:
+      write_raw_image_templ<TilemapTraits>(f, gen);
+      break;
+  }
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -831,7 +863,9 @@ static void write_raw_image(FILE* f, const Image* image)
 //////////////////////////////////////////////////////////////////////
 
 template<typename ImageTraits>
-static void write_compressed_image_templ(FILE* f, ScanlinesGen* gen)
+static void write_compressed_image_templ(FILE* f,
+                                         ScanlinesGen* gen,
+                                         base::buffer* compressedOutput)
 {
   PixelIO<ImageTraits> pixel_io;
   z_stream zstream;
@@ -872,6 +906,17 @@ static void write_compressed_image_templ(FILE* f, ScanlinesGen* gen)
         if ((fwrite(&compressed[0], 1, output_bytes, f) != (size_t)output_bytes)
             || ferror(f))
           throw base::Exception("Error writing compressed image pixels.\n");
+
+        // Save the whole compressed buffer to re-use in following
+        // save options (so we don't have to re-compress the whole
+        // tileset)
+        if (compressedOutput) {
+          std::size_t n = compressedOutput->size();
+          compressedOutput->resize(n + output_bytes);
+          std::copy(compressed.begin(),
+                    compressed.begin() + output_bytes,
+                    compressedOutput->begin() + n);
+        }
       }
     } while (zstream.avail_out == 0);
   }
@@ -881,23 +926,26 @@ static void write_compressed_image_templ(FILE* f, ScanlinesGen* gen)
     throw base::Exception("ZLib error %d in deflateEnd().", err);
 }
 
-static void write_compressed_image(FILE* f, ScanlinesGen* gen, PixelFormat pixelFormat)
+static void write_compressed_image(FILE* f,
+                                   ScanlinesGen* gen,
+                                   PixelFormat pixelFormat,
+                                   base::buffer* compressedOutput = nullptr)
 {
   switch (pixelFormat) {
     case IMAGE_RGB:
-      write_compressed_image_templ<RgbTraits>(f, gen);
+      write_compressed_image_templ<RgbTraits>(f, gen, compressedOutput);
       break;
 
     case IMAGE_GRAYSCALE:
-      write_compressed_image_templ<GrayscaleTraits>(f, gen);
+      write_compressed_image_templ<GrayscaleTraits>(f, gen, compressedOutput);
       break;
 
     case IMAGE_INDEXED:
-      write_compressed_image_templ<IndexedTraits>(f, gen);
+      write_compressed_image_templ<IndexedTraits>(f, gen, compressedOutput);
       break;
 
     case IMAGE_TILEMAP:
-      write_compressed_image_templ<TilemapTraits>(f, gen);
+      write_compressed_image_templ<TilemapTraits>(f, gen, compressedOutput);
       break;
   }
 }
@@ -939,7 +987,8 @@ static void ase_file_write_cel_chunk(FILE* f, dio::AsepriteFrameHeader* frame_he
   fputw(cel->y(), f);
   fputc(cel->opacity(), f);
   fputw(cel_type, f);
-  ase_file_write_padding(f, 7);
+  fputw(cel->zIndex(), f);
+  ase_file_write_padding(f, 5);
 
   switch (cel_type) {
 
@@ -952,21 +1001,8 @@ static void ase_file_write_cel_chunk(FILE* f, dio::AsepriteFrameHeader* frame_he
         fputw(image->height(), f);
 
         // Pixel data
-        switch (image->pixelFormat()) {
-
-          case IMAGE_RGB:
-            write_raw_image<RgbTraits>(f, image);
-            break;
-
-          case IMAGE_GRAYSCALE:
-            write_raw_image<GrayscaleTraits>(f, image);
-            break;
-
-          case IMAGE_INDEXED:
-            write_raw_image<IndexedTraits>(f, image);
-            break;
-
-        }
+        ImageScanlines scan(image);
+        write_raw_image(f, &scan, image->pixelFormat());
       }
       else {
         // Width and height
@@ -1009,9 +1045,9 @@ static void ase_file_write_cel_chunk(FILE* f, dio::AsepriteFrameHeader* frame_he
       fputw(image->height(), f);
       fputw(32, f);             // TODO use different bpp when possible
       fputl(tile_i_mask, f);
-      fputl(tile_f_flipx, f);
-      fputl(tile_f_flipy, f);
-      fputl(tile_f_90cw, f);
+      fputl(tile_f_xflip, f);
+      fputl(tile_f_yflip, f);
+      fputl(tile_f_dflip, f);
       ase_file_write_padding(f, 10);
 
       ImageScanlines scan(image);
@@ -1164,7 +1200,7 @@ static void ase_file_write_user_data_chunk(FILE* f, FileOp* fop,
 {
   ChunkWriter chunk(f, frame_header, ASE_FILE_CHUNK_USER_DATA);
 
-  size_t nmaps = userData->countNonEmptyPropertiesMaps();
+  size_t nmaps = count_nonempty_properties_maps(userData->propertiesMaps());
   int flags = 0;
   if (!userData->text().empty())
     flags |= ASE_USER_DATA_FLAG_HAS_TEXT;
@@ -1216,7 +1252,8 @@ static void ase_file_write_slice_chunk(FILE* f, dio::AsepriteFrameHeader* frame_
 {
   ChunkWriter chunk(f, frame_header, ASE_FILE_CHUNK_SLICE);
 
-  auto range = slice->range(fromFrame, toFrame);
+  frame_t firstFromFrame = slice->empty() ? fromFrame : slice->fromFrame();
+  auto range = slice->range(firstFromFrame, toFrame);
   ASSERT(!range.empty());
 
   int flags = 0;
@@ -1232,10 +1269,10 @@ static void ase_file_write_slice_chunk(FILE* f, dio::AsepriteFrameHeader* frame_
   fputl(0, f);                             // 4 bytes reserved
   ase_file_write_string(f, slice->name()); // slice name
 
-  frame_t frame = fromFrame;
+  frame_t frame = firstFromFrame;
   const SliceKey* oldKey = nullptr;
   for (auto key : range) {
-    if (frame == fromFrame || key != oldKey) {
+    if (frame == firstFromFrame || key != oldKey) {
       fputl(frame, f);
       fputl((int32_t)(key ? key->bounds().x: 0), f);
       fputl((int32_t)(key ? key->bounds().y: 0), f);
@@ -1290,6 +1327,9 @@ static void ase_file_write_external_files_chunk(
   };
 
   for (const Tileset* tileset : *sprite->tilesets()) {
+    if (!tileset)
+      continue;
+
     if (!tileset->externalFilename().empty()) {
       ext_files.insert(ASE_EXTERNAL_FILE_TILESET,
                        tileset->externalFilename());
@@ -1338,6 +1378,12 @@ static void ase_file_write_external_files_chunk(
     putExtentionIds(slice->userData().propertiesMaps(), ext_files);
   }
 
+  // Tile management plugin
+  if (sprite->hasTileManagementPlugin()) {
+    ext_files.insert(ASE_EXTERNAL_FILE_TILE_MANAGEMENT,
+                     sprite->tileManagementPlugin());
+  }
+
   // No external files to write
   if (ext_files.items().empty())
     return;
@@ -1360,15 +1406,17 @@ static void ase_file_write_tileset_chunks(FILE* f, FileOp* fop,
 {
   tileset_index si = 0;
   for (const Tileset* tileset : *tilesets) {
-    ase_file_write_tileset_chunk(f, fop, frame_header, ext_files,
-                                 tileset, si);
+    if (tileset) {
+      ase_file_write_tileset_chunk(f, fop, frame_header, ext_files,
+                                   tileset, si);
 
-    ase_file_write_user_data_chunk(f, fop, frame_header, ext_files, &tileset->userData());
+      ase_file_write_user_data_chunk(f, fop, frame_header, ext_files, &tileset->userData());
 
-    // Write tile UserData
-    for (tile_index i=0; i < tileset->size(); ++i) {
-      UserData tileData = tileset->getTileData(i);
-      ase_file_write_user_data_chunk(f, fop, frame_header, ext_files, &tileData);
+      // Write tile UserData
+      for (tile_index i=0; i < tileset->size(); ++i) {
+        UserData tileData = tileset->getTileData(i);
+        ase_file_write_user_data_chunk(f, fop, frame_header, ext_files, &tileData);
+      }
     }
     ++si;
   }
@@ -1388,6 +1436,11 @@ static void ase_file_write_tileset_chunk(FILE* f, FileOp* fop,
     flags |= ASE_TILESET_FLAG_EXTERNAL_FILE;
   else
     flags |= ASE_TILESET_FLAG_EMBEDDED;
+
+  doc::tile_flags tf = tileset->matchFlags();
+  if (tf & doc::tile_f_xflip) flags |= ASE_TILESET_FLAG_MATCH_XFLIP;
+  if (tf & doc::tile_f_yflip) flags |= ASE_TILESET_FLAG_MATCH_YFLIP;
+  if (tf & doc::tile_f_dflip) flags |= ASE_TILESET_FLAG_MATCH_DFLIP;
 
   fputl(si, f);         // Tileset ID
   fputl(flags, f);      // Tileset Flags
@@ -1420,24 +1473,49 @@ static void ase_file_write_tileset_chunk(FILE* f, FileOp* fop,
   // Flag 2 = tileset
   if (flags & ASE_TILESET_FLAG_EMBEDDED) {
     size_t beg = ftell(f);
-    fputl(0, f);                  // Field for compressed data length (completed later)
-    TilesetScanlines gen(tileset);
-    write_compressed_image(f, &gen, tileset->sprite()->pixelFormat());
 
-    size_t end = ftell(f);
-    fseek(f, beg, SEEK_SET);
-    fputl(end-beg-4, f);          // Save the compressed data length
-    fseek(f, end, SEEK_SET);
+    // Save the cached tileset compressed data
+    if (!tileset->compressedData().empty() &&
+        tileset->compressedDataVersion() == tileset->version()) {
+      const base::buffer& data = tileset->compressedData();
+
+      ASEFILE_TRACE("[%d] saving compressed tileset (%s)\n",
+                    tileset->id(), base::get_pretty_memory_size(data.size()).c_str());
+
+      fputl(data.size(), f); // Compressed data length
+      fwrite(&data[0], 1, data.size(), f);
+    }
+    // Compress and save the tileset now
+    else {
+      fputl(0, f);                  // Field for compressed data length (completed later)
+      TilesetScanlines gen(tileset);
+
+      ASEFILE_TRACE("[%d] recompressing tileset\n", tileset->id());
+
+      base::buffer compressedData;
+      base::buffer* compressedDataPtr = nullptr;
+      if (fop->config().cacheCompressedTilesets)
+        compressedDataPtr = &compressedData;
+
+      write_compressed_image(f, &gen, tileset->sprite()->pixelFormat(),
+                             compressedDataPtr);
+
+      // As we've just compressed the tileset, we can cache this same
+      // data (so saving the file again will not need recompressing).
+      if (compressedDataPtr)
+        tileset->setCompressedData(compressedData);
+
+      size_t end = ftell(f);
+      fseek(f, beg, SEEK_SET);
+      fputl(end-beg-4, f);          // Save the compressed data length
+      fseek(f, end, SEEK_SET);
+    }
   }
 }
 
 static void ase_file_write_property_value(FILE* f,
                                           const UserData::Variant& value)
 {
-  // TODO reduce value type depending on the actual value we're going
-  // to save (e.g. we don't need to save a 64-bit integer if the
-  // value=30, we can use a uint8_t for that case)
-
   switch (value.type()) {
     case USER_DATA_PROPERTY_TYPE_NULLPTR:
       ASSERT(false);
@@ -1494,37 +1572,58 @@ static void ase_file_write_property_value(FILE* f,
       break;
     }
     case USER_DATA_PROPERTY_TYPE_VECTOR: {
-      auto& v = *std::get_if<UserData::Vector>(&value);
-      fputl(v.size(), f);
-      const uint16_t type = (v.empty() ? 0 : v.front().type());
+      auto& vector = *std::get_if<UserData::Vector>(&value);
+      fputl(vector.size(), f);
+
+      const uint16_t type = doc::all_elements_of_same_type(vector);
       fputw(type, f);
-      for (const auto& elem : v) {
-        ASSERT(type == elem.type()); // Check that all elements have the same type
-        ase_file_write_property_value(f, elem);
+
+      for (const auto& elem : vector) {
+        UserData::Variant v = elem;
+
+        // Reduce each element if possible, because each element has
+        // its own type.
+        if (type == 0) {
+          if (is_reducible_int(v)) {
+            v = reduce_int_type_size(v);
+          }
+          fputw(v.type(), f);
+        }
+        // Reduce to the smaller/common int type.
+        else if (is_reducible_int(v) && type < v.type()) {
+          v = cast_to_smaller_int_type(v, type);
+        }
+
+        ase_file_write_property_value(f, v);
       }
       break;
     }
-    case USER_DATA_PROPERTY_TYPE_PROPERTIES:
-      ase_file_write_properties(f, *std::get_if<UserData::Properties>(&value));
+    case USER_DATA_PROPERTY_TYPE_PROPERTIES: {
+      auto& properties = *std::get_if<UserData::Properties>(&value);
+      ASSERT(properties.size() > 0);
+      fputl(properties.size(), f);
+
+      for (const auto& property : properties) {
+        const std::string& name = property.first;
+        ase_file_write_string(f, name);
+
+        UserData::Variant v = property.second;
+        if (is_reducible_int(v)) {
+          v = reduce_int_type_size(v);
+        }
+        fputw(v.type(), f);
+
+        ase_file_write_property_value(f, v);
+      }
       break;
-  }
-}
-
-static void ase_file_write_properties(FILE* f,
-                                      const UserData::Properties& properties)
-{
-  ASSERT(properties.size() > 0);
-
-  fputl(properties.size(), f);
-
-  for (auto property : properties) {
-    const std::string& name = property.first;
-    ase_file_write_string(f, name);
-
-    const UserData::Variant& value = property.second;
-    fputw(value.type(), f);
-
-    ase_file_write_property_value(f, value);
+    }
+    case USER_DATA_PROPERTY_TYPE_UUID: {
+      auto& uuid = *std::get_if<base::Uuid>(&value);
+      for (int i=0; i<16; ++i) {
+        fputc(uuid[i], f);
+      }
+      break;
+    }
   }
 }
 
@@ -1542,7 +1641,7 @@ static void ase_file_write_properties_maps(FILE* f, FileOp* fop,
   fputl(0, f);
 
   fputl(nmaps, f);
-  for (auto propertiesMap : propertiesMaps) {
+  for (const auto& propertiesMap : propertiesMaps) {
     const UserData::Properties& properties = propertiesMap.second;
     // Skip properties map if it doesn't have any property
     if (properties.empty())
@@ -1567,7 +1666,7 @@ static void ase_file_write_properties_maps(FILE* f, FileOp* fop,
       //continue;
     }
     fputl(extensionId, f);
-    ase_file_write_properties(f, properties);
+    ase_file_write_property_value(f, properties);
   }
   long endPos = ftell(f);
   // We can overwrite the properties maps size now

@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020  Igara Studio S.A.
+// Copyright (c) 2020-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -96,6 +96,21 @@ namespace gfx {
 
     Matrix& postTranslate(float dx, float dy) {
       m_skMatrix.postTranslate(dx, dy);
+      return *this;
+    }
+
+    Matrix& setConcat(const Matrix& a, const Matrix& b) {
+      m_skMatrix.setConcat(a.m_skMatrix, b.m_skMatrix);
+      return *this;
+    }
+
+    Matrix& preConcat(const Matrix& other) {
+      m_skMatrix.preConcat(other.m_skMatrix);
+      return *this;
+    }
+
+    Matrix& postConcat(const Matrix& other) {
+      m_skMatrix.postConcat(other.m_skMatrix);
       return *this;
     }
 

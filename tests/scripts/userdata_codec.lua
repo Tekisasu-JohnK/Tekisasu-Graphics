@@ -24,6 +24,13 @@ do
   spr.layers[1].tileset.properties.a = "i'm a tilemap"
   spr.layers[1].tileset.properties.b = 11
   spr.layers[1].tileset.properties("ext").a = "text from extension"
+  -- Create some tiles with properties
+  local tile = spr:newTile(spr.layers[1].tileset, 1)
+  tile.properties.a = 320
+  tile.properties.b = 330
+  tile = spr:newTile(spr.layers[1].tileset, 2)
+  tile.properties.a = 640
+  tile.properties.b = 650
   -- Set tags custom properties
   spr.tags[1].properties.a = Point(1,2)
   spr.tags[1].properties.b = {a="text",b=35.567,c=Rectangle(1,2,3,4)}
@@ -60,6 +67,10 @@ do
   assert(spr.layers[1].tileset.properties.a == "i'm a tilemap")
   assert(spr.layers[1].tileset.properties.b == 11)
   assert(spr.layers[1].tileset.properties("ext").a == "text from extension")
+  assert(spr.layers[1].tileset:tile(1).properties.a == 320)
+  assert(spr.layers[1].tileset:tile(1).properties.b == 330)
+  assert(spr.layers[1].tileset:tile(2).properties.a == 640)
+  assert(spr.layers[1].tileset:tile(2).properties.b == 650)
   assert(#spr.tags[1].properties == 2)
   assert(#spr.tags[1].properties("ext") == 1)
   assert(spr.tags[1].properties.a.x == 1)
@@ -118,4 +129,41 @@ do
   assert(#spr.layers[1].properties("ext") == 0)
   assert(#spr.layers[2].properties("ext") == 1)
   assert(spr.layers[2].properties("ext").b == 32)
+end
+
+-- Test save vector with different types inside
+do
+  local spr = Sprite(32, 32)
+  spr.properties.a = { 3, "hi", {4, 5, 6}, {a="bye", b=10} }
+
+  spr:saveAs("_test_userdata_codec_3.aseprite")
+  spr:close()
+
+  spr = Sprite{ fromFile="_test_userdata_codec_3.aseprite" }
+  assert(#spr.properties.a == 4)
+  assert(spr.properties.a[1] == 3)
+  assert(spr.properties.a[2] == "hi")
+  assert(#spr.properties.a[3] == 3)
+  assert(spr.properties.a[3][1] == 4)
+  assert(spr.properties.a[3][2] == 5)
+  assert(spr.properties.a[3][3] == 6)
+  assert(spr.properties.a[4].a == "bye")
+  assert(spr.properties.a[4].b == 10)
+end
+
+-- Test save UUID
+do
+  local a = Uuid()
+  local b = Uuid()
+  local spr = Sprite(1, 1)
+  spr.properties.a = a
+  spr.properties.b = b
+
+  spr:saveAs("_test_userdata_codec_4.aseprite")
+  spr:close()
+
+  spr = Sprite{ fromFile="_test_userdata_codec_4.aseprite" }
+  assert(#spr.properties == 2)
+  assert(spr.properties.a == a)
+  assert(spr.properties.b == b)
 end

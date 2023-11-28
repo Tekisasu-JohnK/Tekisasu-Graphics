@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -29,13 +29,13 @@
 #include "gfx/rect.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #define DOC_SPRITE_MAX_WIDTH  65535
 #define DOC_SPRITE_MAX_HEIGHT 65535
 
 namespace doc {
-
   class CelsRange;
   class Document;
   class Image;
@@ -45,6 +45,7 @@ namespace doc {
   class Mask;
   class Palette;
   class Remap;
+  class RenderPlan;
   class RgbMap;
   class RgbMapRGB5A3;
   class SelectedFrames;
@@ -72,6 +73,14 @@ namespace doc {
     static Sprite* MakeStdSprite(const ImageSpec& spec,
                                  const int ncolors = 256,
                                  const ImageBufferPtr& imageBuf = ImageBufferPtr());
+    // Creates a new sprite with one tilemap layer and one cel
+    // with a tilemap's image of the size specified by tilemapspec and the
+    // given tileset.
+    static Sprite* MakeStdTilemapSpriteWithTileset(const ImageSpec& spec,
+                                  const ImageSpec& tilemapspec,
+                                  const Tileset& tileset,
+                                  const int ncolors = 256,
+                                  const ImageBufferPtr& imageBuf = ImageBufferPtr());
 
     ////////////////////////////////////////
     // Main properties
@@ -196,11 +205,9 @@ namespace doc {
     void remapImages(const Remap& remap);
     void remapTilemaps(const Tileset* tileset,
                        const Remap& remap);
-    void pickCels(const double x,
-                  const double y,
-                  const frame_t frame,
+    void pickCels(const gfx::PointF& pos,
                   const int opacityThreshold,
-                  const LayerList& layers,
+                  const RenderPlan& plan,
                   CelList& cels) const;
 
     ////////////////////////////////////////
@@ -210,9 +217,11 @@ namespace doc {
     LayerList allVisibleLayers() const;
     LayerList allVisibleReferenceLayers() const;
     LayerList allBrowsableLayers() const;
+    LayerList allTilemaps() const;
 
     CelsRange cels() const;
     CelsRange cels(frame_t frame) const;
+    CelsRange cels(const SelectedFrames& selFrames) const;
     CelsRange uniqueCels() const;
     CelsRange uniqueCels(const SelectedFrames& selFrames) const;
 
@@ -221,6 +230,18 @@ namespace doc {
 
     bool hasTilesets() const { return m_tilesets != nullptr; }
     Tilesets* tilesets() const;
+
+    const std::string& tileManagementPlugin() const {
+      return m_tileManagementPlugin;
+    }
+
+    bool hasTileManagementPlugin() const {
+      return !m_tileManagementPlugin.empty();
+    }
+
+    void setTileManagementPlugin(const std::string& plugin) {
+      m_tileManagementPlugin = plugin;
+    }
 
   private:
     Document* m_document;
@@ -241,6 +262,15 @@ namespace doc {
 
     // Tilesets
     mutable Tilesets* m_tilesets;
+
+    // Custom tile management plugin. This can be an ID that specifies
+    // a custom plugin that will be used to handle tilesets and
+    // tilemaps for this specific sprite. This property is saved
+    // inside .aseprite files (ASE_EXTERNAL_FILE_TILE_MANAGEMENT), and
+    // it's used by the UI to disable the standard tileset/tilemap UX
+    // (e.g. drag & drop tiles, or TilesetMode::Auto mode, etc.),
+    // giving the possibility to handle tiles exclusively to a plugin.
+    std::string m_tileManagementPlugin;
 
     // Disable default constructor and copying
     Sprite();

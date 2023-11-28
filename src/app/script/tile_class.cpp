@@ -8,6 +8,7 @@
 #include "config.h"
 #endif
 
+#include "app/cmd/replace_image.h"
 #include "app/cmd/set_tile_data.h"
 #include "app/cmd/set_tile_data_properties.h"
 #include "app/script/docobj.h"
@@ -33,6 +34,13 @@ struct Tile {
   }
 };
 
+int Tile_get_index(lua_State* L)
+{
+  auto tile = get_obj<Tile>(L, 1);
+  lua_pushinteger(L, tile->ti);
+  return 1;
+}
+
 int Tile_get_image(lua_State* L)
 {
   auto tile = get_obj<Tile>(L, 1);
@@ -40,12 +48,25 @@ int Tile_get_image(lua_State* L)
   if (!ts)
     return 0;
 
-  ImageRef image = ts->get(tile->ti);
-  if (image)
-    push_tileset_image(L, ts, image.get());
-  else
-    lua_pushnil(L);
+  push_tileset_image(L, ts, tile->ti);
   return 1;
+}
+
+int Tile_set_image(lua_State* L)
+{
+  auto tile = get_obj<Tile>(L, 1);
+  auto ts = doc::get<Tileset>(tile->id);
+  auto srcImage = get_image_from_arg(L, 2);
+  ImageRef newImage(Image::createCopy(srcImage));
+
+  if (ts && ts->sprite()) {
+    Tx tx;
+    tx(new cmd::ReplaceImage(ts->sprite(),
+                             ts->get(tile->ti),
+                             newImage));
+    tx.commit();
+  }
+  return 0;
 }
 
 int Tile_get_data(lua_State* L)
@@ -165,7 +186,8 @@ const luaL_Reg Tile_methods[] = {
 };
 
 const Property Tile_properties[] = {
-  { "image", Tile_get_image, nullptr }, // TODO Tile_set_image
+  { "index", Tile_get_index, nullptr },
+  { "image", Tile_get_image, Tile_set_image },
   { "data", Tile_get_data, Tile_set_data },
   { "color", Tile_get_color, Tile_set_color },
   { "properties", Tile_get_properties, Tile_set_properties },

@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2021  Igara Studio S.A.
+// Copyright (C) 2020-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -117,8 +117,20 @@ public:
 
   // Create an empty mask bitmap.
   HBITMAP hmonobmp() {
-    if (!m_hmonobmp)
-      m_hmonobmp.reset(CreateBitmap(m_size.w, m_size.h, 1, 1, nullptr));
+    if (!m_hmonobmp) {
+      // We must fill the mask bitmap with ones to avoid issues when a cursor is fully
+      // transparent. Before this change we were returning a "no cursor" from makeCursor
+      // when the cursor was fully transparent to avoid showing a black bitmap as the
+      // cursor. But then the following issue was found:
+      // https://github.com/aseprite/aseprite/issues/3989 (which is about the mouse
+      // cursor leaving a trail of cursors after it was switched to a fully transparent
+      // cursor bitmap.
+      // By filling the mask with ones we fix both, the issue and the black cursor.
+      int maskSize = (((m_size.w + 15) >> 4) << 1) * m_size.h;
+      auto maskBits = std::make_unique<BYTE[]>(maskSize);
+      std::memset(maskBits.get(), 0xFF, maskSize);
+      m_hmonobmp.reset(CreateBitmap(m_size.w, m_size.h, 1, 1, maskBits.get()));
+    }
     return m_hmonobmp.get();
   }
 
@@ -143,6 +155,7 @@ SystemWin::SystemWin()
 
 SystemWin::~SystemWin()
 {
+  destroyInstance();
 }
 
 void SystemWin::setAppName(const std::string& appName)
@@ -194,15 +207,11 @@ CursorRef SystemWin::makeCursor(const os::Surface* surface,
     return nullptr;
 
   uint32_t* bits = g_cursor_cache.bits();
-  bool completelyTransparent = true;
   for (int y=0; y<sz.h; ++y) {
     const uint32_t* ptr = (const uint32_t*)surface->getData(0, (sz.h-1-y)/scale);
     for (int x=0, u=0; x<sz.w; ++x, ++bits) {
       uint32_t c = *ptr;
       uint32_t a = ((c & format.alphaMask) >> format.alphaShift);
-
-      if (a)
-        completelyTransparent = false;
 
       *bits = (a << 24) |
         (((c & format.redMask  ) >> format.redShift  ) << 16) |
@@ -213,16 +222,6 @@ CursorRef SystemWin::makeCursor(const os::Surface* surface,
         ++ptr;
       }
     }
-  }
-
-  // It looks like if we set a cursor that is completely transparent
-  // (all pixels with alpha=0), Windows will create a black opaque
-  // rectangle cursor. Which is not what we are looking for. So in
-  // this specific case we put a "no cursor" which has the expected
-  // result.
-  if (completelyTransparent) {
-    // Return a valid Cursor instance but with a nullptr handle.
-    return make_ref<CursorWin>(nullptr);
   }
 
   ICONINFO ii;

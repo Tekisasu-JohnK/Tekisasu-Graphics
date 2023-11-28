@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2023  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -190,19 +190,23 @@ void StateWithWheelBehavior::processWheelAction(
 
     case WheelAction::FgTile: {
       auto tilesView = ColorBar::instance()->getTilesView();
-      int lastIndex = tilesView->tileset()->size()-1;
-      int newIndex = initialFgTileIndex() + int(dz);
-      newIndex = std::clamp(newIndex, 0, lastIndex);
-      ColorBar::instance()->setFgTile(newIndex);
+      if (tilesView->tileset()) {
+        int lastIndex = tilesView->tileset()->size()-1;
+        int newIndex = initialFgTileIndex() + int(dz);
+        newIndex = std::clamp(newIndex, 0, lastIndex);
+        ColorBar::instance()->setFgTile(newIndex);
+      }
       break;
     }
 
     case WheelAction::BgTile: {
       auto tilesView = ColorBar::instance()->getTilesView();
-      int lastIndex = tilesView->tileset()->size()-1;
-      int newIndex = initialBgTileIndex() + int(dz);
-      newIndex = std::clamp(newIndex, 0, lastIndex);
-      ColorBar::instance()->setBgTile(newIndex);
+      if (tilesView->tileset()) {
+        int lastIndex = tilesView->tileset()->size()-1;
+        int newIndex = initialBgTileIndex() + int(dz);
+        newIndex = std::clamp(newIndex, 0, lastIndex);
+        ColorBar::instance()->setBgTile(newIndex);
+      }
       break;
     }
 
@@ -587,6 +591,12 @@ bool StateWithWheelBehavior::onSetCursor(Editor* editor, const gfx::Point& mouse
   }
 
   return true;
+}
+
+void StateWithWheelBehavior::onBeforeRemoveLayer(Editor* editor)
+{
+  // Clear the cached list of layers
+  m_browsableLayers.clear();
 }
 
 void StateWithWheelBehavior::setZoom(Editor* editor,

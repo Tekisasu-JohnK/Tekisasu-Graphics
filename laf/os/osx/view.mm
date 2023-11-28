@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2021  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -41,6 +41,7 @@ int g_pressedKeys[kKeyScancodes];
 bool g_translateDeadKeys = false;
 UInt32 g_lastDeadKeyState = 0;
 NSCursor* g_emptyNsCursor = nil;
+Event::MouseButton g_lastMouseButton = Event::NoneButton;
 
 gfx::Point get_local_mouse_pos(NSView* view, NSEvent* event)
 {
@@ -125,26 +126,31 @@ using namespace os;
 
 - (id)initWithFrame:(NSRect)frameRect
 {
-  // We start without the system mouse cursor
-  m_nsCursor = nil;
-  m_visibleMouse = true;
-  m_pointerType = os::PointerType::Unknown;
-  m_impl = nullptr;
+  // This autoreleasepool with the removeImpl code is needed to
+  // release CALayers from memory. Without this we will keep growing
+  // the memory with CALayers.
+  @autoreleasepool {
+    // We start without the system mouse cursor
+    m_nsCursor = nil;
+    m_visibleMouse = true;
+    m_pointerType = os::PointerType::Unknown;
+    m_impl = nullptr;
 
-  self = [super initWithFrame:frameRect];
-  if (self != nil) {
-    [self createMouseTrackingArea];
-    [self registerForDraggedTypes:
-      [NSArray arrayWithObjects:
-        NSFilenamesPboardType,
-        nil]];
+    self = [super initWithFrame:frameRect];
+    if (self != nil) {
+      [self createMouseTrackingArea];
+      [self registerForDraggedTypes:
+              [NSArray arrayWithObjects:
+                         NSFilenamesPboardType,
+                       nil]];
 
-    // Create a CALayer for backing content with async drawing. This
-    // fixes performance issues on Retina displays with wide color
-    // spaces (like Display P3).
-    if (os::g_async_view) {
-      self.wantsLayer = true;
-      self.layer.drawsAsynchronously = true;
+      // Create a CALayer for backing content with async drawing. This
+      // fixes performance issues on Retina displays with wide color
+      // spaces (like Display P3).
+      if (os::g_async_view) {
+        self.wantsLayer = true;
+        self.layer.drawsAsynchronously = true;
+      }
     }
   }
   return self;
@@ -157,7 +163,14 @@ using namespace os;
 
 - (void)removeImpl
 {
-  m_impl = nullptr;
+  @autoreleasepool {
+    // Reconfigure the view to release the CALayer object. This along
+    // with the autoreleasepool in initWithFrame: are needed.
+    self.layer.drawsAsynchronously = false;
+    self.wantsLayer = false;
+
+    m_impl = nullptr;
+  }
 }
 
 - (BOOL)acceptsFirstResponder
@@ -210,12 +223,19 @@ using namespace os;
 
 - (void)drawRect:(NSRect)dirtyRect
 {
-  [super drawRect:dirtyRect];
-  if (m_impl)
+  if (m_impl) {
+    // dirtyRect includes the title bar in its own height, so here we
+    // have to intersect the view area (self.bounds) to remove the
+    // title bar area (remember that rectangles are from bottom to
+    // top, so here we are like removing the top title bar area from
+    // the dirtyRect).
+    dirtyRect = NSIntersectionRect(dirtyRect, self.bounds);
+
     m_impl->onDrawRect(gfx::Rect(dirtyRect.origin.x,
                                  dirtyRect.origin.y,
                                  dirtyRect.size.width,
                                  dirtyRect.size.height));
+  }
 }
 
 - (void)keyDown:(NSEvent*)event
@@ -428,11 +448,20 @@ using namespace os;
 
 - (void)handleMouseDown:(NSEvent*)event
 {
+  Event::MouseButton button = get_mouse_buttons(event);
   Event ev;
-  ev.setType(event.clickCount == 2 ? Event::MouseDoubleClick:
-                                     Event::MouseDown);
+
+  if (event.clickCount == 2 &&
+      button == g_lastMouseButton) {
+    ev.setType(Event::MouseDoubleClick);
+  }
+  else {
+    ev.setType(Event::MouseDown);
+    g_lastMouseButton = button;
+  }
+
   ev.setPosition(get_local_mouse_pos(self, event));
-  ev.setButton(get_mouse_buttons(event));
+  ev.setButton(button);
   ev.setModifiers(get_modifiers_from_nsevent(event));
   ev.setPressure(event.pressure);
 

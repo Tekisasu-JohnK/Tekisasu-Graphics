@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020  Igara Studio S.A.
+// Copyright (c) 2020-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -26,6 +26,7 @@ namespace gfx {
     Path& lineTo(float x, float y) { return *this; }
     Path& lineTo(const Point& p) { return *this; }
     Path& cubicTo(float dx1, float dy1, float dx2, float dy2, float dx3, float dy3) { return *this; }
+    Path& oval(const Rect& rc) { return *this; }
     Path& rect(const Rect& rc) { return *this; }
     Path& roundedRect(const Rect& rc, float rx, float ry) { return *this; }
     Path& close() { return *this; }

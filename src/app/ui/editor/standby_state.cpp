@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -53,10 +53,12 @@
 #include "app/util/layer_utils.h"
 #include "app/util/new_image_from_mask.h"
 #include "app/util/readable_time.h"
+#include "app/util/tile_flags_utils.h"
 #include "base/pi.h"
 #include "base/vector2d.h"
 #include "doc/grid.h"
 #include "doc/layer.h"
+#include "doc/layer_tilemap.h"
 #include "doc/mask.h"
 #include "doc/slice.h"
 #include "doc/sprite.h"
@@ -498,7 +500,7 @@ bool StandbyState::onKeyDown(Editor* editor, KeyMessage* msg)
 
   Keys keys = KeyboardShortcuts::instance()
     ->getDragActionsFromKeyMessage(KeyContext::MouseWheel, msg);
-  if (!keys.empty()) {
+  if (editor->hasMouse() && !keys.empty()) {
     // Don't enter DraggingValueState to change brush size if we are
     // in a selection-like tool
     if (keys.size() == 1 &&
@@ -606,7 +608,12 @@ bool StandbyState::onUpdateStatusBar(Editor* editor)
             site.layer()->isTilemap() &&
             site.image()) {
           if (site.image()->bounds().contains(pt)) {
-            buf += fmt::format(" [{}]", site.image()->getPixel(pt.x, pt.y));
+            doc::tile_t t = site.image()->getPixel(pt.x, pt.y);
+            doc::tile_index ti = doc::tile_geti(t);
+            doc::tile_flags tf = doc::tile_getf(t);
+            std::string str;
+            build_tile_flags_string(tf, str);
+            buf += fmt::format(" [{}{}]", ti, str);
           }
         }
       }

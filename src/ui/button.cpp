@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -50,10 +50,10 @@ WidgetType ButtonBase::behaviorType() const
   return m_behaviorType;
 }
 
-void ButtonBase::onClick(Event& ev)
+void ButtonBase::onClick()
 {
   // Fire Click() signal
-  Click(ev);
+  Click();
 }
 
 bool ButtonBase::onProcessMessage(Message* msg)
@@ -80,8 +80,11 @@ bool ButtonBase::onProcessMessage(Message* msg)
       KeyScancode scancode = keymsg->scancode();
 
       if (isEnabled() && isVisible()) {
-        bool mnemonicPressed =
-          ((msg->altPressed() || msg->cmdPressed()) &&
+        const bool mnemonicPressed =
+          (mnemonic() &&
+           (!mnemonicRequiresModifiers() ||
+            msg->altPressed() ||
+            msg->cmdPressed()) &&
            isMnemonicPressed(keymsg));
 
         // For kButtonWidget
@@ -147,8 +150,7 @@ bool ButtonBase::onProcessMessage(Message* msg)
 
           case kCheckWidget: {
             // Fire onClick() event
-            Event ev(this);
-            onClick(ev);
+            onClick();
             return true;
           }
 
@@ -202,7 +204,7 @@ bool ButtonBase::onProcessMessage(Message* msg)
       if (hasCapture()) {
         releaseMouse();
 
-        if (hasMouseOver()) {
+        if (hasMouse()) {
           switch (m_behaviorType) {
 
             case kButtonWidget:
@@ -212,8 +214,7 @@ bool ButtonBase::onProcessMessage(Message* msg)
             case kCheckWidget:
               {
                 // Fire onClick() event
-                Event ev(this);
-                onClick(ev);
+                onClick();
 
                 invalidate();
               }
@@ -225,8 +226,7 @@ bool ButtonBase::onProcessMessage(Message* msg)
                 setSelected(true);
 
                 // Fire onClick() event
-                Event ev(this);
-                onClick(ev);
+                onClick();
               }
               break;
           }
@@ -260,8 +260,7 @@ void ButtonBase::generateButtonSelectSignal()
   setSelected(false);
 
   // Fire onClick() event
-  Event ev(this);
-  onClick(ev);
+  onClick();
 }
 
 void ButtonBase::onStartDrag()
@@ -271,7 +270,7 @@ void ButtonBase::onStartDrag()
 
 void ButtonBase::onSelectWhenDragging()
 {
-  bool hasMouse = hasMouseOver();
+  const bool hasMouse = this->hasMouse();
 
   // Switch state when the mouse go out
   if ((hasMouse && isSelected() != m_pressedStatus) ||

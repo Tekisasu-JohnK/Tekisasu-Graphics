@@ -227,8 +227,8 @@ public:
     m_filename = filename;
   }
 
-  bool show(Window* window) override {
-    bool retValue = false;
+  Result show(Window* window) override {
+    Result retValue = Result::Cancel;
     @autoreleasepool {
       NSSavePanel* panel = nil;
 
@@ -337,7 +337,7 @@ public:
           m_filename = [[url path] UTF8String];
           m_filenames.push_back(m_filename);
         }
-        retValue = true;
+        retValue = Result::OK;
       }
 
       m_popup = nullptr;

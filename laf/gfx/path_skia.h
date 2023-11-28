@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020-2022  Igara Studio S.A.
+// Copyright (c) 2020-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -61,13 +61,18 @@ namespace gfx {
       return *this;
     }
 
+    Path& oval(const Rect& rc) {
+      m_skPath.addOval(SkRect::MakeXYWH(rc.x, rc.y, rc.w, rc.h));
+      return *this;
+    }
+
     Path& rect(const Rect& rc) {
       m_skPath.addRect(SkRect::MakeXYWH(rc.x, rc.y, rc.w, rc.h));
       return *this;
     }
 
     Path& roundedRect(const Rect& rc, float rx, float ry) {
-      m_skPath.addRoundRect(SkRect::MakeXYWH(rc.x, rc.y, rc.w, rc.h), rx, ry);
+      m_skPath.addRoundRect(SkRect::MakeXYWH(rc.x+0.5, rc.y+0.5, rc.w, rc.h), rx, ry);
       return *this;
     }
 

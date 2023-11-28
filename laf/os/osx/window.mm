@@ -24,105 +24,108 @@
 - (WindowOSXObjc*)initWithImpl:(os::WindowOSX*)impl
                           spec:(const os::WindowSpec*)spec
 {
-  m_impl = impl;
-  m_scale = spec->scale();
+  // This autoreleasepool reduces the total number of references that
+  // the NSWindow object has when we close it.
+  @autoreleasepool {
+    m_impl = impl;
+    m_scale = spec->scale();
 
-  NSScreen* nsScreen;
-  if (spec->screen())
-    nsScreen = (__bridge NSScreen*)spec->screen()->nativeHandle();
-  else
-    nsScreen = [NSScreen mainScreen];
+    NSScreen* nsScreen;
+    if (spec->screen())
+      nsScreen = (__bridge NSScreen*)spec->screen()->nativeHandle();
+    else
+      nsScreen = [NSScreen mainScreen];
 
-  NSWindowStyleMask style = 0;
-  if (spec->titled()) style |= NSWindowStyleMaskTitled;
-  if (spec->closable()) style |= NSWindowStyleMaskClosable;
-  if (spec->minimizable()) style |= NSWindowStyleMaskMiniaturizable;
-  if (spec->resizable()) style |= NSWindowStyleMaskResizable;
-  if (spec->borderless()) style |= NSWindowStyleMaskBorderless;
+    NSWindowStyleMask style = 0;
+    if (spec->titled()) style |= NSWindowStyleMaskTitled;
+    if (spec->closable()) style |= NSWindowStyleMaskClosable;
+    if (spec->minimizable()) style |= NSWindowStyleMaskMiniaturizable;
+    if (spec->resizable()) style |= NSWindowStyleMaskResizable;
+    if (spec->borderless()) style |= NSWindowStyleMaskBorderless;
 
-  NSRect contentRect;
-  if (!spec->contentRect().isEmpty()) {
-    contentRect =
-      NSMakeRect(spec->contentRect().x - nsScreen.frame.origin.x,
-                 nsScreen.frame.size.height - spec->contentRect().y2() - nsScreen.frame.origin.y,
-                 spec->contentRect().w,
-                 spec->contentRect().h);
+    NSRect contentRect;
+    if (!spec->contentRect().isEmpty()) {
+      contentRect =
+        NSMakeRect(spec->contentRect().x - nsScreen.frame.origin.x,
+                   nsScreen.frame.size.height - spec->contentRect().y2() - nsScreen.frame.origin.y,
+                   spec->contentRect().w,
+                   spec->contentRect().h);
+    }
+    else if (!spec->frame().isEmpty()) {
+      NSRect frameRect =
+        NSMakeRect(spec->frame().x - nsScreen.frame.origin.x,
+                   nsScreen.frame.size.height - spec->frame().y2() - nsScreen.frame.origin.y,
+                   spec->frame().w,
+                   spec->frame().h);
+
+      contentRect =
+        [NSWindow contentRectForFrameRect:frameRect
+                                styleMask:style];
+    }
+    else {
+      // TODO is there a default size for macOS apps?
+      contentRect = NSMakeRect(0, 0, 400, 300);
+    }
+
+    // Align the content size to the scale, because macOS give us the
+    // chance to create the frame with any size, then the
+    // contentResizeIncrements stablish a delta from this initial size.
+    contentRect.size.width = int(contentRect.size.width / m_scale) * m_scale;
+    contentRect.size.height = int(contentRect.size.height / m_scale) * m_scale;
+
+    self = [self initWithContentRect:contentRect
+                           styleMask:style
+                             backing:NSBackingStoreBuffered
+                               defer:NO
+                              screen:nsScreen];
+    if (!self)
+      return nil;
+
+    m_delegate = [[WindowOSXDelegate alloc] initWithWindowImpl:impl];
+
+    // The NSView width and height will be a multiple of scale().
+    self.contentResizeIncrements = NSMakeSize(m_scale, m_scale);
+
+    ViewOSX* view = [[ViewOSX alloc] initWithFrame:contentRect];
+    m_view = view;
+    [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+
+    // Remove shadow for borderless windows (the shadow is too dark and
+    // creates a thick black border arround our windows).
+    if (spec->borderless())
+      self.hasShadow = false;
+
+    if (spec->transparent()) {
+      self.hasShadow = false;
+      self.opaque = false;
+      self.backgroundColor = NSColor.clearColor;
+    }
+
+    // Redraw the entire window content when we resize it.
+    // TODO add support to avoid redrawing the entire window
+    self.preservesContentDuringLiveResize = false;
+
+    [self setDelegate:m_delegate];
+    [self setContentView:view];
+
+    if (spec->position() == os::WindowSpec::Position::Center) {
+      [self center];
+    }
+
+    if (spec->parent())
+      self.parentWindow = (__bridge NSWindow*)static_cast<os::WindowOSX*>(spec->parent())->nativeHandle();
+
+    [self makeKeyAndOrderFront:self];
+
+    if (spec->floating()) {
+      self.level = NSFloatingWindowLevel;
+      self.hidesOnDeactivate = true;
+    }
+
+    // Hide the "View > Show Tab Bar" menu item
+    if ([self respondsToSelector:@selector(setTabbingMode:)])
+      [self setTabbingMode:NSWindowTabbingModeDisallowed];
   }
-  else if (!spec->frame().isEmpty()) {
-    NSRect frameRect =
-      NSMakeRect(spec->frame().x - nsScreen.frame.origin.x,
-                 nsScreen.frame.size.height - spec->frame().y2() - nsScreen.frame.origin.y,
-                 spec->frame().w,
-                 spec->frame().h);
-
-    contentRect =
-      [NSWindow contentRectForFrameRect:frameRect
-                              styleMask:style];
-  }
-  else {
-    // TODO is there a default size for macOS apps?
-    contentRect = NSMakeRect(0, 0, 400, 300);
-  }
-
-  // Align the content size to the scale, because macOS give us the
-  // chance to create the frame with any size, then the
-  // contentResizeIncrements stablish a delta from this initial size.
-  contentRect.size.width = int(contentRect.size.width / m_scale) * m_scale;
-  contentRect.size.height = int(contentRect.size.height / m_scale) * m_scale;
-
-  self = [self initWithContentRect:contentRect
-                         styleMask:style
-                           backing:NSBackingStoreBuffered
-                             defer:NO
-                            screen:nsScreen];
-  if (!self)
-    return nil;
-
-  m_delegate = [[WindowOSXDelegate alloc] initWithWindowImpl:impl];
-
-  // The NSView width and height will be a multiple of scale().
-  self.contentResizeIncrements = NSMakeSize(m_scale, m_scale);
-
-  ViewOSX* view = [[ViewOSX alloc] initWithFrame:contentRect];
-  m_view = view;
-  [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-  // Remove shadow for borderless windows (the shadow is too dark and
-  // creates a thick black border arround our windows).
-  if (spec->borderless())
-    self.hasShadow = false;
-
-  if (spec->transparent()) {
-    self.hasShadow = false;
-    self.opaque = false;
-    self.backgroundColor = NSColor.clearColor;
-  }
-
-  // Redraw the entire window content when we resize it.
-  // TODO add support to avoid redrawing the entire window
-  self.preservesContentDuringLiveResize = false;
-
-  [self setDelegate:m_delegate];
-  [self setContentView:view];
-
-  if (spec->position() == os::WindowSpec::Position::Center) {
-    [self center];
-  }
-
-  if (spec->parent())
-    self.parentWindow = (__bridge NSWindow*)static_cast<os::WindowOSX*>(spec->parent())->nativeHandle();
-
-  [self makeKeyAndOrderFront:self];
-
-  if (spec->floating()) {
-    self.level = NSFloatingWindowLevel;
-    self.hidesOnDeactivate = true;
-  }
-
-  // Hide the "View > Show Tab Bar" menu item
-  if ([self respondsToSelector:@selector(setTabbingMode:)])
-    [self setTabbingMode:NSWindowTabbingModeDisallowed];
-
   return self;
 }
 
@@ -133,13 +136,17 @@
 
 - (void)removeImpl
 {
-  [((ViewOSX*)self.contentView) removeImpl];
+  [m_view removeImpl];
 
   [self setDelegate:nil];
   [m_delegate removeImpl];
   m_delegate = nil;
 
+  m_view = nil;
   m_impl = nil;
+
+  // After calling this the ViewOSX dealloc should be called.
+  [self setContentView:nil];
 }
 
 - (int)scale
@@ -294,26 +301,29 @@ void WindowOSX::destroyWindow()
   if (!m_nsWindow)
     return;
 
-  [m_nsWindow removeImpl];
-  [(ViewOSX*)m_nsWindow.contentView destroyMouseTrackingArea];
+  // This autoreleasepool reduces the total number of references that
+  // the NSWindow object has when we destroy it.
+  @autoreleasepool {
+    [m_nsWindow removeImpl];
 
-  // Select other window
-  {
-    auto app = [NSApplication sharedApplication];
-    auto index = [app.windows indexOfObject:m_nsWindow];
-    if (index+1 < app.windows.count) {
-      ++index;
+    // Select other window
+    {
+      auto app = [NSApplication sharedApplication];
+      auto index = [app.windows indexOfObject:m_nsWindow];
+      if (index+1 < app.windows.count) {
+        ++index;
+      }
+      else {
+        --index;
+      }
+      if (index >= 0 && index < app.windows.count)
+        [[app.windows objectAtIndex:index] makeKeyWindow];
     }
-    else {
-      --index;
-    }
-    if (index >= 0 && index < app.windows.count)
-      [[app.windows objectAtIndex:index] makeKeyWindow];
+
+    [m_nsWindow discardEventsMatchingMask:NSEventMaskAny
+                              beforeEvent:nullptr];
+    [m_nsWindow close];
   }
-
-  [m_nsWindow discardEventsMatchingMask:NSEventMaskAny
-                            beforeEvent:nullptr];
-  [m_nsWindow close];
   m_nsWindow = nil;
 }
 

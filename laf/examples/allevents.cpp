@@ -80,8 +80,9 @@ public:
         //[[fallthrough]];
       case os::Event::KeyUp: {
         wchar_t wideUnicode[2] = { ev.unicodeChar(), 0 };
-        logLine("%s scancode=%d unicode=%d (%s)%s",
+        logLine("%s repeat=%d scancode=%d unicode=%d (%s)%s",
                 (ev.type() == os::Event::KeyDown ? "KeyDown": "KeyUp"),
+                ev.repeat(),
                 ev.scancode(),
                 ev.unicodeChar(),
                 base::to_utf8(wideUnicode).c_str(),

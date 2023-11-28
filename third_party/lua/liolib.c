@@ -25,11 +25,6 @@
 
 
 
-/* Define this externally */
-extern FILE* lua_user_fopen(const char* fname,
-                            const char* mode);
-
-
 /*
 ** Change this macro to accept other modes for 'fopen' besides
 ** the standard ones.

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -176,6 +176,8 @@ private:
   void paintingProc() {
     COLSEL_TRACE("COLSEL: paintingProc starts\n");
 
+    base::this_thread::set_name("colsel-painter");
+
     std::unique_lock<std::mutex> lock(m_mutex);
     while (true) {
       m_paintingCV.wait(lock);
@@ -332,7 +334,7 @@ bool ColorSelector::onProcessMessage(ui::Message* msg)
 
       app::Color color = getColorByPosition(pos);
       if (color != app::Color::fromMask()) {
-        base::ScopedValue<bool> switcher(m_lockColor, subColorPicked(), false);
+        base::ScopedValue switcher(m_lockColor, subColorPicked());
 
         StatusBar::instance()->showColor(0, color);
         if (hasCapture())

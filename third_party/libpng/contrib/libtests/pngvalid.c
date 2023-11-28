@@ -6719,7 +6719,7 @@ transform_range_check(png_const_structp pp, unsigned int r, unsigned int g,
    unsigned int out, png_byte sample_depth, double err, double limit,
    const char *name, double digitization_error)
 {
-   /* Compare the scaled, digitzed, values of our local calculation (in+-err)
+   /* Compare the scaled, digitized, values of our local calculation (in+-err)
     * with the digitized values libpng produced;  'sample_depth' is the actual
     * digitization depth of the libpng output colors (the bit depth except for
     * palette images where it is always 8.)  The check on 'err' is to detect
@@ -7643,7 +7643,7 @@ image_transform_png_set_rgb_to_gray_ini(const image_transform *this,
 
    else
    {
-      /* The default (built in) coeffcients, as above: */
+      /* The default (built in) coefficients, as above: */
 #     if PNG_LIBPNG_VER < 10700
          data.red_coefficient = 6968 / 32768.;
          data.green_coefficient = 23434 / 32768.;
@@ -9065,7 +9065,7 @@ image_transform_reset_count(void)
 static int
 image_transform_test_counter(png_uint_32 counter, unsigned int max)
 {
-   /* Test the list to see if there is any point contining, given a current
+   /* Test the list to see if there is any point continuing, given a current
     * counter and a 'max' value.
     */
    image_transform *next = image_transform_first;
@@ -11768,7 +11768,7 @@ int main(int argc, char **argv)
 
    /* The following allows results to pass if they correspond to anything in the
     * transformed range [input-.5,input+.5]; this is is required because of the
-    * way libpng treates the 16_TO_8 flag when building the gamma tables in
+    * way libpng treats the 16_TO_8 flag when building the gamma tables in
     * releases up to 1.6.0.
     *
     * TODO: review this

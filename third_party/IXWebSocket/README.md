@@ -35,6 +35,7 @@ int main()
 
     // Connect to a server with encryption
     // See https://machinezone.github.io/IXWebSocket/usage/#tls-support-and-configuration
+    //     https://github.com/machinezone/IXWebSocket/issues/386#issuecomment-1105235227 (self signed certificates)
     std::string url("wss://echo.websocket.org");
     webSocket.setUrl(url);
 
@@ -106,6 +107,7 @@ If your company or project is using this library, feel free to open an issue or 
 - [Teleport](http://teleportconnect.com/), Teleport is your own personal remote robot avatar
 - [Abaddon](https://github.com/uowuo/abaddon), An alternative Discord client made with C++/gtkmm 
 - [NovaCoin](https://github.com/novacoin-project/novacoin), a hybrid scrypt PoW + PoS based cryptocurrency.
+- [Candy](https://github.com/lanthora/candy), A WebSocket and TUN based VPN for Linux 
 
 ## Alternative libraries
 

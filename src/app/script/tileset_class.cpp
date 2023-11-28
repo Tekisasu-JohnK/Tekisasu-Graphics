@@ -8,6 +8,8 @@
 #include "config.h"
 #endif
 
+#include "app/cmd/set_tileset_base_index.h"
+#include "app/cmd/set_tileset_name.h"
 #include "app/script/docobj.h"
 #include "app/script/engine.h"
 #include "app/script/luacpp.h"
@@ -39,12 +41,8 @@ int Tileset_len(lua_State* L)
 int Tileset_getTile(lua_State* L)
 {
   auto tileset = get_docobj<Tileset>(L, 1);
-  tile_index i = lua_tointeger(L, 2);
-  ImageRef image = tileset->get(i);
-  if (image)
-    push_tileset_image(L, tileset, image.get());
-  else
-    lua_pushnil(L);
+  tile_index ti = lua_tointeger(L, 2);
+  push_tileset_image(L, tileset, ti);
   return 1;
 }
 
@@ -69,8 +67,11 @@ int Tileset_get_name(lua_State* L)
 int Tileset_set_name(lua_State* L)
 {
   auto tileset = get_docobj<Tileset>(L, 1);
-  if (const char* newName = lua_tostring(L, 2))
-    tileset->setName(newName);
+  if (const char* newName = lua_tostring(L, 2)) {
+    Tx tx;
+    tx(new cmd::SetTilesetName(tileset, newName));
+    tx.commit();
+  }
   return 0;
 }
 
@@ -92,7 +93,9 @@ int Tileset_set_baseIndex(lua_State* L)
 {
   auto tileset = get_docobj<Tileset>(L, 1);
   int i = lua_tointeger(L, 2);
-  tileset->setBaseIndex(i);
+  Tx tx;
+  tx(new cmd::SetTilesetBaseIndex(tileset, i));
+  tx.commit();
   return 0;
 }
 

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2020  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -16,6 +16,7 @@
 #include "app/modules/gui.h"
 #include "app/ui/skin/skin_theme.h"
 #include "doc/image.h"
+#include "fmt/format.h"
 #include "ui/box.h"
 #include "ui/button.h"
 #include "ui/theme.h"
@@ -26,6 +27,7 @@
 namespace app {
 
 using namespace app::skin;
+using namespace doc;
 using namespace filters;
 using namespace ui;
 
@@ -68,6 +70,7 @@ FilterTargetButtons::FilterTargetButtons(int imgtype, bool withChannels)
   // Create the button to select which cels will be modified by the
   // filter.
   m_cels = addItem(getCelsTargetText(), 4, 1);
+  initTheme();
 }
 
 void FilterTargetButtons::setTarget(const int target)
@@ -113,10 +116,10 @@ void FilterTargetButtons::updateFromCelsTarget()
 void FilterTargetButtons::updateComponentTooltip(Item* item, const char* channelName, int align)
 {
   if (item) {
-    char buf[256];
-    std::sprintf(buf, "%s %s Component",
-                 (item->isSelected() ? "Modify": "Ignore"),
-                 channelName);
+    std::string buf =
+      fmt::format("{} {} Component",
+                  (item->isSelected() ? "Modify": "Ignore"),
+                  channelName);
     m_tooltips.addTooltipFor(item, buf, align);
   }
 }

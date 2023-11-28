@@ -16,9 +16,11 @@
 
 namespace base {
 
+  class task;
   class thread_pool;
 
   class task_token {
+    friend class task;
   public:
     task_token()
       : m_canceled(false)
@@ -41,6 +43,11 @@ namespace base {
     }
 
   private:
+    void reset() {
+      m_canceled = false;
+      m_progress = 0.0f;
+    }
+
     std::atomic<bool> m_canceled;
     std::atomic<float> m_progress;
     float m_progress_min, m_progress_max;

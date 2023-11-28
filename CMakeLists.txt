@@ -9,15 +9,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # We use -std=c++17 instead of -std=gnu++17 in macOS
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-if(COMMAND cmake_policy)
-  # CMP0003: Libraries linked via full path no longer produce linker search paths.
-  #cmake_policy(SET CMP0003 NEW)
-  if(CMAKE_MAJOR_VERSION GREATER 2)
-    # CMP0046: Old behavior to silently ignore non-existent dependencies.
-    cmake_policy(SET CMP0046 OLD)
-  endif()
-endif()
-
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
       "Choose the type of build, options are:
@@ -59,7 +50,7 @@ option(USE_SHARED_HARFBUZZ "Use shared HarfBuzz library" off)
 option(ENABLE_ASEPRITE_EXE "Compile main Aseprite executable" on)
 option(ENABLE_MEMLEAK      "Enable memory-leaks detector (only for developers)" off)
 option(ENABLE_NEWS         "Enable the news in Home tab" on)
-option(ENABLE_UPDATER      "Enable automatic check for updates" off)
+option(ENABLE_UPDATER      "Enable automatic check for updates" on)
 option(ENABLE_SCRIPTING    "Compile with scripting support" on)
 option(ENABLE_WEBSOCKET    "Compile with websocket support" on)
 option(ENABLE_TESTS        "Compile unit tests" off)
@@ -109,18 +100,8 @@ if(NOT LAF_OS_BACKEND)
   endif()
 endif()
 
-# Check valid gtk + libpng combination
-if(LAF_OS_WITH_GTK)
-  if(NOT USE_SHARED_LIBPNG)
-    message(FATAL_ERROR "Cannot compile with gtk and static libpng, set USE_SHARED_LIBPNG=ON")
-  endif()
-  if(NOT USE_SHARED_HARFBUZZ)
-    message(FATAL_ERROR "Cannot compile with gtk and static HarfBuzz, set USE_SHARED_HARFBUZZ=ON")
-  endif()
-endif()
-
 if(ENABLE_DRM AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/drm/CMakeLists.txt)
-  message(FATAL_ERROR "Your Tekisasu-Graphics repository is incomplete, clone the drm repository")
+  message(FATAL_ERROR "Your Aseprite repository is incomplete, clone the drm repository")
 endif()
 
 ######################################################################

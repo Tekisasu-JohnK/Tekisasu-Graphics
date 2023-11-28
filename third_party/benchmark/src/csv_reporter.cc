@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "benchmark/benchmark.h"
-#include "complexity.h"
-
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
@@ -22,7 +19,9 @@
 #include <tuple>
 #include <vector>
 
+#include "benchmark/benchmark.h"
 #include "check.h"
+#include "complexity.h"
 #include "string_util.h"
 #include "timers.h"
 
@@ -37,11 +36,29 @@ std::vector<std::string> elements = {
     "error_occurred", "error_message"};
 }  // namespace
 
+std::string CsvEscape(const std::string& s) {
+  std::string tmp;
+  tmp.reserve(s.size() + 2);
+  for (char c : s) {
+    switch (c) {
+      case '"':
+        tmp += "\"\"";
+        break;
+      default:
+        tmp += c;
+        break;
+    }
+  }
+  return '"' + tmp + '"';
+}
+
+BENCHMARK_EXPORT
 bool CSVReporter::ReportContext(const Context& context) {
   PrintBasicContext(&GetErrorStream(), context);
   return true;
 }
 
+BENCHMARK_EXPORT
 void CSVReporter::ReportRuns(const std::vector<Run>& reports) {
   std::ostream& Out = GetOutputStream();
 
@@ -49,6 +66,8 @@ void CSVReporter::ReportRuns(const std::vector<Run>& reports) {
     // save the names of all the user counters
     for (const auto& run : reports) {
       for (const auto& cnt : run.counters) {
+        if (cnt.first == "bytes_per_second" || cnt.first == "items_per_second")
+          continue;
         user_counter_names_.insert(cnt.first);
       }
     }
@@ -69,7 +88,10 @@ void CSVReporter::ReportRuns(const std::vector<Run>& reports) {
     // check that all the current counters are saved in the name set
     for (const auto& run : reports) {
       for (const auto& cnt : run.counters) {
-        CHECK(user_counter_names_.find(cnt.first) != user_counter_names_.end())
+        if (cnt.first == "bytes_per_second" || cnt.first == "items_per_second")
+          continue;
+        BM_CHECK(user_counter_names_.find(cnt.first) !=
+                 user_counter_names_.end())
             << "All counters must be present in each run. "
             << "Counter named \"" << cnt.first
             << "\" was not in a run after being added to the header";
@@ -83,20 +105,14 @@ void CSVReporter::ReportRuns(const std::vector<Run>& reports) {
   }
 }
 
+BENCHMARK_EXPORT
 void CSVReporter::PrintRunData(const Run& run) {
   std::ostream& Out = GetOutputStream();
-
-  // Field with embedded double-quote characters must be doubled and the field
-  // delimited with double-quotes.
-  std::string name = run.benchmark_name;
-  ReplaceAll(&name, "\"", "\"\"");
-  Out << '"' << name << "\",";
-  if (run.error_occurred) {
+  Out << CsvEscape(run.benchmark_name()) << ",";
+  if (run.skipped) {
     Out << std::string(elements.size() - 3, ',');
-    Out << "true,";
-    std::string msg = run.error_message;
-    ReplaceAll(&msg, "\"", "\"\"");
-    Out << '"' << msg << "\"\n";
+    Out << std::boolalpha << (internal::SkippedWithError == run.skipped) << ",";
+    Out << CsvEscape(run.skip_message) << "\n";
     return;
   }
 
@@ -117,20 +133,16 @@ void CSVReporter::PrintRunData(const Run& run) {
   }
   Out << ",";
 
-  if (run.bytes_per_second > 0.0) {
-    Out << run.bytes_per_second;
+  if (run.counters.find("bytes_per_second") != run.counters.end()) {
+    Out << run.counters.at("bytes_per_second");
   }
   Out << ",";
-  if (run.items_per_second > 0.0) {
-    Out << run.items_per_second;
+  if (run.counters.find("items_per_second") != run.counters.end()) {
+    Out << run.counters.at("items_per_second");
   }
   Out << ",";
   if (!run.report_label.empty()) {
-    // Field with embedded double-quote characters must be doubled and the field
-    // delimited with double-quotes.
-    std::string label = run.report_label;
-    ReplaceAll(&label, "\"", "\"\"");
-    Out << "\"" << label << "\"";
+    Out << CsvEscape(run.report_label);
   }
   Out << ",,";  // for error_occurred and error_message
 

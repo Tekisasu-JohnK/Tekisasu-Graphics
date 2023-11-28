@@ -39,6 +39,35 @@ endif()
 # SkShaper module + freetype + harfbuzz + zlib
 find_library(SKSHAPER_LIBRARY skshaper PATH "${SKIA_LIBRARY_DIR}")
 
+# Check that Skia is compiled for the same CPU architecture
+if(WIN32 AND
+    MSVC AND
+    NOT "${MSVC_C_ARCHITECTURE_ID}" EQUAL "" AND
+    EXISTS "${SKIA_LIBRARY_DIR}/args.gn" )
+  file(READ "${SKIA_LIBRARY_DIR}/args.gn" SKIA_ARGS_GN)
+  string(REGEX MATCH "target_cpu *=[ \"]*([^ \"]*)" skia_target_cpu_line "${SKIA_ARGS_GN}")
+
+  if(NOT "${skia_target_cpu_line}" EQUAL "")
+    # TODO We should say "laf" instead of "Aseprite", but for clarity
+    #      with Aseprite users we just say "Aseprite"
+    set(skia_target_cpu "${CMAKE_MATCH_1}")
+    string(TOLOWER "${MSVC_C_ARCHITECTURE_ID}" aseprite_target_cpu)
+
+    if(NOT "${aseprite_target_cpu}" STREQUAL "${skia_target_cpu}")
+      message(FATAL_ERROR
+        "----------------------------------------------------------------------"
+        "                        INCOMPATIBILITY ERROR "
+        "----------------------------------------------------------------------\n"
+        " The specified Skia library (${SKIA_LIBRARY_DIR}) is compiled\n"
+        " for ${skia_target_cpu} CPU arch but Aseprite is being targeted for ${aseprite_target_cpu} CPU arch.\n"
+        " \n"
+        " Change Skia to the ${aseprite_target_cpu} version, or start the developer prompt for ${skia_target_cpu}:\n"
+        "   https://docs.microsoft.com/en-us/dotnet/framework/tools/developer-command-prompt-for-vs\n"
+        "----------------------------------------------------------------------")
+    endif()
+  endif()
+endif()
+
 # Check that if Skia is compiled with libc++, we use -stdlib=libc++
 if(UNIX AND NOT APPLE AND EXISTS "${SKIA_LIBRARY_DIR}/args.gn")
   file(READ "${SKIA_LIBRARY_DIR}/args.gn" SKIA_ARGS_GN)

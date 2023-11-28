@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2023 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -99,6 +100,14 @@ void hkey::close()
     RegCloseKey(m_hkey);
     m_hkey = nullptr;
   }
+}
+
+bool hkey::exists(const std::string& name)
+{
+  std::wstring wname = from_utf8(name);
+  LONG result = RegQueryValueExW(m_hkey, wname.c_str(),
+                                 nullptr, nullptr, nullptr, nullptr);
+  return (result == ERROR_SUCCESS);
 }
 
 std::string hkey::string(const std::string& name)

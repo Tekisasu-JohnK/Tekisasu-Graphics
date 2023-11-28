@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -184,21 +184,40 @@ ColorBar::ColorBar(int align, TooltipManager* tooltipManager)
 {
   m_instance = this;
 
+  auto& pref = Preferences::instance();
   auto theme = SkinTheme::get(this);
 
-  m_editPal.addItem(theme->parts.timelineOpenPadlockActive());
-  m_buttons.addItem(theme->parts.palSort());
-  m_buttons.addItem(theme->parts.palPresets());
-  m_buttons.addItem(theme->parts.palOptions());
-  m_tilesButton.addItem(theme->parts.tiles());
+  auto item = m_editPal.addItem("");
+  item->InitTheme.connect(
+    [this, item](){
+      auto style =
+        (m_editMode ? SkinTheme::instance()->styles.palEditUnlock() :
+                      SkinTheme::instance()->styles.palEditLock());
+      item->setStyle(style);
+  });
+  m_buttons.addItem(theme->parts.palSort(), "pal_button");
+  m_buttons.addItem(theme->parts.palPresets(), "pal_button");
+  m_buttons.addItem(theme->parts.palOptions(), "pal_button");
+  item = m_tilesButton.addItem(theme->parts.tiles());
+  item->InitTheme.connect(
+    [this, item]() {
+      auto theme = SkinTheme::instance();
+      const bool editTiles = (canEditTiles() &&
+                              m_tilemapMode == TilemapMode::Tiles);
+      auto style = (editTiles ? theme->styles.editTilesMode() :
+                                theme->styles.editPixelsMode());
+      item->setStyle(style);
+    });
 
   static_assert(0 == int(TilesetMode::Manual) &&
                 1 == int(TilesetMode::Auto) &&
                 2 == int(TilesetMode::Stack), "Tileset mode buttons doesn't match TilesetMode enum values");
 
-  m_tilesetModeButtons.addItem(theme->parts.tilesManual());
-  m_tilesetModeButtons.addItem(theme->parts.tilesAuto());
-  m_tilesetModeButtons.addItem(theme->parts.tilesStack());
+  m_tilesetModeButtons.addItem(theme->parts.tilesManual(), "pal_button");
+  m_tilesetModeButtons.addItem(theme->parts.tilesAuto(), "pal_button");
+  m_tilesetModeButtons.addItem(theme->parts.tilesStack(), "pal_button");
+
+  m_tilesetMode = pref.colorBar.defaultTilesetMode();
   setTilesetMode(m_tilesetMode);
 
   m_paletteView.setColumns(8);
@@ -226,8 +245,7 @@ ColorBar::ColorBar(int align, TooltipManager* tooltipManager)
   m_splitter.addChild(&m_palettePlaceholder);
   m_splitter.addChild(&m_selectorPlaceholder);
 
-  setColorSelector(
-    Preferences::instance().colorBar.selector());
+  setColorSelector(pref.colorBar.selector());
 
   m_tilesHBox.addChild(&m_tilesButton);
   m_tilesHBox.addChild(&m_tilesetModeButtons);
@@ -288,6 +306,7 @@ ColorBar::ColorBar(int align, TooltipManager* tooltipManager)
   m_fgTile.Change.connect(&ColorBar::onFgTileButtonChange, this);
   m_bgTile.Change.connect(&ColorBar::onBgTileButtonChange, this);
   m_tilesetModeButtons.ItemChange.connect([this]{ onTilesetModeButtonClick(); });
+  m_tilesetModeButtons.RightClick.connect([this]{ onTilesetModeButtonRightClick(); });
 
   InitTheme.connect(
     [this, fgBox, bgBox]{
@@ -303,8 +322,9 @@ ColorBar::ColorBar(int align, TooltipManager* tooltipManager)
 
       for (auto w : { &m_editPal, &m_buttons,
                       &m_tilesButton, &m_tilesetModeButtons }) {
-        w->setMinSize(gfx::Size(0, theme->dimensions.colorBarButtonsHeight()));
-        w->setMaxSize(gfx::Size(std::numeric_limits<int>::max(),
+        w->setMinMaxSize(
+          gfx::Size(0, theme->dimensions.colorBarButtonsHeight()),
+          gfx::Size(std::numeric_limits<int>::max(),
                                 theme->dimensions.colorBarButtonsHeight())); // TODO add resetMaxSize
       }
 
@@ -338,13 +358,13 @@ ColorBar::ColorBar(int align, TooltipManager* tooltipManager)
   initTheme();
 
   // Set background color reading its value from the configuration.
-  setBgColor(Preferences::instance().colorBar.bgColor());
+  setBgColor(pref.colorBar.bgColor());
 
   // Clear the selection of the BG color in the palette.
   m_paletteView.deselect();
 
   // Set foreground color reading its value from the configuration.
-  setFgColor(Preferences::instance().colorBar.fgColor());
+  setFgColor(pref.colorBar.fgColor());
 
   // Tooltips
   setupTooltips(tooltipManager);
@@ -354,11 +374,11 @@ ColorBar::ColorBar(int align, TooltipManager* tooltipManager)
   UIContext::instance()->add_observer(this);
   m_beforeCmdConn = UIContext::instance()->BeforeCommandExecution.connect(&ColorBar::onBeforeExecuteCommand, this);
   m_afterCmdConn = UIContext::instance()->AfterCommandExecution.connect(&ColorBar::onAfterExecuteCommand, this);
-  m_fgConn = Preferences::instance().colorBar.fgColor.AfterChange.connect([this]{ onFgColorChangeFromPreferences(); });
-  m_bgConn = Preferences::instance().colorBar.bgColor.AfterChange.connect([this]{ onBgColorChangeFromPreferences(); });
-  m_fgTileConn = Preferences::instance().colorBar.fgTile.AfterChange.connect([this]{ onFgTileChangeFromPreferences(); });
-  m_bgTileConn = Preferences::instance().colorBar.bgTile.AfterChange.connect([this]{ onBgTileChangeFromPreferences(); });
-  m_sepConn = Preferences::instance().colorBar.entriesSeparator.AfterChange.connect([this]{ invalidate(); });
+  m_fgConn = pref.colorBar.fgColor.AfterChange.connect([this]{ onFgColorChangeFromPreferences(); });
+  m_bgConn = pref.colorBar.bgColor.AfterChange.connect([this]{ onBgColorChangeFromPreferences(); });
+  m_fgTileConn = pref.colorBar.fgTile.AfterChange.connect([this]{ onFgTileChangeFromPreferences(); });
+  m_bgTileConn = pref.colorBar.bgTile.AfterChange.connect([this]{ onBgTileChangeFromPreferences(); });
+  m_sepConn = pref.colorBar.entriesSeparator.AfterChange.connect([this]{ invalidate(); });
   m_paletteView.FocusOrClick.connect(&ColorBar::onFocusPaletteView, this);
   m_tilesView.FocusOrClick.connect(&ColorBar::onFocusTilesView, this);
   m_appPalChangeConn = App::instance()->PaletteChange.connect(&ColorBar::onAppPaletteChange, this);
@@ -515,13 +535,12 @@ bool ColorBar::inEditMode() const
 
 void ColorBar::setEditMode(bool state)
 {
-  auto theme = SkinTheme::get(this);
-  ButtonSet::Item* item = m_editPal.getItem(0);
-
   m_editMode = state;
-  item->setIcon(state ? theme->parts.timelineOpenPadlockActive():
-                        theme->parts.timelineClosedPadlockNormal());
-  item->setHotColor(state ? theme->colors.editPalFace(): gfx::ColorNone);
+
+  // The item icon/style will be set depending on m_editMode state.
+  ButtonSet::Item* item = m_editPal.getItem(0);
+  item->initTheme();
+  item->invalidate();
 
   // Deselect color entries when we cancel editing
   if (!state)
@@ -538,6 +557,12 @@ TilemapMode ColorBar::tilemapMode() const
 
 void ColorBar::setTilemapMode(TilemapMode mode)
 {
+  // With sprites that has a custom tile management plugin, we support
+  // only editing pixels in manual mode.
+  if (customTileManagement()) {
+    mode = TilemapMode::Pixels;
+  }
+
   if (m_tilemapMode != mode) {
     m_tilemapMode = mode;
     updateFromTilemapMode();
@@ -546,16 +571,11 @@ void ColorBar::setTilemapMode(TilemapMode mode)
 
 void ColorBar::updateFromTilemapMode()
 {
-  SkinTheme* theme = static_cast<SkinTheme*>(this->theme());
   ButtonSet::Item* item = m_tilesButton.getItem(0);
-
   const bool canEditTiles = this->canEditTiles();
   const bool editTiles = (canEditTiles &&
                           m_tilemapMode == TilemapMode::Tiles);
-
-  item->setHotColor(editTiles ? theme->colors.editPalFace():
-                                gfx::ColorNone);
-  item->setMono(true);
+  item->initTheme();
 
   if (Preferences::instance().colorBar.showColorAndTiles()) {
     m_scrollablePalView.setVisible(true);
@@ -609,8 +629,14 @@ TilesetMode ColorBar::tilesetMode() const
     return TilesetMode::Manual;
 }
 
-void ColorBar::setTilesetMode(const TilesetMode mode)
+void ColorBar::setTilesetMode(TilesetMode mode)
 {
+  // With sprites that has a custom tile management plugin, we support
+  // only the manual mode.
+  if (customTileManagement()) {
+    mode = TilesetMode::Manual;
+  }
+
   m_tilesetMode = mode;
 
   for (int i=0; i<3; ++i) {
@@ -651,8 +677,15 @@ void ColorBar::onActiveSiteChange(const Site& site)
   }
 
   bool isTilemap = false;
-  if (site.layer())
+  if (site.layer()) {
     isTilemap = site.layer()->isTilemap();
+
+    if (isTilemap && customTileManagement()) {
+      isTilemap = false;
+      m_tilesetMode = TilesetMode::Manual;
+      m_tilemapMode = TilemapMode::Pixels;
+    }
+  }
 
   if (m_tilesHBox.isVisible() != isTilemap) {
     m_tilesHBox.setVisible(isTilemap);
@@ -689,6 +722,12 @@ void ColorBar::onTilesetChanged(DocEvent& ev)
     m_scrollableTilesView.updateView();
 
   m_tilesView.deselect();
+}
+
+void ColorBar::onTileManagementPluginChange(DocEvent& ev)
+{
+  // Same update process as in onActiveSiteChange()
+  onActiveSiteChange(UIContext::instance()->activeSite());
 }
 
 void ColorBar::onAppPaletteChange()
@@ -799,6 +838,25 @@ void ColorBar::onTilesetModeButtonClick()
   setTilesetMode(static_cast<TilesetMode>(item));
 }
 
+void ColorBar::onTilesetModeButtonRightClick()
+{
+  int item = m_tilesetModeButtons.selectedItem();
+  gfx::Rect bounds = m_tilesetModeButtons.getItem(item)->bounds();
+
+  Menu menu;
+  MenuItem setAsDefault(Strings::color_bar_set_as_default());
+
+  auto& pref = Preferences::instance();
+  setAsDefault.setSelected(item == int(pref.colorBar.defaultTilesetMode()));
+  menu.addChild(&setAsDefault);
+
+  setAsDefault.Click.connect([&pref, item]{
+    pref.colorBar.defaultTilesetMode((TilesetMode)item);
+  });
+
+  menu.showPopup(gfx::Point(bounds.x, bounds.y2()), display());
+}
+
 void ColorBar::onRemapPalButtonClick()
 {
   ASSERT(m_oldPalette);
@@ -907,9 +965,11 @@ void ColorBar::onRemapTilesButtonClick()
 
     if (n > 0) {
       for (const ImageRef& tilemap : tilemaps) {
-        for (const doc::tile_t t : LockImageBits<TilemapTraits>(tilemap.get()))
-          if (t != doc::notile)
-            usedTiles[doc::tile_geti(t)] = true;
+        for (const doc::tile_t t : LockImageBits<TilemapTraits>(tilemap.get())) {
+          const doc::tile_index ti = doc::tile_geti(t);
+          if (ti > 0 && ti < n)
+            usedTiles[ti] = true;
+        }
       }
     }
 
@@ -993,7 +1053,7 @@ void ColorBar::onPaletteViewIndexChange(int index, ui::MouseButton button)
 {
   COLOR_BAR_TRACE("ColorBar::onPaletteViewIndexChange(%d)\n", index);
 
-  base::ScopedValue<bool> lock(m_fromPalView, true, m_fromPalView);
+  base::ScopedValue lock(m_fromPalView, true);
 
   app::Color color = app::Color::fromIndex(index);
 
@@ -1258,7 +1318,7 @@ void ColorBar::onFgColorChangeFromPreferences()
   if (m_fromPref)
     return;
 
-  base::ScopedValue<bool> sync(m_fromPref, true, false);
+  base::ScopedValue sync(m_fromPref, true);
   setFgColor(Preferences::instance().colorBar.fgColor());
 }
 
@@ -1276,7 +1336,7 @@ void ColorBar::onBgColorChangeFromPreferences()
     setFgColor(Preferences::instance().colorBar.bgColor());
   }
   else {
-    base::ScopedValue<bool> sync(m_fromPref, true, false);
+    base::ScopedValue sync(m_fromPref, true);
     setBgColor(Preferences::instance().colorBar.bgColor());
   }
 }
@@ -1286,7 +1346,7 @@ void ColorBar::onFgTileChangeFromPreferences()
   if (m_fromPref)
     return;
 
-  base::ScopedValue<bool> sync(m_fromPref, true, false);
+  base::ScopedValue sync(m_fromPref, true);
   auto tile = Preferences::instance().colorBar.fgTile();
   m_fgTile.setTile(tile);
   m_tilesView.selectColor(tile);
@@ -1297,7 +1357,7 @@ void ColorBar::onBgTileChangeFromPreferences()
   if (m_fromPref)
     return;
 
-  base::ScopedValue<bool> sync(m_fromPref, true, false);
+  base::ScopedValue sync(m_fromPref, true);
   auto tile = Preferences::instance().colorBar.bgTile();
   m_bgTile.setTile(tile);
   m_tilesView.selectColor(tile);
@@ -1336,10 +1396,10 @@ void ColorBar::onFgColorButtonChange(const app::Color& color)
   if (m_fromFgButton)
     return;
 
-  base::ScopedValue<bool> lock(m_fromFgButton, true, false);
+  base::ScopedValue lock(m_fromFgButton, true);
 
   if (!m_fromPref) {
-    base::ScopedValue<bool> sync(m_fromPref, true, false);
+    base::ScopedValue sync(m_fromPref, true);
     Preferences::instance().colorBar.fgColor(color);
   }
 
@@ -1354,13 +1414,13 @@ void ColorBar::onBgColorButtonChange(const app::Color& color)
   if (m_fromBgButton)
     return;
 
-  base::ScopedValue<bool> lock(m_fromBgButton, true, false);
+  base::ScopedValue lock(m_fromBgButton, true);
 
   if (!m_fromPalView && !inEditMode())
     m_paletteView.deselect();
 
   if (!m_fromPref) {
-    base::ScopedValue<bool> sync(m_fromPref, true, false);
+    base::ScopedValue sync(m_fromPref, true);
     Preferences::instance().colorBar.bgColor(color);
   }
 
@@ -1680,7 +1740,7 @@ void ColorBar::onFixWarningClick(ColorButton* colorButton, ui::Button* warningIc
   if (inEditMode()) {
     const int newEntries = palette->size();
     if (oldEntries != newEntries) {
-      base::ScopedValue<bool> sync(m_fromPref, true, m_fromPref);
+      base::ScopedValue sync(m_fromPref, true);
       app::Color newIndex = app::Color::fromIndex(newEntries-1);
       if (colorButton == &m_bgColor)
         setBgColor(newIndex);
@@ -2007,7 +2067,15 @@ bool ColorBar::canEditTiles() const
 {
   const Site site = UIContext::instance()->activeSite();
   return (site.layer() &&
-          site.layer()->isTilemap());
+          site.layer()->isTilemap() &&
+          !customTileManagement());
+}
+
+bool ColorBar::customTileManagement() const
+{
+  return (m_lastDocument &&
+          m_lastDocument->sprite() &&
+          m_lastDocument->sprite()->hasTileManagementPlugin());
 }
 
 } // namespace app

@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020  Igara Studio S.A.
+// Copyright (c) 2020-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -46,6 +46,11 @@ namespace gfx {
     void setScaleTranslate(float sx, float sy, float tx, float ty) { }
     Matrix& preTranslate(float dx, float dy) { return *this; }
     Matrix& postTranslate(float dx, float dy) { return *this; }
+
+    Matrix& setConcat(const Matrix& a, const Matrix& b) { return *this; }
+    Matrix& preConcat(const Matrix& other) { return *this; }
+    Matrix& postConcat(const Matrix& other) { return *this; }
+
     RectF mapRect(const RectF& src) const { return RectF(); }
   };
 

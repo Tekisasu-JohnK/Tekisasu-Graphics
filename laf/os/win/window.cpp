@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -28,6 +28,8 @@
 #include "base/string.h"
 #include "base/thread.h"
 #include "base/win/comptr.h"
+#include "base/win/registry.h"
+#include "base/win/win32_exception.h"
 #include "gfx/border.h"
 #include "gfx/region.h"
 #include "gfx/size.h"
@@ -130,6 +132,10 @@ static BOOL CALLBACK log_monitor_info(HMONITOR monitor,
   }
   return TRUE;
 }
+
+// Keys used to detect if the Windows 11 dark mode is selected.
+static constexpr const char* kPersonalizeKey = "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
+static constexpr const char* kAppsUseLightThemeValue = "AppsUseLightTheme";
 
 PointerType WindowWin::m_pointerType = PointerType::Unknown;
 float WindowWin::m_pressure = 0.0f;
@@ -874,6 +880,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
         }
       }
 
+      checkDarkModeChange();
       notifyFullScreenStateToShell();
       break;
     }
@@ -1131,6 +1138,10 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
     case WM_EXITSIZEMOVE:
       checkColorSpaceChange();
       onEndResizing();
+      break;
+
+    case WM_SETTINGCHANGE:
+      checkDarkModeChange();
       break;
 
     // Mouse and Trackpad Messages
@@ -1668,7 +1679,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       ev.setModifiers(get_modifiers_from_last_win32_message());
       ev.setScancode(ourScancode);
       ev.setUnicodeChar(0);
-      ev.setRepeat(std::max(0, int((lparam & 0xffff)-1)));
+      ev.setRepeat(lparam & (1 << 30) ? 1: 0);
 
       KEY_TRACE("KEYDOWN vk=%d scancode=%d->%d modifiers=%d\n",
                 vk, scancode, ev.scancode(), ev.modifiers());
@@ -1714,7 +1725,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       ev.setModifiers(get_modifiers_from_last_win32_message());
       ev.setScancode(win32vk_to_scancode(wparam));
       ev.setUnicodeChar(0);
-      ev.setRepeat(std::max(0, int((lparam & 0xffff)-1)));
+      ev.setRepeat(lparam & (1 << 30) ? 0: 1);
       queueEvent(ev);
 
       // TODO If we use native menus, this message should be given
@@ -2341,6 +2352,35 @@ void WindowWin::checkColorSpaceChange()
   os::ColorSpaceRef newColorSpace = colorSpace();
   if (oldColorSpace != newColorSpace)
     onChangeColorSpace();
+}
+
+// We only support the Windows 11 dark mode, detecting it and using
+// the correct (dark/light) title bar.
+//
+// A lot of information and discussion about this can be found here:
+// https://github.com/microsoft/WindowsAppSDK/issues/41
+void WindowWin::checkDarkModeChange()
+{
+  try {
+    auto key = base::hkey::current_user().open(kPersonalizeKey,
+                                               base::hkey::read);
+
+    // We can check if "AppsUseLightTheme" option is 0 which means
+    // that we have to use the dark theme. Not sure why this is not
+    // automatic or the default behavior on Windows 11, or configured
+    // through the manifest for Win32 apps.
+    if (key.exists(kAppsUseLightThemeValue)) {
+      BOOL value = (key.dword(kAppsUseLightThemeValue) == 0);
+      DwmSetWindowAttribute(
+        m_hwnd, 20, // DWMWA_USE_IMMERSIVE_DARK_MODE,
+        &value, sizeof(BOOL));
+    }
+  }
+  catch (const base::Win32Exception&) {
+    // Probably the "Personalize" key doesn't exist because we are on
+    // Windows 10, so we do nothing, which means: use the light
+    // theme/current theme/title bar as it is.
+  }
 }
 
 void WindowWin::openWintabCtx()

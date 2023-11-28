@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -57,6 +57,8 @@
 #include "app/util/clipboard.h"
 #include "base/exception.h"
 #include "base/fs.h"
+#include "base/platform.h"
+#include "base/replace_string.h"
 #include "base/split_string.h"
 #include "doc/sprite.h"
 #include "fmt/format.h"
@@ -363,6 +365,7 @@ int App::initialize(const AppOptions& options)
 
     // Create the main window.
     m_mainWindow.reset(new MainWindow);
+    m_mainWindow->initialize();
     if (m_mod)
       m_mod->modMainWindow(m_mainWindow.get());
 
@@ -575,6 +578,8 @@ void App::close()
 {
 #ifdef ENABLE_UI
   if (isGui()) {
+    ExitGui();
+
     // Select no document
     static_cast<UIContext*>(context())->setActiveView(nullptr);
 
@@ -759,13 +764,42 @@ void App::showBackupNotification(bool state)
 
 void App::updateDisplayTitleBar()
 {
-  std::string defaultTitle = fmt::format("{} v{}", get_app_name(), get_app_version());
+  static std::string defaultTitle;
   std::string title;
+
+  if (defaultTitle.empty()) {
+    defaultTitle = fmt::format("{} v{}", get_app_name(), get_app_version());
+
+#if LAF_MACOS
+    // On macOS we remove the "-arm64" suffix for Apple Silicon as it
+    // will be the most common platform from now on.
+    if constexpr (base::Platform::arch == base::Platform::Arch::arm64) {
+      base::replace_string(defaultTitle, "-arm64", "");
+    }
+    else if constexpr (base::Platform::arch == base::Platform::Arch::x64) {
+      base::replace_string(defaultTitle, "-x64", "");
+      defaultTitle += " (x64)";
+    }
+#else
+    // On PC (Windows/Linux) we try to remove "-x64" suffix as it's
+    // the most common platform.
+    if constexpr (base::Platform::arch == base::Platform::Arch::x64) {
+      base::replace_string(defaultTitle, "-x64", "");
+    }
+    else if constexpr (base::Platform::arch == base::Platform::Arch::x86) {
+      base::replace_string(defaultTitle, "-x86", "");
+      defaultTitle += " (x86)";
+    }
+#endif
+  }
 
   DocView* docView = UIContext::instance()->activeView();
   if (docView) {
     // Prepend the document's filename.
     title += docView->document()->name();
+    if (docView->document()->isReadOnly()) {
+      title += " [Read-Only]";
+    }
     title += " - ";
   }
 

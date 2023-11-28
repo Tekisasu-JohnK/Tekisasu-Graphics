@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -783,6 +783,13 @@ tools::ToolLoop* create_tool_loop(
   Site site = editor->getSite();
   doc::Grid grid = site.grid();
 
+  // If the document is read-only.
+  if (site.document()->isReadOnly()) {
+    StatusBar::instance()->showTip(
+      3000, Strings::statusbar_tips_cannot_modify_readonly_sprite());
+    return nullptr;
+  }
+
   ToolLoopParams params;
   params.tool = editor->getCurrentEditorTool();
   params.ink = editor->getCurrentEditorInk();
@@ -822,11 +829,15 @@ tools::ToolLoop* create_tool_loop(
       return nullptr;
     }
     else if (!layer->isVisibleHierarchy()) {
-      StatusBar::instance()->showTip(
-        1000,
-        fmt::format(Strings::statusbar_tips_layer_x_is_hidden(),
-                    layer->name()));
-      return nullptr;
+      auto& toolPref = Preferences::instance().tool(params.tool);
+      if (toolPref.floodfill.referTo() ==
+          app::gen::FillReferTo::ACTIVE_LAYER) {
+        StatusBar::instance()->showTip(
+          1000,
+          fmt::format(Strings::statusbar_tips_layer_x_is_hidden(),
+                      layer->name()));
+        return nullptr;
+      }
     }
     // If the active layer is read-only.
     else if (layer_is_locked(editor)) {
@@ -845,8 +856,8 @@ tools::ToolLoop* create_tool_loop(
   // Get fg/bg colors
   ColorBar* colorbar = ColorBar::instance();
   if (site.tilemapMode() == TilemapMode::Tiles) {
-    params.fg = app::Color::fromIndex(colorbar->getFgTile()); // TODO Color::fromTileIndex?
-    params.bg = app::Color::fromIndex(colorbar->getBgTile());
+    params.fg = app::Color::fromTile(colorbar->getFgTile());
+    params.bg = app::Color::fromTile(colorbar->getBgTile());
   }
   else {
     params.fg = colorbar->getFgColor();
@@ -962,9 +973,14 @@ public:
         tools::WellKnownPointShapes::Brush);
     }
     else if (m_pointShape->isFloodFill()) {
-      m_pointShape = App::instance()->toolBox()->getPointShapeById
-        (m_tilesMode ? tools::WellKnownPointShapes::Tile:
-                       tools::WellKnownPointShapes::Pixel);
+      const char* id;
+      if (m_tilesMode)
+        id = tools::WellKnownPointShapes::Tile;
+      else if (m_brush->type() == BrushType::kImageBrushType)
+        id = tools::WellKnownPointShapes::Brush;
+      else
+        id = tools::WellKnownPointShapes::Pixel;
+      m_pointShape = App::instance()->toolBox()->getPointShapeById(id);
     }
   }
 
@@ -1035,8 +1051,8 @@ tools::ToolLoop* create_tool_loop_preview(
   // Get fg/bg colors
   ColorBar* colorbar = ColorBar::instance();
   if (site.tilemapMode() == TilemapMode::Tiles) {
-    params.fg = app::Color::fromIndex(colorbar->getFgTile()); // TODO Color::fromTileIndex?
-    params.bg = app::Color::fromIndex(colorbar->getBgTile());
+    params.fg = app::Color::fromTile(colorbar->getFgTile());
+    params.bg = app::Color::fromTile(colorbar->getBgTile());
   }
   else {
     params.fg = colorbar->getFgColor();

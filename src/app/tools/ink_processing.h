@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -37,6 +37,11 @@ public:
   virtual void prepareVForPointShape(ToolLoop* loop, int y) { }
   virtual void prepareUForPointShapeWholeScanline(ToolLoop* loop, int x1) { }
   virtual void prepareUForPointShapeSlicedScanline(ToolLoop* loop, bool leftSlice, int x1) { }
+};
+
+class NoopInkProcessing : public BaseInkProcessing {
+public:
+  void processScanline(int x1, int y, int x2, ToolLoop* loop) override { }
 };
 
 typedef std::unique_ptr<BaseInkProcessing> InkProcessingPtr;
@@ -1139,10 +1144,21 @@ public:
   }
 
   void prepareForPointShape(ToolLoop* loop, bool firstPoint, int x, int y) override {
-    if ((m_patternAlign == BrushPattern::ALIGNED_TO_DST && firstPoint) ||
-        (m_patternAlign == BrushPattern::PAINT_BRUSH)) {
-      m_u = ((m_brush->patternOrigin().x % loop->sprite()->width()) - loop->getCelOrigin().x) % m_width;
-      m_v = ((m_brush->patternOrigin().y % loop->sprite()->height()) - loop->getCelOrigin().y) % m_height;
+    if (m_patternAlign != BrushPattern::ALIGNED_TO_SRC) {
+      // Case: during painting process with PaintBucket Tool
+      if (loop->getPointShape()->isFloodFill()) {
+        m_u = x - m_brush->bounds().w / 2;
+        m_v = y - m_brush->bounds().h / 2;
+      }
+      // Case: during brush preview of PaintBucket Tool
+      else if (loop->getController()->isOnePoint()) {
+        m_u = 0;
+        m_v = 0;
+      }
+      else {
+        m_u = ((m_brush->patternOrigin().x % loop->sprite()->width()) - loop->getCelOrigin().x) % m_width;
+        m_v = ((m_brush->patternOrigin().y % loop->sprite()->height()) - loop->getCelOrigin().y) % m_height;
+      }
     }
   }
 

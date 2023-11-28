@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2021-2022  Igara Studio S.A.
+// Copyright (C) 2021-2023  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -48,6 +48,7 @@ XCursorImageX11 g_cachedCursorImage;
 
 SystemX11::~SystemX11()
 {
+  destroyInstance();
   g_nativeCursors.fill(nullptr);
   g_cachedCursorImage.reset();
 }

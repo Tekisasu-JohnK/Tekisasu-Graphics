@@ -29,6 +29,12 @@ namespace os {
       SaveFile,
     };
 
+    enum class Result {
+      Error = -1,     // This happens when we cannot open the native dialog
+      Cancel = 0,     // The user canceled the dialog
+      OK = 1,         // The user selected some file(s)
+    };
+
     virtual ~FileDialog() { }
     virtual void setType(const Type type) = 0;
     virtual void setTitle(const std::string& title) = 0;
@@ -37,7 +43,7 @@ namespace os {
     virtual std::string fileName() = 0;
     virtual void getMultipleFileNames(base::paths& output) = 0;
     virtual void setFileName(const std::string& filename) = 0;
-    virtual bool show(Window* parent) = 0;
+    virtual Result show(Window* parent) = 0;
   };
 
   class NativeDialogs : public RefCount {
