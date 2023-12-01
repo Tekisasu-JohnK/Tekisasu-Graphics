@@ -19,6 +19,7 @@
 #include "app/commands/quick_command.h"
 #include "app/doc.h"
 #include "app/doc_event.h"
+#include "app/extensions.h"
 #include "app/i18n/strings.h"
 #include "app/ini_file.h"
 #include "app/match_words.h"
@@ -1155,6 +1156,11 @@ public:
     addItem(SkinTheme::get(this)->parts.dynamics(), "dynamics_field");
 
     loadDynamicsPref();
+    initTheme();
+  }
+
+  void updateIconFromActiveToolPref() {
+    initTheme();
   }
 
   void switchPopup() {
@@ -1193,13 +1199,15 @@ public:
     }
     else {
       // Load dynamics just in case that the active tool has changed.
+      //
+      // TODO cache the loaded dynamics per tool until the preferences
+      //      changes (listen pref changes)
       loadDynamicsPref();
     }
     return m_dynamics;
   }
 
   void setOptionsGridVisibility(bool state) {
-    m_optionsGridVisibility = state;
     if (m_popup)
       m_popup->setOptionsGridVisibility(state);
   }
@@ -1207,11 +1215,8 @@ public:
   void saveDynamicsPref() {
     m_sameInAllTools = m_popup->sharedSettings();
     Preferences::instance().shared.shareDynamics(m_sameInAllTools);
-    tools::Tool* tool = nullptr;
-    if (!m_sameInAllTools)
-      tool = App::instance()->activeTool();
 
-    auto& dynaPref = Preferences::instance().tool(tool).dynamics;
+    auto& dynaPref = Preferences::instance().tool(getTool()).dynamics;
     m_dynamics = m_popup->getDynamics();
     dynaPref.stabilizer(m_dynamics.stabilizer);
     dynaPref.stabilizerFactor(m_dynamics.stabilizerFactor);
@@ -1226,15 +1231,14 @@ public:
     dynaPref.maxVelocityThreshold(m_dynamics.maxVelocityThreshold);
     dynaPref.colorFromTo(m_dynamics.colorFromTo);
     dynaPref.matrixName(m_popup->ditheringMatrixName());
+
+    initTheme();
   }
 
   void loadDynamicsPref() {
     m_sameInAllTools = Preferences::instance().shared.shareDynamics();
-    tools::Tool* tool = nullptr;
-    if (!m_sameInAllTools)
-      tool = App::instance()->activeTool();
 
-    auto& dynaPref = Preferences::instance().tool(tool).dynamics;
+    auto& dynaPref = Preferences::instance().tool(getTool()).dynamics;
     m_dynamics.stabilizer = dynaPref.stabilizer();
     m_dynamics.stabilizerFactor = dynaPref.stabilizerFactor();
     m_dynamics.size = dynaPref.size();
@@ -1248,11 +1252,19 @@ public:
     m_dynamics.maxVelocityThreshold = dynaPref.maxVelocityThreshold();
     m_dynamics.colorFromTo = dynaPref.colorFromTo();
 
-    DitheringSelector matrixSel(DitheringSelector::SelectMatrix);
-    matrixSel.setSelectedItemIndex(matrixSel.findItemIndex(
-      dynaPref.matrixName()));
-    render::DitheringMatrix matrix(matrixSel.ditheringMatrix());
-    m_dynamics.ditheringMatrix = matrix;
+    // Get the dithering matrix by name from the extensions.
+    bool found = false;
+    auto ditheringMatrices = App::instance()
+      ->extensions().ditheringMatrices();
+    for (const auto& it : ditheringMatrices) {
+      if (it.name() == dynaPref.matrixName()) {
+        m_dynamics.ditheringMatrix = it.matrix();
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      m_dynamics.ditheringMatrix = render::DitheringMatrix();
   }
 
 private:
@@ -1271,6 +1283,12 @@ private:
     Preferences::instance().tool(tool).brush.angle(angle);
   }
 
+  void onDynamicsChange(const tools::DynamicsOptions& dynamicsOptions) override {
+    updateIcon(dynamicsOptions.size != tools::DynamicSensor::Static ||
+               dynamicsOptions.angle != tools::DynamicSensor::Static ||
+               dynamicsOptions.gradient != tools::DynamicSensor::Static);
+  }
+
   // ButtonSet overrides
   void onItemChange(Item* item) override {
     ButtonSet::onItemChange(item);
@@ -1280,14 +1298,32 @@ private:
   // Widget overrides
   void onInitTheme(InitThemeEvent& ev) override {
     ButtonSet::onInitTheme(ev);
+
+    auto& dynaPref = Preferences::instance().tool(getTool()).dynamics;
+    updateIcon(dynaPref.size() != tools::DynamicSensor::Static ||
+               dynaPref.angle() != tools::DynamicSensor::Static ||
+               dynaPref.gradient() != tools::DynamicSensor::Static);
+
     if (m_popup)
       m_popup->initTheme();
+  }
+
+  tools::Tool* getTool() const {
+    if (m_sameInAllTools)
+      return nullptr; // For shared dynamic options we use tool=nullptr
+    else
+      return App::instance()->activeTool();
+  }
+
+  void updateIcon(const bool dynamicsOn) {
+    auto theme = SkinTheme::get(this);
+    getItem(0)->setIcon(dynamicsOn ? theme->parts.dynamicsOn():
+                                     theme->parts.dynamics());
   }
 
   std::unique_ptr<DynamicsPopup> m_popup;
   ContextBar* m_ctxBar;
   mutable tools::DynamicsOptions m_dynamics;
-  bool m_optionsGridVisibility = true;
   bool m_sameInAllTools = false;
 };
 
@@ -2158,6 +2194,10 @@ void ContextBar::updateForTool(tools::Tool* tool)
     (tool->getController(0)->isFreehand() ||
      tool->getController(1)->isFreehand());
 
+  const bool isFilled = tool &&
+    (tool->getFill(0) == tools::FillAlways ||
+     tool->getFill(1) == tools::FillAlways);
+
   const bool showOpacity =
     (supportOpacity) &&
     ((isPaint && (hasInkWithOpacity || hasImageBrush)) ||
@@ -2167,9 +2207,11 @@ void ContextBar::updateForTool(tools::Tool* tool)
     (tool->getInk(0)->withDitheringOptions() ||
      tool->getInk(1)->withDitheringOptions());
 
-  // True if the brush supports dynamics
-  // TODO add support for dynamics in custom brushes in the future
-  const bool supportDynamics = (!hasImageBrush);
+  // True if the tool & brush support dynamics
+  const bool supportDynamics =
+    (isFreehand &&
+     !isFilled &&     // TODO add support for dynamics to contour tool
+     !hasImageBrush); // TODO add support for dynamics in custom brushes
 
   // Show/Hide fields
   m_zoomButtons->setVisible(needZoomButtons(tool));
@@ -2184,8 +2226,10 @@ void ContextBar::updateForTool(tools::Tool* tool)
   m_inkShades->setVisible(hasInkShades);
   m_eyedropperField->setVisible(isEyedropper);
   m_autoSelectLayer->setVisible(isMove);
-  m_dynamics->setVisible(isFreehand && supportDynamics);
+  m_dynamics->setVisible(supportDynamics);
   m_dynamics->setOptionsGridVisibility(isFreehand && !hasSelectOptions);
+  if (supportDynamics)
+    m_dynamics->updateIconFromActiveToolPref();
   m_freehandBox->setVisible(isFreehand && (supportOpacity || hasSelectOptions));
   m_toleranceLabel->setVisible(hasTolerance);
   m_tolerance->setVisible(hasTolerance);
