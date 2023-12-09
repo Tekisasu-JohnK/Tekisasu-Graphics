@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <theme name="Default Dark" screenscaling="2" uiscaling="1">
     <authors>
+        <author name="Tekisasu" url="https://dev.tekisasu.com" />
         <author name="David Capello" url="https://davidcapello.com/" />
         <author name="Ilija Melentijevic" url="https://ilkke.net/" />
         <author name="Nicolas Desilets" url="https://twitter.com/MapleGecko" />
     </authors>
     <fonts>
-        <font id="default" font="Aseprite" />
-        <font id="mini" font="Aseprite Mini" mnemonics="off" />
+        <font id="default" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="6" />
+        <font id="mini" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="6" />
     </fonts>
     <dimensions>
         <dim id="scrollbar_size" value="12" />

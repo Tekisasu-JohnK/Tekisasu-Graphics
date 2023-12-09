@@ -138,8 +138,8 @@
   <global>
     <section id="general">
       <option id="language" type="std::string" default="&quot;en&quot;" />
-      <option id="screen_scale" type="int" default="0" />
-      <option id="ui_scale" type="int" default="1" />
+      <option id="screen_scale" type="int" default="1" />
+      <option id="ui_scale" type="int" default="2" />
       <option id="gpu_acceleration" type="bool" default="false" />
       <option id="show_home" type="bool" default="true" />
       <option id="visible_timeline" type="bool" default="false" />
@@ -228,7 +228,7 @@
       <option id="api" type="std::string" />
     </section>
     <section id="experimental" text="Experimental">
-      <option id="multiple_windows" type="bool" default="false" />
+      <option id="multiple_windows" type="bool" default="true" />
       <option id="new_render_engine" type="bool" default="true" />
       <option id="new_blend" type="bool" default="true" />
       <option id="use_native_clipboard" type="bool" default="true" />

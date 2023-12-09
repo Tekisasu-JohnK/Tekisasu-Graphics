@@ -50,7 +50,7 @@ option(USE_SHARED_HARFBUZZ "Use shared HarfBuzz library" off)
 option(ENABLE_ASEPRITE_EXE "Compile main Aseprite executable" on)
 option(ENABLE_MEMLEAK      "Enable memory-leaks detector (only for developers)" off)
 option(ENABLE_NEWS         "Enable the news in Home tab" on)
-option(ENABLE_UPDATER      "Enable automatic check for updates" on)
+option(ENABLE_UPDATER      "Enable automatic check for updates" off)
 option(ENABLE_SCRIPTING    "Compile with scripting support" on)
 option(ENABLE_WEBSOCKET    "Compile with websocket support" on)
 option(ENABLE_TESTS        "Compile unit tests" off)
@@ -101,7 +101,7 @@ if(NOT LAF_OS_BACKEND)
 endif()
 
 if(ENABLE_DRM AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/drm/CMakeLists.txt)
-  message(FATAL_ERROR "Your Aseprite repository is incomplete, clone the drm repository")
+  message(FATAL_ERROR "Your Tekisasu Graphics repository is incomplete, clone the drm repository")
 endif()
 
 ######################################################################
