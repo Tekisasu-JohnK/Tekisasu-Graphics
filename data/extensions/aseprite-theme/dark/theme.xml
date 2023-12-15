@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <theme name="Default Dark" screenscaling="2" uiscaling="1">
     <authors>
-        <author name="Tekisasu" url="https://dev.tekisasu.com/" />
+        <author name="Tekisasu" url="https://dev.tekisasu.com" />
         <author name="David Capello" url="https://davidcapello.com/" />
         <author name="Ilija Melentijevic" url="https://ilkke.net/" />
         <author name="Nicolas Desilets" url="https://twitter.com/MapleGecko" />
     </authors>
     <fonts>
-        <font id="default" font="Aseprite" />
-        <font id="mini" font="Aseprite Mini" mnemonics="off" />
+        <font id="default" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="6" />
+        <font id="mini" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="6" />
     </fonts>
     <dimensions>
         <dim id="scrollbar_size" value="12" />
@@ -39,7 +39,7 @@
         <color id="disabled" value="#202125" />
         <color id="face" value="#2c2c30" />
         <color id="hot_face" value="#faf0e6" />
-        <color id="selected" value="#e1b85f" />
+        <color id="selected" value="#5fc5e1" />
         <color id="selected_text" value="#41444a" />
         <color id="separator_label" value="#6e9adb" />
         <color id="background" value="#41444a" />
@@ -48,7 +48,7 @@
         <color id="textbox_code_face" value="#eeeeee" />
         <color id="entry_suffix" value="#c6c6c6" />
         <color id="link_text" value="#6e9adb" />
-        <color id="link_hover" value="#e1b85f" />
+        <color id="link_hover" value="#5fc5e1" />
         <color id="button_normal_text" value="#c0c0c0" />
         <color id="button_hot_text" value="#c0c0c0" />
         <color id="button_selected_text" value="#ffffff" />
@@ -73,12 +73,12 @@
         <color id="listitem_normal_text" value="#c0c0c0" />
         <color id="listitem_normal_face" value="#41444a" />
         <color id="listitem_selected_text" value="#41444a" />
-        <color id="listitem_selected_face" value="#e1b85f" />
+        <color id="listitem_selected_face" value="#5fc5e1" />
         <color id="slider_empty_text" value="#202125" />
         <color id="slider_full_text" value="#c0c0c0" />
         <color id="tab_normal_text" value="#7d7d7d" />
         <color id="tab_active_text" value="#c0c0c0" />
-        <color id="tab_active_face" value="#333333" />
+        <color id="tab_active_face" value="#292c33" />
         <color id="popup_window_border" value="#c0c0c0" />
         <color id="tooltip_text" value="#c0c0c0" />
         <color id="tooltip_face" value="#4069c2" />
@@ -87,12 +87,12 @@
         <color id="filelist_odd_row_text" value="#c0c0c0" />
         <color id="filelist_odd_row_face" value="#41444a" />
         <color id="filelist_selected_row_text" value="#41444a" />
-        <color id="filelist_selected_row_face" value="#e1b85f" />
+        <color id="filelist_selected_row_face" value="#5fc5e1" />
         <color id="filelist_disabled_row_text" value="#ffc8c8" />
-        <color id="workspace" value="#333333" />
+        <color id="workspace" value="#292c33" />
         <color id="workspace_text" value="#c0c0c0" />
         <color id="workspace_link" value="#6e9adb" />
-        <color id="workspace_link_hover" value="#e1b85f" />
+        <color id="workspace_link_hover" value="#5fc5e1" />
         <color id="timeline_normal" value="#41444a" />
         <color id="timeline_normal_text" value="#636d79" />
         <color id="timeline_hover" value="#d9d9d9" />
@@ -108,7 +108,7 @@
         <color id="timeline_band_highlight" value="#93adbb" />
         <color id="timeline_band_bg" value="#76858e" />
         <color id="status_bar_text" value="#636d79" />
-        <color id="status_bar_face" value="#333333" />
+        <color id="status_bar_face" value="#292c33" />
         <color id="flag_normal" value="#2c2c30" />
         <color id="flag_active" value="#c75a68" />
         <color id="flag_clicked" value="#41444a" />
