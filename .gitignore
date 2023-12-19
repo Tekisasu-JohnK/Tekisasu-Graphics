@@ -14,4 +14,3 @@
 .vs
 tests/_test*
 build
-*.yml
