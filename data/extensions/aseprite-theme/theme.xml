@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<theme name="Default" screenscaling="2" uiscaling="1">
+<theme name="Default" screenscaling="1" uiscaling="2">
     <authors>
+        <author name="Tekisasu" url="https://dev.tekisasu.com" />
         <author name="David Capello" url="https://davidcapello.com/" />
         <author name="Ilija Melentijevic" url="https://ilkke.net/" />
     </authors>
     <fonts>
-        <font id="default" font="Aseprite" />
-        <font id="mini" font="Aseprite Mini" mnemonics="off" />
+        <font id="default" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="7" />
+        <font id="mini" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="7" />
     </fonts>
     <dimensions>
         <dim id="scrollbar_size" value="12" />
@@ -32,11 +33,11 @@
     </dimensions>
     <colors>
         <color id="text" value="#000000" />
-        <color id="disabled" value="#968275" />
-        <color id="face" value="#d3cbbe" />
+        <color id="disabled" value="#858585" />
+        <color id="face" value="#bbbfc4" />
         <color id="hot_face" value="#faf0e6" />
-        <color id="selected" value="#ff5555" />
-        <color id="selected_text" value="#ffffff" />
+        <color id="selected" value="#23acd2" />
+        <color id="selected_text" value="#273b41" />
         <color id="separator_label" value="#2c4c91" />
         <color id="background" value="#ffffff" />
         <color id="textbox_text" value="#000000" />
@@ -44,69 +45,69 @@
         <color id="textbox_code_face" value="#eeeeee" />
         <color id="entry_suffix" value="#c6c6c6" />
         <color id="link_text" value="#2c4c91" />
-        <color id="link_hover" value="#ff5555" />
+        <color id="link_hover" value="#23acd2" />
         <color id="button_normal_text" value="#000000" />
         <color id="button_hot_text" value="#000000" />
         <color id="button_selected_text" value="#ffffff" />
-        <color id="check_hot_face" value="#ffebb6" />
+        <color id="check_hot_face" value="#23acd2" />
         <color id="check_focus_face" value="#c6c6c6" />
-        <color id="radio_hot_face" value="#ffebb6" />
+        <color id="radio_hot_face" value="#23acd2" />
         <color id="radio_focus_face" value="#c6c6c6" />
         <color id="menuitem_normal_text" value="#000000" />
-        <color id="menuitem_normal_face" value="#d3cbbe" />
+        <color id="menuitem_normal_face" value="#bbbfc4" />
         <color id="menuitem_hot_text" value="#000000" />
-        <color id="menuitem_hot_face" value="#ffebb6" />
-        <color id="menuitem_highlight_text" value="#ffffff" />
-        <color id="menuitem_highlight_face" value="#7c909f" />
-        <color id="window_face" value="#d3cbbe" />
-        <color id="window_titlebar_text" value="#ffffff" />
-        <color id="window_titlebar_face" value="#7c909f" />
-        <color id="editor_face" value="#655561" />
+        <color id="menuitem_hot_face" value="#23acd2" />
+        <color id="menuitem_highlight_text" value="#000000" />
+        <color id="menuitem_highlight_face" value="#23acd2" />
+        <color id="window_face" value="#bbbfc4" />
+        <color id="window_titlebar_text" value="#000000" />
+        <color id="window_titlebar_face" value="#8d949d" />
+        <color id="editor_face" value="#545454" />
         <color id="editor_sprite_border" value="#000000" />
         <color id="editor_sprite_bottom_border" value="#41412c" />
         <color id="editor_view_face" value="#000000" />
         <color id="listitem_normal_text" value="#000000" />
         <color id="listitem_normal_face" value="#ffffff" />
-        <color id="listitem_selected_text" value="#ffffff" />
-        <color id="listitem_selected_face" value="#ff5555" />
+        <color id="listitem_selected_text" value="#000000" />
+        <color id="listitem_selected_face" value="#23acd2" />
         <color id="slider_empty_text" value="#000000" />
         <color id="slider_full_text" value="#ffffff" />
         <color id="tab_normal_text" value="#000000" />
-        <color id="tab_active_text" value="#ffffff" />
-        <color id="tab_active_face" value="#7d929e" />
+        <color id="tab_active_text" value="#000000" />
+        <color id="tab_active_face" value="#8d949d" />
         <color id="popup_window_border" value="#000000" />
         <color id="tooltip_text" value="#000000" />
-        <color id="tooltip_face" value="#ffff7d" />
+        <color id="tooltip_face" value="#23acd2" />
         <color id="filelist_even_row_text" value="#000000" />
         <color id="filelist_even_row_face" value="#ffffff" />
         <color id="filelist_odd_row_text" value="#000000" />
         <color id="filelist_odd_row_face" value="#ffffff" />
-        <color id="filelist_selected_row_text" value="#ffffff" />
-        <color id="filelist_selected_row_face" value="#ff5555" />
+        <color id="filelist_selected_row_text" value="#000000" />
+        <color id="filelist_selected_row_face" value="#23acd2" />
         <color id="filelist_disabled_row_text" value="#ffc8c8" />
-        <color id="workspace" value="#7d929e" />
-        <color id="workspace_text" value="#655561" />
-        <color id="workspace_link" value="#655561" />
-        <color id="workspace_link_hover" value="#ffff7d" />
+        <color id="workspace" value="#8d949d" />
+        <color id="workspace_text" value="#2e3942" />
+        <color id="workspace_link" value="#2e3942" />
+        <color id="workspace_link_hover" value="#89d6eb" />
         <color id="timeline_normal" value="#c6c6c6" />
         <color id="timeline_normal_text" value="#000000" />
         <color id="timeline_hover" value="#d9d9d9" />
         <color id="timeline_hover_text" value="#000000" />
-        <color id="timeline_active" value="#7d929e" />
+        <color id="timeline_active" value="#8d949d" />
         <color id="timeline_active_text" value="#ffffff" />
         <color id="timeline_active_hover" value="#99b3c2" />
         <color id="timeline_active_hover_text" value="#ffffff" />
         <color id="timeline_clicked" value="#536069" />
         <color id="timeline_clicked_text" value="#ffffff" />
         <color id="timeline_focused_text" value="#ffffff" />
-        <color id="timeline_padding" value="#7d929e" />
+        <color id="timeline_padding" value="#8d949d" />
         <color id="timeline_band_highlight" value="#93adbb" />
         <color id="timeline_band_bg" value="#76858e" />
         <color id="status_bar_text" value="#2e3234" />
-        <color id="status_bar_face" value="#7d929e" />
-        <color id="flag_normal" value="#d3cbbe" />
+        <color id="status_bar_face" value="#8d949d" />
+        <color id="flag_normal" value="#bbbfc4" />
         <color id="flag_active" value="#ff0000" />
-        <color id="flag_clicked" value="#7d929e" />
+        <color id="flag_clicked" value="#8d949d" />
         <color id="select_box_ruler" value="#0000ff" />
         <color id="select_box_grid" value="#64c864" />
         <color id="palette_entries_separator" value="#000000" />
