@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -119,7 +119,8 @@ PixelsMovement::PixelsMovement(
   : m_reader(context)
   , m_site(site)
   , m_document(site.document())
-  , m_tx(context, operationName)
+  , m_tx(Tx::DontLockDoc, context,
+         context->activeDocument(), operationName)
   , m_isDragging(false)
   , m_adjustPivot(false)
   , m_handle(NoHandle)
@@ -786,9 +787,10 @@ void PixelsMovement::stampImage(bool finalStamp)
     cels.push_back(currentCel);
   }
 
-  if (currentCel && currentCel->layer() &&
+  if (currentCel &&
+      currentCel->layer() &&
       currentCel->layer()->isImage() &&
-      !currentCel->layer()->isEditableHierarchy()) {
+      !currentCel->layer()->canEditPixels()) {
     Transformation initialCelPos(gfx::Rect(m_initialMask0->bounds()), m_currentData.cornerThick());
     redrawExtraImage(&initialCelPos);
     stampExtraCelImage();

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -167,15 +167,7 @@ protected:
       return Editor::onProcessMessage(msg);
     }
     catch (const std::exception& ex) {
-      EditorState* state = getState().get();
-
-      Console console;
-      Console::showException(ex);
-      console.printf("\nInternal details:\n"
-        "- Message type: %d\n"
-        "- Editor state: %s\n",
-        msg->type(),
-        state ? typeid(*state).name(): "None");
+      showUnhandledException(ex, msg);
       return false;
     }
   }
@@ -486,7 +478,16 @@ void DocView::onTotalFramesChanged(DocEvent& ev)
 
 void DocView::onLayerRestacked(DocEvent& ev)
 {
-  m_editor->invalidate();
+  if (hasContentInActiveFrame(ev.layer()))
+    m_editor->invalidate();
+}
+
+void DocView::onAfterLayerVisibilityChange(DocEvent& ev)
+{
+  // If there is no cel for this layer in the current frame, there is
+  // no need to redraw the editor
+  if (hasContentInActiveFrame(ev.layer()))
+    m_editor->invalidate();
 }
 
 void DocView::onTilesetChanged(DocEvent& ev)
@@ -630,7 +631,7 @@ bool DocView::onClear(Context* ctx)
 
   // TODO This code is similar to clipboard::cut()
   {
-    Tx tx(writer.context(), "Clear");
+    Tx tx(writer, "Clear");
     const bool deselectMask =
       (visibleMask &&
        !Preferences::instance().selection.keepSelectionAfterClear());
@@ -659,6 +660,21 @@ void DocView::onCancel(Context* ctx)
     Command* deselectMask = Commands::instance()->byId(CommandId::DeselectMask());
     ctx->executeCommand(deselectMask);
   }
+}
+
+bool DocView::hasContentInActiveFrame(const doc::Layer* layer) const
+{
+  if (!layer)
+    return false;
+  else if (layer->cel(m_editor->frame()))
+    return true;
+  else if (layer->isGroup()) {
+    for (const doc::Layer* child : static_cast<const doc::LayerGroup*>(layer)->layers()) {
+      if (hasContentInActiveFrame(child))
+        return true;
+    }
+  }
+  return false;
 }
 
 } // namespace app

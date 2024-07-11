@@ -265,7 +265,7 @@ private:
                                      newBlendMode != static_cast<LayerImage*>(m_layer)->blendMode()))))) {
       try {
         ContextWriter writer(UIContext::instance());
-        Tx tx(writer.context(), "Set Layer Properties");
+        Tx tx(writer, "Set Layer Properties");
 
         DocRange range;
         if (m_range.enabled())
@@ -308,6 +308,17 @@ private:
 
       update_screen_for_document(m_document);
     }
+
+    // We indicate that there are no more pending changes in both
+    // cases 1) if we were able to commit the transaction or 2) if an
+    // exception ocurred (e.g. the sprite was locked). This is because
+    // sometimes if a big operation with multiple modifications
+    // (e.g. deleting a lot of cels at the same time) is going to
+    // happen, we'll receive a lot of onActiveSiteChange() events +
+    // onCommitChange() calls.
+    //
+    // TODO this is similar to CelPropertiesWindow::onCommitChange()
+    m_pendingChanges = false;
   }
 
   // ContextObserver impl
@@ -384,7 +395,7 @@ private:
           tileset->matchFlags() != tilesetInfo.matchFlags ||
           tilesetInfo.tsi != tilemap->tilesetIndex()) {
         ContextWriter writer(UIContext::instance());
-        Tx tx(writer.context(), "Set Tileset Properties");
+        Tx tx(writer, "Set Tileset Properties");
         // User changed tilemap's tileset
         if (tilesetInfo.tsi != tilemap->tilesetIndex()) {
           tileset = tilemap->sprite()->tilesets()->get(tilesetInfo.tsi);

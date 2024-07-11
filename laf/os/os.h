@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (c) 2019-2021  Igara Studio S.A.
+// Copyright (c) 2019-2024  Igara Studio S.A.
 // Copyright (c) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -9,6 +9,8 @@
 #define OS_H_INCLUDED
 #pragma once
 
+#include "gfx/matrix.h"
+#include "gfx/path.h"
 #include "gfx/point.h"
 #include "gfx/rect.h"
 #include "gfx/region.h"

@@ -190,3 +190,95 @@ Issue #383 - emphasis parsing.
 <p>**<em><strong>Hello<em>world</em></strong></em></p>
 ````````````````````````````````
 
+Issue #424 - emphasis before links
+
+```````````````````````````````` example
+*text* [link](#section)
+.
+<p><em>text</em> <a href="#section">link</a></p>
+````````````````````````````````
+
+`<!doctype` is case-insensitive
+```````````````````````````````` example
+<!docType html>
+.
+<!docType html>
+````````````````````````````````
+
+Declarations don't need spaces, according to the spec
+```````````````````````````````` example
+x <!A>
+.
+<p>x <!A></p>
+````````````````````````````````
+
+An underscore that is not part of a delimiter should not prevent another
+pair of underscores from forming part of their own.
+```````````````````````````````` example
+__!_!__
+
+__!x!__
+
+**!*!**
+
+---
+
+_*__*_*
+
+_*xx*_*
+
+_*__-_-
+
+_*xx-_-
+.
+<p><strong>!_!</strong></p>
+<p><strong>!x!</strong></p>
+<p><strong>!*!</strong></p>
+<hr />
+<p><em><em>__</em></em>*</p>
+<p><em><em>xx</em></em>*</p>
+<p><em>*__-</em>-</p>
+<p><em>*xx-</em>-</p>
+````````````````````````````````
+
+commonmark.js #277:
+```````````````````````````````` example
+```language-r
+x <- 1
+```
+
+```r
+x <- 1
+```
+.
+<pre><code class="language-r">x &lt;- 1
+</code></pre>
+<pre><code class="language-r">x &lt;- 1
+</code></pre>
+````````````````````````````````
+
+https://github.com/commonmark/commonmark.js/issues/283
+```````````````````````````````` example
+x<!x>
+
+x<!>
+.
+<p>x<!x></p>
+<p>x&lt;!&gt;</p>
+````````````````````````````````
+
+Case fold test
+```````````````````````````````` example
+[link][µÓĐĹŠƆƦǏǶȜɆΓΨϪЇЛЯҎҶӞԆԮՄႠႴᏸᲕᲩᲿḦṎṶẚỂỪἙἿὭᾑᾥᾼῢΩↃⓉⰍⰡⱩⲔⲼⳫꙢꜢꝌꝽꞪꟇꭾꮒꮦꮺＣＷ𐐐𐐤𐓀𐕰𐖅𐲅𐲙𐲭𑢮𖹂𖹖𞤊𞤞]
+
+[μóđĺšɔʀǐƕȝɇγψϫїляҏҷӟԇԯմⴀⴔᏰვჩჿḧṏṷaʾểừἑἷὥἡιὥιαιῢωↄⓣⰽⱑⱪⲕⲽⳬꙣꜣꝍᵹɦꟈᎮᏂᏖᏪｃｗ𐐸𐑌𐓨𐖗𐖬𐳅𐳙𐳭𑣎𖹢𖹶𞤬𞥀]: /url
+.
+<p><a href="/url">link</a></p>
+````````````````````````````````
+
+https://github.com/commonmark/cmark/issues/548
+```````````````````````````````` example
+(&#xFFFE;&#xFFFF;)
+.
+<p>(￾￿)</p>
+````````````````````````````````

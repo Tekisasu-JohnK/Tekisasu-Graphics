@@ -147,7 +147,8 @@ public:
 
     {
       std::vector<char> buf(256);
-      std::sprintf(&buf[0], "Scroll=%.2f %.2f  Zoom=%.2f", m_scroll.x, m_scroll.y, m_zoom);
+      std::snprintf(buf.data(), buf.size(),
+                    "Scroll=%.2f %.2f  Zoom=%.2f", m_scroll.x, m_scroll.y, m_zoom);
       p.style(os::Paint::Fill);
       os::draw_text(surface, nullptr, &buf[0], gfx::Point(12, 12), &p);
     }
@@ -196,7 +197,6 @@ int app_main(int argc, char* argv[])
 {
   os::SystemRef system = os::make_system();
   system->setAppMode(os::AppMode::GUI);
-  system->setGpuAcceleration(true);
 
   PanWindow window(system.get());
 

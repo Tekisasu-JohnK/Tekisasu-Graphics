@@ -20,8 +20,11 @@ namespace base {
 
   // Undefined convertion
   template<typename To, typename From>
-  To convert_to(const From& from) {
-    static_assert(false && sizeof(To), "Invalid conversion");
+  To convert_to(const From&) {
+    // We've to use the sizeof(To) trick to use static_assert(false)
+    // and make the compiler fail in non-specialized cases, see P2593R0:
+    // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html
+    static_assert(false && sizeof(To), "Invalid conversion"); // NOLINT readability-simplify-boolean-expr
   }
 
   template<> int convert_to(const std::string& from);

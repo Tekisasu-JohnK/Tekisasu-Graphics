@@ -17,17 +17,15 @@ namespace base {
     if (a > 1 && b > 1) {
       if (a == b)
         return a;
-      else {
-        while (a != b) {
-          if (a > b) {
-            a = a - b;
-          }
-          else if (a < b) {
-            b = b - a;
-          }
-          if (a == b) {
-            return a;
-          }
+      while (a != b) {
+        if (a > b) {
+          a = a - b;
+        }
+        else if (a < b) {
+          b = b - a;
+        }
+        if (a == b) {
+          return a;
         }
       }
     }

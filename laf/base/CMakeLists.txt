@@ -1,5 +1,5 @@
 # LAF Base Library
-# Copyright (c) 2019-2023 Igara Studio S.A.
+# Copyright (c) 2019-2024 Igara Studio S.A.
 # Copyright (c) 2001-2018 David Capello
 
 include(CheckIncludeFiles)
@@ -94,6 +94,8 @@ if(WIN32)
   target_link_libraries(laf-base dbghelp shlwapi version)
 else()
   if(APPLE)
+    target_compile_options(laf-base PRIVATE -fobjc-arc)
+
     find_library(FOUNDATION_LIBRARY Foundation)
     target_compile_definitions(laf-base PUBLIC LAF_MACOS)
     target_link_libraries(laf-base ${FOUNDATION_LIBRARY})

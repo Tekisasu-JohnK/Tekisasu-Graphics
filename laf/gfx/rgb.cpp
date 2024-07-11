@@ -17,9 +17,9 @@ using namespace std;
 // Reference: http://en.wikipedia.org/wiki/HSL_and_HSV
 Rgb::Rgb(const Hsv& hsv)
 {
-  double chroma = hsv.value() * hsv.saturation();
-  double hue_prime = hsv.hue() / 60.0;
-  double x = chroma * (1.0 - std::fabs(std::fmod(hue_prime, 2.0) - 1.0));
+  const double chroma = hsv.value() * hsv.saturation();
+  const double hue_prime = hsv.hue() / 60.0;
+  const double x = chroma * (1.0 - std::fabs(std::fmod(hue_prime, 2.0) - 1.0));
   double r, g, b;
 
   r = g = b = 0.0;
@@ -55,7 +55,7 @@ Rgb::Rgb(const Hsv& hsv)
       break;
   }
 
-  double m = hsv.value() - chroma;
+  const double m = hsv.value() - chroma;
   r += m;
   g += m;
   b += m;
@@ -67,9 +67,9 @@ Rgb::Rgb(const Hsv& hsv)
 
 Rgb::Rgb(const Hsl& hsl)
 {
-  double chroma = (1.0 - std::fabs(2.0*hsl.lightness() - 1.0)) * hsl.saturation();
-  double hue_prime = hsl.hue() / 60.0;
-  double x = chroma * (1.0 - std::fabs(std::fmod(hue_prime, 2.0) - 1.0));
+  const double chroma = (1.0 - std::fabs(2.0*hsl.lightness() - 1.0)) * hsl.saturation();
+  const double hue_prime = hsl.hue() / 60.0;
+  const double x = chroma * (1.0 - std::fabs(std::fmod(hue_prime, 2.0) - 1.0));
   double r, g, b;
 
   r = g = b = 0.0;
@@ -105,7 +105,7 @@ Rgb::Rgb(const Hsl& hsl)
       break;
   }
 
-  double m = hsl.lightness() - chroma/2.0;
+  const double m = hsl.lightness() - chroma/2.0;
   r += m;
   g += m;
   b += m;
@@ -119,16 +119,14 @@ int Rgb::maxComponent() const
 {
   if (m_red > m_green)
     return (m_red > m_blue) ? m_red: m_blue;
-  else
-    return (m_green > m_blue) ? m_green: m_blue;
+  return (m_green > m_blue) ? m_green: m_blue;
 }
 
 int Rgb::minComponent() const
 {
   if (m_red < m_green)
     return (m_red < m_blue) ? m_red: m_blue;
-  else
-    return (m_green < m_blue) ? m_green: m_blue;
+  return (m_green < m_blue) ? m_green: m_blue;
 }
 
 } // namespace gfx

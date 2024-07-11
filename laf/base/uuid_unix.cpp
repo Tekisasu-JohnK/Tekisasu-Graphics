@@ -21,14 +21,14 @@ Uuid Uuid::Generate()
   Uuid uuid;
   buffer buf = read_file_content("/proc/sys/kernel/random/uuid");
   if (buf.size() >= 16) {
-    uuid = base::convert_to<Uuid>(std::string((const char*)&buf[0]));
+    uuid = base::convert_to<Uuid>(std::string((const char*)buf.data()));
 
 #if LAF_BASE_TRACE_UUID
     if (buf[buf.size()-1] == '\n')
       buf[buf.size()-1] = 0;
     printf("convert_to  = \"%s\"\n"
            "random/uuid = \"%s\"\n",
-           base::convert_to<std::string>(uuid).c_str(), &buf[0]);
+           base::convert_to<std::string>(uuid).c_str(), buf.data());
 #endif
   }
   return uuid;

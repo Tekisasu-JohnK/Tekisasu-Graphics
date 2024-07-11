@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -227,7 +227,8 @@ void Clipboard::setData(Image* image,
   else
     m_data->image.reset(image);
 
-  if (set_native_clipboard) {
+  if (set_native_clipboard &&
+      use_native_clipboard()) {
     // Copy tilemap to the native clipboard
     if (isTilemap) {
       ASSERT(tileset);
@@ -242,8 +243,7 @@ void Clipboard::setData(Image* image,
           image->setMaskColor(-1);
       }
 
-      if (use_native_clipboard())
-        setNativeBitmap(image, mask, palette);
+      setNativeBitmap(image, mask, palette);
 
       if (image && !image_source_is_transparent)
         image->setMaskColor(oldMask);
@@ -362,7 +362,7 @@ void Clipboard::cut(ContextWriter& writer)
   else {
     // TODO This code is similar to DocView::onClear()
     {
-      Tx tx(writer.context(), "Cut");
+      Tx tx(writer, "Cut");
       Site site = writer.context()->activeSite();
       CelList cels;
       if (site.range().enabled()) {
@@ -456,15 +456,20 @@ void Clipboard::copyPalette(const Palette* palette,
           nullptr,
           new Palette(*palette),
           nullptr,
-          true,                 // set native clipboard
+          false,               // Don't touch the native clipboard now
           false);
+
+  // Here is where we copy the palette as text (hex format)
+  if (use_native_clipboard())
+    setNativePalette(palette, picks);
+
   m_data->picks = picks;
 }
 
 void Clipboard::paste(Context* ctx,
                       const bool interactive)
 {
-  Site site = ctx->activeSite();
+  const Site site = ctx->activeSite();
   Doc* dstDoc = site.document();
   if (!dstDoc)
     return;
@@ -531,7 +536,8 @@ void Clipboard::paste(Context* ctx,
         if (!dstLayer || !dstLayer->isImage())
           return;
 
-        Tx tx(ctx, "Paste Image");
+        ContextWriter writer(ctx);
+        Tx tx(writer, "Paste Image");
         DocApi api = dstDoc->getApi(tx);
         Cel* dstCel = api.addCel(
           static_cast<LayerImage*>(dstLayer), site.frame(),
@@ -611,7 +617,8 @@ void Clipboard::paste(Context* ctx,
             break;
           }
 
-          Tx tx(ctx, "Paste Cels");
+          ContextWriter writer(ctx);
+          Tx tx(writer, "Paste Cels");
           DocApi api = dstDoc->getApi(tx);
 
           // Add extra frames if needed
@@ -671,7 +678,8 @@ void Clipboard::paste(Context* ctx,
             break;
           }
 
-          Tx tx(ctx, "Paste Frames");
+          ContextWriter writer(ctx);
+          Tx tx(writer, "Paste Frames");
           DocApi api = dstDoc->getApi(tx);
 
           auto srcLayers = srcSpr->allBrowsableLayers();
@@ -714,7 +722,8 @@ void Clipboard::paste(Context* ctx,
           if (srcDoc->colorMode() != dstDoc->colorMode())
             throw std::runtime_error("You cannot copy layers of document with different color modes");
 
-          Tx tx(ctx, "Paste Layers");
+          ContextWriter writer(ctx);
+          Tx tx(writer, "Paste Layers");
           DocApi api = dstDoc->getApi(tx);
 
           // Remove children if their parent is selected so we only

@@ -12,7 +12,7 @@
 
 #include <ft2build.h>
 
-#define STREAM_FILE(stream) ((FILE*)stream->descriptor.pointer)
+#define STREAM_FILE(stream) ((FILE*)(stream)->descriptor.pointer)
 
 namespace ft {
 

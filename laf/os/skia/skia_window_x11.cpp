@@ -90,7 +90,7 @@ void SkiaWindowX11::onPaint(const gfx::Rect& rc)
     if (requiredSize > m_buffer.size())
       m_buffer.resize(requiredSize);
 
-    if (scaled.installPixels(info, (void*)&m_buffer[0], rowBytes)) {
+    if (scaled.installPixels(info, (void*)m_buffer.data(), rowBytes)) {
       SkPaint paint;
       paint.setBlendMode(SkBlendMode::kSrc);
 

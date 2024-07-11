@@ -73,8 +73,8 @@ namespace os {
     virtual gfx::Color getPixel(int x, int y) const = 0;
     virtual void putPixel(gfx::Color color, int x, int y) = 0;
 
-    virtual void drawLine(const float x0, const float y0,
-                          const float x1, const float y1,
+    virtual void drawLine(float x0, float y0,
+                          float x1, float y1,
                           const os::Paint& paint) = 0;
 
     void drawLine(const int x0, const int y0,
@@ -106,8 +106,7 @@ namespace os {
                paint);
     }
 
-    virtual void drawCircle(const float cx, const float cy,
-                            const float radius,
+    virtual void drawCircle(float cx, float cy, float radius,
                             const os::Paint& paint) = 0;
 
     void drawCircle(const gfx::PointF& center,
@@ -141,7 +140,7 @@ namespace os {
                                  const gfx::Rect& src,
                                  const gfx::Rect& center,
                                  const gfx::Rect& dst,
-                                 const bool drawCenter,
+                                 bool drawCenter,
                                  const os::Paint* paint) = 0;
 
     virtual void applyScale(int scaleFactor) = 0;

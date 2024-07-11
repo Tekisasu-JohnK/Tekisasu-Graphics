@@ -23,8 +23,7 @@
     size_t aligned_n = n + (remaining ? (alignment - remaining): 0);
     if (aligned_n > alignment)
       return aligned_n;
-    else
-      return alignment;
+    return alignment;
   }
 #endif
 

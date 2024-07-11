@@ -102,7 +102,7 @@ void this_thread::set_name(const std::string& name)
     pthread_setname_np(name.substr(0, 63).c_str());
   }
 #else
-  int res = pthread_setname_np(pthread_self(), name.c_str());
+  const int res = pthread_setname_np(pthread_self(), name.c_str());
   if (res != 0 && name.size() > 15) {
     // Try with a shorter string (no more than 16 chars including the
     // null char, as the spec says).
@@ -125,7 +125,7 @@ std::string this_thread::get_name()
   }
 #else
   char name[65];
-  int result = pthread_getname_np(pthread_self(), name, sizeof(name)-1);
+  const int result = pthread_getname_np(pthread_self(), name, sizeof(name)-1);
   if (result == 0) { // Returns 0 if it was successful
     // pthread_getname_np() returns a null terminated name.
     return std::string(name);

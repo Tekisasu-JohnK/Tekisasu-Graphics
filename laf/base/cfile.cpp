@@ -231,7 +231,7 @@ int fputq(long long l, FILE* file)
 // Returns 0 in success or -1 in error
 int fputf(float l, FILE* file)
 {
-  int b = *(reinterpret_cast<int*>(&l));
+  const int b = *(reinterpret_cast<int*>(&l));
   int b1, b2, b3, b4;
 
   // Little endian.
@@ -254,7 +254,7 @@ int fputf(float l, FILE* file)
 // Returns 0 in success or -1 in error
 int fputd(double l, FILE* file)
 {
-  long long b = *(reinterpret_cast<long long*>(&l));
+  const long long b = *(reinterpret_cast<long long*>(&l));
   int b1, b2, b3, b4, b5, b6, b7, b8;
 
   // Little endian.

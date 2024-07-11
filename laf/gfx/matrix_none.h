@@ -1,5 +1,5 @@
 // LAF Gfx Library
-// Copyright (c) 2020-2023  Igara Studio S.A.
+// Copyright (c) 2020-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -7,6 +7,8 @@
 #ifndef GFX_MATRIX_NONE_H_INCLUDED
 #define GFX_MATRIX_NONE_H_INCLUDED
 #pragma once
+
+#include "gfx/rect.h"
 
 namespace gfx {
 

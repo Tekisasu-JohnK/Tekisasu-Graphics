@@ -277,13 +277,12 @@ public:
   RectT createUnion(const RectT& rc) const {
     if (isEmpty())
       return rc;
-    else if (rc.isEmpty())
+    if (rc.isEmpty())
       return *this;
-    else
-      return RectT(PointT<T>(x < rc.x ? x: rc.x,
-                             y < rc.y ? y: rc.y),
-                   PointT<T>(x+w > rc.x+rc.w ? x+w: rc.x+rc.w,
-                             y+h > rc.y+rc.h ? y+h: rc.y+rc.h));
+    return RectT(PointT<T>(x < rc.x ? x: rc.x,
+                           y < rc.y ? y: rc.y),
+                 PointT<T>(x+w > rc.x+rc.w ? x+w: rc.x+rc.w,
+                           y+h > rc.y+rc.h ? y+h: rc.y+rc.h));
   }
 
   // Returns the intersection rectangle between this and rc rectangles.
@@ -293,8 +292,7 @@ public:
                              y > rc.y ? y: rc.y),
                    PointT<T>(x+w < rc.x+rc.w ? x+w: rc.x+rc.w,
                              y+h < rc.y+rc.h ? y+h: rc.y+rc.h));
-    else
-      return RectT();
+    return RectT();
   }
 
   const RectT& operator+=(const BorderT<T>& br) {

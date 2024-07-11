@@ -67,23 +67,23 @@ static void LOGva(const char* format, va_list ap)
 {
   va_list apTmp;
   va_copy(apTmp, ap);
-  int size = std::vsnprintf(nullptr, 0, format, apTmp);
+  const int size = std::vsnprintf(nullptr, 0, format, apTmp);
   va_end(apTmp);
   if (size < 1)
     return;                     // Nothing to log
 
   std::vector<char> buf(size+1);
-  std::vsnprintf(&buf[0], buf.size(), format, ap);
+  std::vsnprintf(buf.data(), buf.size(), format, ap);
 
   {
-    std::lock_guard lock(log_mutex);
+    const std::lock_guard lock(log_mutex);
     ASSERT(log_ostream);
-    log_ostream->write(&buf[0], size);
+    log_ostream->write(buf.data(), size);
     log_ostream->flush();
   }
 
 #ifdef _DEBUG
-  fputs(&buf[0], stderr);
+  fputs(buf.data(), stderr);
   fflush(stderr);
 #endif
 }

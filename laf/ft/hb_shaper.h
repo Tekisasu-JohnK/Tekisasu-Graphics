@@ -61,8 +61,7 @@ namespace ft {
     int next() {
       if (++m_index < m_glyphCount)
         return m_glyphInfo[m_index].codepoint;
-      else
-        return 0;
+      return 0;
     }
 
     int unicodeChar() const {

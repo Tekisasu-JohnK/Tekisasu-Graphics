@@ -140,13 +140,11 @@ Region::Overlap Region::contains(const Rect& rect) const
       assert(false); // Impossible state? RectInRegion() said true above
       return Out;
     }
-    else if (EqualRgn(tmp.m_hrgn, rectRgn.m_hrgn))
+    if (EqualRgn(tmp.m_hrgn, rectRgn.m_hrgn))
       return In;
-    else
-      return Part;
+    return Part;
   }
-  else
-    return Out;
+  return Out;
 }
 
 void Region::resetData() const

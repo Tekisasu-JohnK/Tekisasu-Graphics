@@ -66,9 +66,7 @@ std::string get_errno_string(int errnum)
       && errors[errnum] != NULL) {
     return errors[errnum];
   }
-  else {
-    return "Unknown error";
-  }
+  return "Unknown error";
 }
 
 } // namespace base

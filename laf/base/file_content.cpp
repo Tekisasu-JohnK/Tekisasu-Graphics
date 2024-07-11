@@ -30,9 +30,9 @@ buffer read_file_content(FILE* file)
   buffer buf;
   size_t pos = 0;
 
-  while (!std::feof(file)) {
+  while (std::feof(file) == 0) {
     buf.resize(buf.size() + kChunkSize);
-    size_t read_bytes = std::fread(&buf[pos], 1, kChunkSize, file);
+    const size_t read_bytes = std::fread(&buf[pos], 1, kChunkSize, file);
     pos += read_bytes;
     if (read_bytes < kChunkSize) {
       buf.resize(pos);
@@ -45,11 +45,10 @@ buffer read_file_content(FILE* file)
 
 buffer read_file_content(const std::string& filename)
 {
-  FileHandle f(open_file(filename, "rb"));
+  const FileHandle f(open_file(filename, "rb"));
   if (f)
     return read_file_content(f.get());
-  else
-    return buffer();
+  return buffer();
 }
 
 void write_file_content(FILE* file, const uint8_t* buf, size_t size)
@@ -66,7 +65,7 @@ void write_file_content(FILE* file, const uint8_t* buf, size_t size)
 
 void write_file_content(const std::string& filename, const uint8_t* buf, size_t size)
 {
-  FileHandle f(open_file(filename, "wb"));
+  const FileHandle f(open_file(filename, "wb"));
   if (f)
     write_file_content(f.get(), buf, size);
 }

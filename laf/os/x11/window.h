@@ -43,7 +43,7 @@ public:
   os::ColorSpaceRef colorSpace() const override;
 
   int scale() const override { return m_scale; }
-  void setScale(const int scale) override;
+  void setScale(int scale) override;
 
   bool isVisible() const override;
   void setVisible(bool visible) override;
@@ -75,7 +75,7 @@ public:
   bool setCursor(NativeCursor cursor) override;
   bool setCursor(const CursorRef& cursor) override;
 
-  void performWindowAction(const WindowAction action,
+  void performWindowAction(WindowAction action,
                            const Event* event) override;
 
   ::Display* x11display() const { return m_display; }

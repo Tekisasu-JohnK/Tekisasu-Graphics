@@ -89,6 +89,11 @@ endif()
 
 add_library(laf-os ${LAF_OS_SOURCES})
 target_link_libraries(laf-os laf-gfx laf-base)
+if(LAF_WITH_CLIP)
+  target_link_libraries(laf-os clip)
+  target_compile_definitions(laf-os PUBLIC
+    LAF_WITH_CLIP)
+endif()
 if(FREETYPE_LIBRARIES AND HARFBUZZ_LIBRARIES)
   target_link_libraries(laf-os laf-ft)
   target_compile_definitions(laf-os PRIVATE

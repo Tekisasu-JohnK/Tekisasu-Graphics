@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2024 Igara Studio S.A.
 // Copyright (c) 2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -47,10 +47,10 @@ std::string get_dll_filename(dll lib)
 {
   std::vector<wchar_t> buf(MAX_PATH);
   if (get_dll_filename_wchar(lib, buf) &&
-      buf.size() > 1)           // One char for the null char
-    return to_utf8(&buf[0], (int)buf.size()-1);
-  else
-    return std::string();
+      buf.size() > 1) {           // One char for the null char
+    return to_utf8(&buf[0], buf.size()-1);
+  }
+  return std::string();
 }
 
 Version get_dll_version(dll lib)
@@ -58,8 +58,7 @@ Version get_dll_version(dll lib)
   std::vector<wchar_t> buf(MAX_PATH);
   if (get_dll_filename_wchar(lib, buf))
     return get_file_version(&buf[0]);
-  else
-    return Version();
+  return Version();
 }
 
 } // namespace base

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -45,6 +45,7 @@
 #include "app/ui_context.h"
 #include "app/util/expand_cel_canvas.h"
 #include "app/util/layer_utils.h"
+#include "doc/brush.h"
 #include "doc/cel.h"
 #include "doc/image.h"
 #include "doc/layer.h"
@@ -188,6 +189,33 @@ public:
     ASSERT(m_tool);
     ASSERT(m_ink);
     ASSERT(m_controller);
+
+    // If the user right-clicks with a custom/image brush we change
+    // the image's colors of the brush to the background color.
+    //
+    // This is different from SwitchColors that makes a new brush
+    // switching fg <-> bg colors, so here we have some extra
+    // functionality with custom brushes (quickly convert the custom
+    // brush with a plain color, or in other words, replace the custom
+    // brush area with the background color).
+    if (m_brush->type() == kImageBrushType && m_button == Right) {
+      // We've to recalculate the background color to use for the
+      // brush using the specific brush image pixel format/color mode,
+      // as we cannot use m_primaryColor or m_bgColor here because
+      // those are in the sprite pixel format/color mode.
+      const color_t brushColor =
+        color_utils::color_for_target_mask(
+          Preferences::instance().colorBar.bgColor(),
+          ColorTarget(ColorTarget::TransparentLayer,
+                      m_brush->image()->pixelFormat(),
+                      -1));
+
+      // Clone the brush with new images to avoid modifying the
+      // current brush used in left-click / brush preview.
+      BrushRef newBrush = m_brush->cloneWithNewImages();
+      newBrush->setImageColor(Brush::ImageColor::BothColors, brushColor);
+      m_brush = newBrush;
+    }
 
     if (m_tilesMode) {
       // Use FloodFillPointShape or TilePointShape in tiles mode
@@ -452,8 +480,8 @@ protected:
 //////////////////////////////////////////////////////////////////////
 // For drawing
 
-class ToolLoopImpl : public ToolLoopBase,
-                     public EditorObserver {
+class ToolLoopImpl final : public ToolLoopBase,
+                           public EditorObserver {
   Context* m_context;
   bool m_filled;
   bool m_previewFilled;
@@ -477,7 +505,9 @@ public:
                const bool saveLastPoint)
     : ToolLoopBase(editor, site, grid, params)
     , m_context(context)
-    , m_tx(m_context,
+    , m_tx(Tx::DontLockDoc,
+           m_context,
+           m_context->activeDocument(),
            m_tool->getText().c_str(),
            ((m_ink->isSelection() ||
              m_ink->isEyedropper() ||
@@ -515,6 +545,9 @@ public:
       }
     }
 
+    // 'isSelectionPreview = true' if the intention is to show a preview
+    // of Selection tools or Slice tool.
+    const bool isSelectionPreview = m_ink->isSelection() || m_ink->isSlice();
     m_expandCelCanvas.reset(new ExpandCelCanvas(
       site, m_layer,
       m_docPref.tiled.mode(),
@@ -528,10 +561,10 @@ public:
         (m_layer->isTilemap() &&
          site.tilemapMode() == TilemapMode::Pixels &&
          site.tilesetMode() == TilesetMode::Manual &&
-         !m_ink->isSelection() ? ExpandCelCanvas::TilesetPreview:
-                                 ExpandCelCanvas::None) |
-        (m_ink->isSelection() ? ExpandCelCanvas::SelectionPreview:
-                                ExpandCelCanvas::None))));
+         !isSelectionPreview ? ExpandCelCanvas::TilesetPreview:
+                               ExpandCelCanvas::None) |
+        (isSelectionPreview ? ExpandCelCanvas::SelectionPreview:
+                              ExpandCelCanvas::None))));
 
     if (!m_floodfillSrcImage)
       m_floodfillSrcImage = const_cast<Image*>(getSrcImage());
@@ -553,7 +586,7 @@ public:
     m_sprayWidth = m_toolPref.spray.width();
     m_spraySpeed = m_toolPref.spray.speed();
 
-    if (m_ink->isSelection()) {
+    if (isSelectionPreview) {
       m_useMask = false;
     }
     else {
@@ -561,7 +594,7 @@ public:
     }
 
     // Start with an empty mask if the user is selecting with "default selection mode"
-    if (m_ink->isSelection() &&
+    if (isSelectionPreview &&
         (!m_document->isMaskVisible() ||
          (int(getModifiers()) & int(tools::ToolLoopModifiers::kReplaceSelection)))) {
       Mask emptyMask;
@@ -590,6 +623,9 @@ public:
       m_editor->remove_observer(this);
 #endif
 
+    // getSrcImage() is a virtual member function but ToolLoopImpl is
+    // marked as final to avoid not calling a derived version from
+    // this destructor.
     if (m_floodfillSrcImage != getSrcImage())
       delete m_floodfillSrcImage;
   }
@@ -952,7 +988,7 @@ tools::ToolLoop* create_tool_loop_for_script(
 
 #ifdef ENABLE_UI
 
-class PreviewToolLoopImpl : public ToolLoopBase {
+class PreviewToolLoopImpl final : public ToolLoopBase {
   Image* m_image;
 
 public:

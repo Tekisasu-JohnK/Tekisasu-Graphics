@@ -1,8 +1,8 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <errno.h>
-#include "config.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "cmark.h"
 #include "node.h"
 
@@ -28,7 +28,7 @@ typedef enum {
   FORMAT_LATEX
 } writer_format;
 
-void print_usage() {
+void print_usage(void) {
   printf("Usage:   cmark [FILE*]\n");
   printf("Options:\n");
   printf("  --to, -t FORMAT  Specify output format (html, xml, man, "
@@ -69,7 +69,7 @@ static void print_document(cmark_node *document, writer_format writer,
     fprintf(stderr, "Unknown format %d\n", writer);
     exit(1);
   }
-  printf("%s", result);
+  fwrite(result, strlen(result), 1, stdout);
   document->mem->free(result);
 }
 

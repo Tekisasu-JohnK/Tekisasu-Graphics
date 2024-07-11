@@ -261,6 +261,8 @@
     case os::NativeCursor::SizeW:
       nsCursor = [NSCursor resizeLeftCursor];
       break;
+    default:
+      break;
   }
 
   [self.contentView setCursor:nsCursor];

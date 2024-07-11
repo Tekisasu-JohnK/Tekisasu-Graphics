@@ -2,6 +2,8 @@
 # Copyright (C) 2016  David Capello
 # Find tests and add rules to compile them and run them
 
+add_custom_target(laf-tests)
+
 function(laf_find_tests dir dependencies)
   file(GLOB tests ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/*_tests.cpp)
   list(REMOVE_AT ARGV 0)
@@ -14,6 +16,7 @@ function(laf_find_tests dir dependencies)
 
     add_executable(${testname} ${testsourcefile})
     add_test(NAME ${testname} COMMAND ${testname})
+    add_dependencies(laf-tests ${testname})
 
     if(MSVC)
       set_target_properties(${testname}

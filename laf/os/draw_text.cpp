@@ -35,7 +35,7 @@ retry:;
   if (font->fallback()) {
     // TODO compose unicode characters and check those codepoints, the
     //      same in the drawing code of sprite sheet font
-    while (uint32_t code = decode.next()) {
+    while (const uint32_t code = decode.next()) {
       if (code && !font->hasCodePoint(code)) {
         Font* newFont = font->fallback();
 
@@ -75,8 +75,8 @@ retry:;
         if (!chr)
           break;
 
-        gfx::Rect charBounds = ssFont->getCharBounds(chr);
-        gfx::Rect outCharBounds(x, y, charBounds.w, charBounds.h);
+        const gfx::Rect charBounds = ssFont->getCharBounds(chr);
+        const gfx::Rect outCharBounds(x, y, charBounds.w, charBounds.h);
 
         if (delegate)
           delegate->preProcessChar(i, chr, fg, bg, outCharBounds);
@@ -105,7 +105,7 @@ retry:;
 
     case FontType::FreeType: {
       FreeTypeFont* ttFont = static_cast<FreeTypeFont*>(font);
-      int fg_alpha = gfx::geta(fg);
+      const int fg_alpha = gfx::geta(fg);
 
       gfx::Rect clipBounds;
       os::SurfaceFormatData fd;
@@ -118,7 +118,7 @@ retry:;
       ft::ForEachGlyph<FreeTypeFont::Face> feg(ttFont->face(), text);
       while (feg.next()) {
         gfx::Rect origDstBounds;
-        auto glyph = feg.glyph();
+        const auto* glyph = feg.glyph();
         if (glyph)
           origDstBounds = gfx::Rect(
             x + int(glyph->startX),
@@ -148,7 +148,7 @@ retry:;
           dstBounds &= clipBounds;
 
         if (surface && !dstBounds.isEmpty()) {
-          int clippedRows = dstBounds.y - origDstBounds.y;
+          const int clippedRows = dstBounds.y - origDstBounds.y;
           int dst_y = dstBounds.y;
           int t;
           for (int v=0; v<dstBounds.h; ++v, ++dst_y) {
@@ -170,7 +170,7 @@ retry:;
                 ++p;
               }
               else if (glyph->bitmap->pixel_mode == FT_PIXEL_MODE_MONO) {
-                if (bit == 8) {
+                if (++bit == 8) {
                   bit = 0;
                   ++p;
                 }
@@ -192,8 +192,8 @@ retry:;
                 }
               }
 
-              uint32_t backdrop = *dst_address;
-              gfx::Color backdropColor =
+              const uint32_t backdrop = *dst_address;
+              const gfx::Color backdropColor =
                 gfx::rgba(
                   ((backdrop & fd.redMask) >> fd.redShift),
                   ((backdrop & fd.greenMask) >> fd.greenShift),

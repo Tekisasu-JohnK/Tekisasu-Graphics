@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -49,8 +49,8 @@ namespace app {
 
 class SaveFileJob : public Job, public IFileOpProgress {
 public:
-  SaveFileJob(FileOp* fop)
-    : Job(Strings::save_file_saving().c_str())
+  SaveFileJob(FileOp* fop, const bool showProgressBar)
+    : Job(Strings::save_file_saving(), showProgressBar)
     , m_fop(fop)
   {
   }
@@ -100,11 +100,11 @@ void SaveFileBaseCommand::onLoadParams(const Params& params)
       this->params().toFrame.isSet()) {
     doc::frame_t fromFrame = this->params().fromFrame();
     doc::frame_t toFrame = this->params().toFrame();
-    m_selFrames.insert(fromFrame, toFrame);
+    m_framesSeq.insert(fromFrame, toFrame);
     m_adjustFramesByTag = true;
   }
   else {
-    m_selFrames.clear();
+    m_framesSeq.clear();
     m_adjustFramesByTag = false;
   }
 }
@@ -212,21 +212,6 @@ void SaveFileBaseCommand::saveDocumentInBackground(
   }
 #endif // ENABLE_UI
 
-  if (params().aniDir.isSet()) {
-    switch (params().aniDir()) {
-      case AniDir::REVERSE:
-        m_selFrames = m_selFrames.makeReverse();
-        break;
-      case AniDir::PING_PONG:
-        m_selFrames = m_selFrames.makePingPong();
-        break;
-      case AniDir::PING_PONG_REVERSE:
-        m_selFrames = m_selFrames.makePingPong();
-        m_selFrames = m_selFrames.makeReverse();
-        break;
-    }
-  }
-
   gfx::Rect bounds;
   if (params().bounds.isSet()) {
     // Export the specific given bounds (e.g. the selection bounds)
@@ -239,7 +224,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
 
   FileOpROI roi(document, bounds,
                 params().slice(), params().tag(),
-                m_selFrames, m_adjustFramesByTag);
+                m_framesSeq, m_adjustFramesByTag);
 
   std::unique_ptr<FileOp> fop(
     FileOp::createSaveDocumentOperation(
@@ -254,7 +239,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
   if (resizeOnTheFly == ResizeOnTheFly::On)
     fop->setOnTheFlyScale(scale);
 
-  SaveFileJob job(fop.get());
+  SaveFileJob job(fop.get(), params().ui());
   job.showProgressWindow();
 
   if (fop->hasError()) {
@@ -272,7 +257,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
     document->impossibleToBackToSavedState();
   }
   else {
-    if (context->isUIAvailable() && params().ui())
+    if (should_add_file_to_recents(context, params()))
       App::instance()->recentFiles()->addRecentFile(filename);
 
     if (markAsSaved == MarkAsSaved::On) {
@@ -385,6 +370,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
   double scale = params().scale();
   gfx::Rect bounds = params().bounds();
   doc::AniDir aniDirValue = params().aniDir();
+  bool isPlaySubtags = params().playSubtags();
   bool isForTwitter = false;
 
 #if ENABLE_UI
@@ -462,6 +448,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
     applyPixelRatio = win.applyPixelRatio();
     aniDirValue = win.aniDirValue();
     isForTwitter = win.isForTwitter();
+    isPlaySubtags = win.isPlaySubtags();
   }
 #endif
 
@@ -518,14 +505,14 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
 
       // m_selFrames is not empty if fromFrame/toFrame parameters are
       // specified.
-      if (m_selFrames.empty()) {
-        // Selected frames to export
-        SelectedFrames selFrames;
-        Tag* tag = calculate_selected_frames(
-          site, frames, selFrames);
+      if (m_framesSeq.empty()) {
+        // Frames sequence to export
+        FramesSequence framesSeq;
+        Tag* tag = calculate_frames_sequence(
+          site, frames, framesSeq, isPlaySubtags, aniDirValue);
         if (tag)
           params().tag(tag->name());
-        m_selFrames = selFrames;
+        m_framesSeq = framesSeq;
       }
       m_adjustFramesByTag = false;
     }
@@ -534,6 +521,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
     params().aniDir(aniDirValue);
     if (!bounds.isEmpty())
       params().bounds(bounds);
+    params().playSubtags(isPlaySubtags);
 
     // TODO This should be set as options for the specific encoder
     GifEncoderDurationFix fixGif(isForTwitter);

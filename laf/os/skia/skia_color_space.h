@@ -22,7 +22,7 @@ public:
   const gfx::ColorSpaceRef& gfxColorSpace() const override { return m_gfxcs; }
   sk_sp<SkColorSpace> skColorSpace() const { return m_skcs; }
 
-  const bool isSRGB() const override { return m_skcs->isSRGB(); }
+  bool isSRGB() const override { return m_skcs->isSRGB(); }
 
 private:
   gfx::ColorSpaceRef m_gfxcs;

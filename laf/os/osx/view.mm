@@ -69,6 +69,8 @@ Event::MouseButton get_mouse_buttons(NSEvent* event)
     case NSEventTypeRightMouseUp:
     case NSEventTypeRightMouseDragged:
       return Event::RightButton;
+    default:
+      break;
   }
 
   switch (event.buttonNumber) {
@@ -661,6 +663,10 @@ using namespace os;
     NSArray* filenames = [pasteboard propertyListForType:NSFilenamesPboardType];
 
     os::Event ev = generate_drop_files_from_nsarray(filenames);
+    NSRect contentRect = [sender.draggingDestinationWindow contentRectForFrameRect: sender.draggingDestinationWindow.frame];
+    ev.setPosition(gfx::Point(
+      sender.draggingLocation.x,
+      contentRect.size.height - sender.draggingLocation.y));
     [self queueEvent:ev];
     return YES;
   }

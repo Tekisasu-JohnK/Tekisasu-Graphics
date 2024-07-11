@@ -20,7 +20,7 @@ namespace {
     is_separator(const std::string* seps) : separators(seps) {
     }
 
-    bool operator()(std::string::value_type chr)
+    bool operator()(std::string::value_type chr) const
     {
       for (std::string::const_iterator
              it = separators->begin(),
@@ -38,7 +38,9 @@ void base::split_string(const std::string& string,
                         std::vector<std::string>& parts,
                         const std::string& separators)
 {
-  std::size_t elements = 1 + std::count_if(string.begin(), string.end(), is_separator(&separators));
+  const std::size_t elements =
+    1 + std::count_if(string.begin(), string.end(),
+                      is_separator(&separators));
   parts.reserve(elements);
 
   std::size_t beg = 0, end;

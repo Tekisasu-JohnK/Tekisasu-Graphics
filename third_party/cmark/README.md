@@ -59,8 +59,9 @@ There are also libraries that wrap `libcmark` for
 [Lua](https://github.com/jgm/cmark-lua),
 [Perl](https://metacpan.org/release/CommonMark),
 [Python](https://pypi.python.org/pypi/paka.cmark),
-[R](https://cran.r-project.org/package=commonmark) and
-[Scala](https://github.com/sparsetech/cmark-scala).
+[R](https://cran.r-project.org/package=commonmark),
+[Scala](https://github.com/sparsetech/cmark-scala) and
+[PHP](https://www.php.net/manual/en/book.cmark.php).
 
 Installing
 ----------
@@ -122,12 +123,9 @@ To do a more systematic fuzz test with [american fuzzy lop]:
 
     AFL_PATH=/path/to/afl_directory make afl
 
-Fuzzing with [libFuzzer] is also supported but, because libFuzzer is still
-under active development, may not work with your system-installed version of
-clang. Assuming LLVM has been built in `$HOME/src/llvm/build` the fuzzer can be
-run with:
+Fuzzing with [libFuzzer] is also supported. The fuzzer can be run with:
 
-    CC="$HOME/src/llvm/build/bin/clang" LIB_FUZZER_PATH="$HOME/src/llvm/lib/Fuzzer/libFuzzer.a" make libFuzzer
+    make libFuzzer
 
 To make a release tarball and zip archive:
 
@@ -138,7 +136,7 @@ Installing (Windows)
 
 To compile with MSVC and NMAKE:
 
-    nmake
+    nmake /f Makefile.nmake
 
 You can cross-compile a Windows binary and dll on linux if you have the
 `mingw32` compiler:
@@ -192,7 +190,5 @@ most of the C library's API and its test harness.
 [cmake]: http://www.cmake.org/download/
 [re2c]: http://re2c.org
 [commonmark.js]: https://github.com/commonmark/commonmark.js
-[Build Status]: https://img.shields.io/travis/commonmark/cmark/master.svg?style=flat
-[Windows Build Status]: https://ci.appveyor.com/api/projects/status/h3fd91vtd1xfmp69?svg=true
 [american fuzzy lop]: http://lcamtuf.coredump.cx/afl/
 [libFuzzer]: http://llvm.org/docs/LibFuzzer.html

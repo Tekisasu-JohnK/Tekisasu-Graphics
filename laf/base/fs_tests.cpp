@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2024 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -6,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include "base/file_content.h"
 #include "base/fs.h"
 
 using namespace base;
@@ -45,96 +47,131 @@ TEST(FS, MakeAllDirectories)
 
 TEST(FS, IsPathSeparator)
 {
-  EXPECT_TRUE (is_path_separator('\\'));
   EXPECT_TRUE (is_path_separator('/'));
   EXPECT_FALSE(is_path_separator('a'));
   EXPECT_FALSE(is_path_separator('+'));
   EXPECT_FALSE(is_path_separator(':'));
+
+#if LAF_WINDOWS
+  EXPECT_TRUE (is_path_separator('\\'));
+#else
+  EXPECT_FALSE(is_path_separator('\\'));
+#endif
 }
 
 TEST(FS, GetFilePath)
 {
-  EXPECT_EQ("C:\\foo",  get_file_path("C:\\foo\\main.cpp"));
   EXPECT_EQ("C:/foo",   get_file_path("C:/foo/pack.tar.gz"));
   EXPECT_EQ(".",        get_file_path("./main.cpp"));
-  EXPECT_EQ(".",        get_file_path(".\\main.cpp"));
   EXPECT_EQ("",         get_file_path("\\main.cpp"));
   EXPECT_EQ("",         get_file_path("main.cpp"));
   EXPECT_EQ("",         get_file_path("main."));
   EXPECT_EQ("",         get_file_path("main"));
   EXPECT_EQ("C:/foo",   get_file_path("C:/foo/"));
-  EXPECT_EQ("C:",       get_file_path("C:\\"));
-  EXPECT_EQ("C:",       get_file_path("C:\\.cpp"));
   EXPECT_EQ("",         get_file_path(".cpp"));
   EXPECT_EQ("",         get_file_path(""));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("C:\\foo",  get_file_path("C:\\foo\\main.cpp"));
+  EXPECT_EQ(".",        get_file_path(".\\main.cpp"));
+  EXPECT_EQ("C:",       get_file_path("C:\\"));
+  EXPECT_EQ("C:",       get_file_path("C:\\.cpp"));
+#else
+  EXPECT_EQ("",         get_file_path("C:\\foo\\main.cpp"));
+  EXPECT_EQ("",         get_file_path(".\\main.cpp"));
+  EXPECT_EQ("",         get_file_path("C:\\"));
+  EXPECT_EQ("",         get_file_path("C:\\.cpp"));
+#endif
 }
 
 TEST(FS, GetFileName)
 {
-  EXPECT_EQ("main.cpp",         get_file_name("C:\\foo\\main.cpp"));
   EXPECT_EQ("pack.tar.gz",      get_file_name("C:/foo/pack.tar.gz"));
   EXPECT_EQ("main.cpp",         get_file_name("./main.cpp"));
-  EXPECT_EQ("main.cpp",         get_file_name(".\\main.cpp"));
-  EXPECT_EQ("main.cpp",         get_file_name("\\main.cpp"));
   EXPECT_EQ("main.cpp",         get_file_name("main.cpp"));
   EXPECT_EQ("main.",            get_file_name("main."));
   EXPECT_EQ("main",             get_file_name("main"));
   EXPECT_EQ("",                 get_file_name("C:/foo/"));
-  EXPECT_EQ("",                 get_file_name("C:\\"));
-  EXPECT_EQ(".cpp",             get_file_name("C:\\.cpp"));
   EXPECT_EQ(".cpp",             get_file_name(".cpp"));
   EXPECT_EQ("",                 get_file_name(""));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("main.cpp",         get_file_name("C:\\foo\\main.cpp"));
+  EXPECT_EQ("main.cpp",         get_file_name(".\\main.cpp"));
+  EXPECT_EQ("main.cpp",         get_file_name("\\main.cpp"));
+  EXPECT_EQ("",                 get_file_name("C:\\"));
+  EXPECT_EQ(".cpp",             get_file_name("C:\\.cpp"));
+#else
+  EXPECT_EQ("C:\\foo\\main.cpp", get_file_name("C:\\foo\\main.cpp"));
+  EXPECT_EQ(".\\main.cpp",      get_file_name(".\\main.cpp"));
+  EXPECT_EQ("\\main.cpp",       get_file_name("\\main.cpp"));
+  EXPECT_EQ("C:\\",             get_file_name("C:\\"));
+  EXPECT_EQ("C:\\.cpp",         get_file_name("C:\\.cpp"));
+#endif
 }
 
 TEST(FS, GetFileExtension)
 {
-  EXPECT_EQ("cpp",      get_file_extension("C:\\foo\\main.cpp"));
   EXPECT_EQ("gz",       get_file_extension("C:/foo/pack.tar.gz"));
   EXPECT_EQ("cpp",      get_file_extension("./main.cpp"));
-  EXPECT_EQ("cpp",      get_file_extension(".\\main.cpp"));
-  EXPECT_EQ("cpp",      get_file_extension("\\main.cpp"));
   EXPECT_EQ("cpp",      get_file_extension("main.cpp"));
   EXPECT_EQ("",         get_file_extension("main."));
   EXPECT_EQ("",         get_file_extension("main"));
   EXPECT_EQ("",         get_file_extension("C:/foo/"));
-  EXPECT_EQ("",         get_file_extension("C:\\"));
-  EXPECT_EQ("cpp",      get_file_extension("C:\\.cpp"));
   EXPECT_EQ("cpp",      get_file_extension(".cpp"));
   EXPECT_EQ("",         get_file_extension(""));
+
+  // Same results on Windows/macOS/Linux
+  EXPECT_EQ("cpp",      get_file_extension("C:\\foo\\main.cpp"));
+  EXPECT_EQ("cpp",      get_file_extension(".\\main.cpp"));
+  EXPECT_EQ("cpp",      get_file_extension("\\main.cpp"));
+  EXPECT_EQ("",         get_file_extension("C:\\"));
+  EXPECT_EQ("cpp",      get_file_extension("C:\\.cpp"));
 }
 
 TEST(FS, GetFileTitle)
 {
-  EXPECT_EQ("main",     get_file_title("C:\\foo\\main.cpp"));
   EXPECT_EQ("pack.tar", get_file_title("C:/foo/pack.tar.gz"));
   EXPECT_EQ("main",     get_file_title("./main.cpp"));
-  EXPECT_EQ("main",     get_file_title(".\\main.cpp"));
-  EXPECT_EQ("main",     get_file_title("\\main.cpp"));
   EXPECT_EQ("main",     get_file_title("main.cpp"));
   EXPECT_EQ("main",     get_file_title("main."));
   EXPECT_EQ("main",     get_file_title("main"));
   EXPECT_EQ("",         get_file_title("C:/foo/"));
-  EXPECT_EQ("",         get_file_title("C:\\"));
-  EXPECT_EQ("",         get_file_title("C:\\.cpp"));
   EXPECT_EQ("",         get_file_title(".cpp"));
   EXPECT_EQ("",         get_file_title(""));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("main",     get_file_title("C:\\foo\\main.cpp"));
+  EXPECT_EQ("main",     get_file_title(".\\main.cpp"));
+  EXPECT_EQ("main",     get_file_title("\\main.cpp"));
+  EXPECT_EQ("",         get_file_title("C:\\"));
+  EXPECT_EQ("",         get_file_title("C:\\.cpp"));
+#else
+  EXPECT_EQ("C:\\foo\\main", get_file_title("C:\\foo\\main.cpp"));
+  EXPECT_EQ(".\\main",  get_file_title(".\\main.cpp"));
+  EXPECT_EQ("\\main",   get_file_title("\\main.cpp"));
+  EXPECT_EQ("C:\\",     get_file_title("C:\\"));
+  EXPECT_EQ("C:\\",     get_file_title("C:\\.cpp"));
+#endif
 }
 
 TEST(FS, GetFileTitleWithPath)
 {
-  EXPECT_EQ("C:\\foo\\main",   get_file_title_with_path("C:\\foo\\main.cpp"));
   EXPECT_EQ("C:/foo/pack.tar", get_file_title_with_path("C:/foo/pack.tar.gz"));
   EXPECT_EQ("./main",          get_file_title_with_path("./main.cpp"));
-  EXPECT_EQ(".\\main",         get_file_title_with_path(".\\main.cpp"));
-  EXPECT_EQ("\\main",          get_file_title_with_path("\\main.cpp"));
   EXPECT_EQ("main",            get_file_title_with_path("main.cpp"));
   EXPECT_EQ("main",            get_file_title_with_path("main."));
   EXPECT_EQ("main",            get_file_title_with_path("main"));
   EXPECT_EQ("C:/foo/",         get_file_title_with_path("C:/foo/"));
-  EXPECT_EQ("C:\\",            get_file_title_with_path("C:\\"));
-  EXPECT_EQ("C:\\",            get_file_title_with_path("C:\\.cpp"));
   EXPECT_EQ("",                get_file_title_with_path(".cpp"));
   EXPECT_EQ("",                get_file_title_with_path(""));
+
+  // Same results on Windows/macOS/Linux
+  EXPECT_EQ("C:\\foo\\main",   get_file_title_with_path("C:\\foo\\main.cpp"));
+  EXPECT_EQ(".\\main",         get_file_title_with_path(".\\main.cpp"));
+  EXPECT_EQ("\\main",          get_file_title_with_path("\\main.cpp"));
+  EXPECT_EQ("C:\\",            get_file_title_with_path("C:\\"));
+  EXPECT_EQ("C:\\",            get_file_title_with_path("C:\\.cpp"));
 }
 
 TEST(FS, JoinPath)
@@ -146,16 +183,26 @@ TEST(FS, JoinPath)
   EXPECT_EQ("fn",                       join_path("", "fn"));
   EXPECT_EQ("/fn",                      join_path("/", "fn"));
   EXPECT_EQ("/this"+sep+"fn",           join_path("/this", "fn"));
+
   EXPECT_EQ("C:\\path"+sep+"fn",        join_path("C:\\path", "fn"));
+#if LAF_WINDOWS
   EXPECT_EQ("C:\\path\\fn",             join_path("C:\\path\\", "fn"));
+#else
+  EXPECT_EQ("C:\\path\\/fn",            join_path("C:\\path\\", "fn"));
+#endif
 }
 
 TEST(FS, RemovePathSeparator)
 {
-  EXPECT_EQ("C:\\foo",                  remove_path_separator("C:\\foo\\"));
   EXPECT_EQ("C:/foo",                   remove_path_separator("C:/foo/"));
   EXPECT_EQ("C:\\foo\\main.cpp",        remove_path_separator("C:\\foo\\main.cpp"));
   EXPECT_EQ("C:\\foo\\main.cpp",        remove_path_separator("C:\\foo\\main.cpp/"));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("C:\\foo",                  remove_path_separator("C:\\foo\\"));
+#else
+  EXPECT_EQ("C:\\foo\\",                remove_path_separator("C:\\foo\\"));
+#endif
 }
 
 TEST(FS, HasFileExtension)
@@ -213,6 +260,20 @@ TEST(FS, CompareFilenames)
   EXPECT_EQ(1, compare_filenames("a1-2.png", "a1-1.png"));
   EXPECT_EQ(1, compare_filenames("a1-10.png", "a1-9.png"));
   EXPECT_EQ(1, compare_filenames("a1-64-10.png", "a1-64-9.png"));
+}
+
+TEST(FS, CopyFiles)
+{
+  std::vector<uint8_t> data = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd' };
+  const std::string dst = "_test_copy_.tmp";
+
+  if (base::is_file(dst))
+    base::delete_file(dst);
+
+  base::write_file_content("_test_orig_.tmp", data.data(), data.size());
+  base::copy_file("_test_orig_.tmp", dst, true);
+
+  EXPECT_EQ(data, base::read_file_content(dst));
 }
 
 int main(int argc, char** argv)

@@ -37,7 +37,7 @@ FT_Face Lib::open(const std::string& filename)
   LOG(VERBOSE, "FT: Loading font '%s'\n", filename.c_str());
 
   FT_Face face = nullptr;
-  FT_Error err = FT_Open_Face(m_ft, &args, 0, &face);
+  const FT_Error err = FT_Open_Face(m_ft, &args, 0, &face);
   if (!err)
     FT_Select_Charmap(face, FT_ENCODING_UNICODE);
   return face;

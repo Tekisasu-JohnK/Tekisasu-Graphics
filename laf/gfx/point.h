@@ -39,7 +39,7 @@ public:
   }
 
   template<typename U>
-  const PointT& operator=(const PointT<U>& pt) {
+  PointT& operator=(const PointT<U>& pt) {
     x = pt.x;
     y = pt.y;
     return *this;

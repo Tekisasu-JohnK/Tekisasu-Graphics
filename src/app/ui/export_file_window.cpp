@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -56,15 +56,26 @@ ExportFileWindow::ExportFileWindow(const Doc* doc)
   fill_layers_combobox(m_doc->sprite(), layers(), m_docPref.saveCopy.layer(), m_docPref.saveCopy.layerIndex());
   fill_frames_combobox(m_doc->sprite(), frames(), m_docPref.saveCopy.frameTag());
   fill_anidir_combobox(anidir(), m_docPref.saveCopy.aniDir());
-  pixelRatio()->setSelected(m_docPref.saveCopy.applyPixelRatio());
+
+  if (doc->sprite()->hasPixelRatio()) {
+    pixelRatio()->setSelected(m_docPref.saveCopy.applyPixelRatio());
+  }
+  else {
+    // Hide "Apply pixel ratio" checkbox when there is no pixel aspect
+    // ratio to apply.
+    pixelRatio()->setSelected(false);
+    pixelRatio()->setVisible(false);
+  }
+
   forTwitter()->setSelected(m_docPref.saveCopy.forTwitter());
   adjustResize()->setVisible(false);
-
+  playSubtags()->setSelected(m_docPref.saveCopy.playSubtags());
   // Here we don't call updateAniDir() because it's already filled and
   // set by the function fill_anidir_combobox(). So if the user
   // exported a tag with a specific AniDir, we want to keep the option
   // in the preference (instead of the tag's AniDir).
   //updateAniDir();
+  updatePlaySubtags();
 
   updateAdjustResizeButton();
 
@@ -82,7 +93,10 @@ ExportFileWindow::ExportFileWindow(const Doc* doc)
     });
 
   resize()->Change.connect([this]{ updateAdjustResizeButton(); });
-  frames()->Change.connect([this]{ updateAniDir(); });
+  frames()->Change.connect([this]{
+    updateAniDir();
+    updatePlaySubtags();
+  });
   forTwitter()->Click.connect([this]{ updateAdjustResizeButton(); });
   adjustResize()->Click.connect([this]{ onAdjustResize(); });
   ok()->Click.connect([this]{ onOK(); });
@@ -105,6 +119,7 @@ void ExportFileWindow::savePref()
   m_docPref.saveCopy.frameTag(framesValue());
   m_docPref.saveCopy.applyPixelRatio(applyPixelRatio());
   m_docPref.saveCopy.forTwitter(isForTwitter());
+  m_docPref.saveCopy.playSubtags(isPlaySubtags());
 }
 
 std::string ExportFileWindow::outputFilenameValue() const
@@ -143,6 +158,11 @@ std::string ExportFileWindow::framesValue() const
 doc::AniDir ExportFileWindow::aniDirValue() const
 {
   return (doc::AniDir)anidir()->getSelectedItemIndex();
+}
+
+bool ExportFileWindow::isPlaySubtags() const
+{
+  return playSubtags()->isSelected() && framesValue() != kSelectedFrames;
 }
 
 bool ExportFileWindow::applyPixelRatio() const
@@ -203,6 +223,15 @@ void ExportFileWindow::updateAniDir()
   }
   else
     anidir()->setSelectedItemIndex(int(doc::AniDir::FORWARD));
+}
+
+void ExportFileWindow::updatePlaySubtags()
+{
+  std::string framesValue = this->framesValue();
+  playSubtags()->setVisible(framesValue != kSelectedFrames &&
+                            // We hide the option if there is no tag
+                            !m_doc->sprite()->tags().empty());
+  layout();
 }
 
 void ExportFileWindow::updateAdjustResizeButton()

@@ -1,5 +1,5 @@
 // Aseprite Code Generator
-// Copyright (c) 2021-2023 Igara Studio S.A.
+// Copyright (c) 2021-2024 Igara Studio S.A.
 // Copyright (c) 2014-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -17,7 +17,8 @@
 #include <set>
 #include <vector>
 
-typedef std::vector<TiXmlElement*> XmlElements;
+using namespace tinyxml2;
+using XmlElements = std::vector<XMLElement*>;
 
 namespace {
 
@@ -36,15 +37,15 @@ struct Item {
 
 }
 
-static TiXmlElement* find_element_by_id(TiXmlElement* elem, const std::string& thisId)
+static XMLElement* find_element_by_id(XMLElement* elem, const std::string& thisId)
 {
   const char* id = elem->Attribute("id");
   if (id && id == thisId)
     return elem;
 
-  TiXmlElement* child = elem->FirstChildElement();
+  XMLElement* child = elem->FirstChildElement();
   while (child) {
-    TiXmlElement* match = find_element_by_id(child, thisId);
+    XMLElement* match = find_element_by_id(child, thisId);
     if (match)
       return match;
 
@@ -54,9 +55,9 @@ static TiXmlElement* find_element_by_id(TiXmlElement* elem, const std::string& t
   return NULL;
 }
 
-static void collect_widgets_with_ids(TiXmlElement* elem, XmlElements& widgets)
+static void collect_widgets_with_ids(XMLElement* elem, XmlElements& widgets)
 {
-  TiXmlElement* child = elem->FirstChildElement();
+  XMLElement* child = elem->FirstChildElement();
   while (child) {
     const char* id = child->Attribute("id");
     if (id)
@@ -66,7 +67,7 @@ static void collect_widgets_with_ids(TiXmlElement* elem, XmlElements& widgets)
   }
 }
 
-static Item convert_to_item(TiXmlElement* elem)
+static Item convert_to_item(XMLElement* elem)
 {
   static std::string parent;
   const std::string name = elem->Value();
@@ -157,6 +158,9 @@ static Item convert_to_item(TiXmlElement* elem)
   if (name == "slider")
     return item.typeIncl("ui::Slider",
                          "ui/slider.h");
+  if (name == "alphaslider" || name == "opacityslider")
+    return item.typeIncl("app::AlphaSlider",
+                         "app/ui/alpha_slider.h");
   if (name == "splitter")
     return item.typeIncl("ui::Splitter",
                          "ui/splitter.h");
@@ -179,7 +183,7 @@ static Item convert_to_item(TiXmlElement* elem)
   throw base::Exception("Unknown widget name: " + name);
 }
 
-void gen_ui_class(TiXmlDocument* doc,
+void gen_ui_class(XMLDocument* doc,
                   const std::string& inputFn,
                   const std::string& widgetId)
 {
@@ -187,8 +191,8 @@ void gen_ui_class(TiXmlDocument* doc,
     << "// Don't modify, generated file from " << inputFn << "\n"
     << "\n";
 
-  TiXmlHandle handle(doc);
-  TiXmlElement* elem = handle.FirstChild("gui").ToElement();
+  XMLHandle handle(doc);
+  XMLElement* elem = handle.FirstChildElement("gui").ToElement();
   elem = find_element_by_id(elem, widgetId);
   if (!elem) {
     std::cout << "#error Widget not found: " << widgetId << "\n";
@@ -199,7 +203,7 @@ void gen_ui_class(TiXmlDocument* doc,
   {
     XmlElements xmlWidgets;
     collect_widgets_with_ids(elem, xmlWidgets);
-    for (TiXmlElement* elem : xmlWidgets) {
+    for (XMLElement* elem : xmlWidgets) {
       const char* id = elem->Attribute("id");
       if (!id)
         continue;

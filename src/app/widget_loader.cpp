@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -17,6 +17,7 @@
 #include "app/i18n/strings.h"
 #include "app/modules/gui.h"
 #include "app/resource_finder.h"
+#include "app/ui/alpha_slider.h"
 #include "app/ui/button_set.h"
 #include "app/ui/color_button.h"
 #include "app/ui/drop_down_button.h"
@@ -33,7 +34,7 @@
 #include "os/system.h"
 #include "ui/ui.h"
 
-#include "tinyxml.h"
+#include "tinyxml2.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -43,11 +44,12 @@
 
 namespace app {
 
-using namespace ui;
 using namespace app::skin;
+using namespace tinyxml2;
+using namespace ui;
 
 static int convert_align_value_to_flags(const char *value);
-static int int_attr(const TiXmlElement* elem, const char* attribute_name, int default_value);
+static int int_attr(const XMLElement* elem, const char* attribute_name, int default_value);
 
 WidgetLoader::WidgetLoader()
   : m_tooltipManager(NULL)
@@ -95,12 +97,12 @@ Widget* WidgetLoader::loadWidgetFromXmlFile(
   m_tooltipManager = NULL;
   m_xmlTranslator.setStringIdPrefix(widgetId.c_str());
 
-  XmlDocumentRef doc(open_xml(xmlFilename));
-  TiXmlHandle handle(doc.get());
+  XMLDocumentRef doc = open_xml(xmlFilename);
+  XMLHandle handle(doc.get());
 
   // Search the requested widget.
-  TiXmlElement* xmlElement = handle
-    .FirstChild("gui")
+  XMLElement* xmlElement = handle
+    .FirstChildElement("gui")
     .FirstChildElement().ToElement();
 
   while (xmlElement) {
@@ -117,7 +119,7 @@ Widget* WidgetLoader::loadWidgetFromXmlFile(
   return widget;
 }
 
-Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget* root, Widget* parent, Widget* widget)
+Widget* WidgetLoader::convertXmlElementToWidget(const XMLElement* elem, Widget* root, Widget* parent, Widget* widget)
 {
   const std::string elem_name = elem->Value();
 
@@ -405,6 +407,13 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
     widget = new Slider(min_value, max_value, min_value);
     static_cast<Slider*>(widget)->setReadOnly(readonly);
   }
+  else if (elem_name == "alphaslider" || elem_name == "opacityslider") {
+    const bool readonly = bool_attr(elem, "readonly", false);
+    widget = new AlphaSlider(0, (elem_name == "alphaslider"
+                                 ? AlphaSlider::Type::ALPHA
+                                 : AlphaSlider::Type::OPACITY));
+    static_cast<AlphaSlider*>(widget)->setReadOnly(readonly);
+  }
   else if (elem_name == "textbox") {
     const char* text = (elem->GetText() ? elem->GetText(): "");
     bool wordwrap = bool_attr(elem, "wordwrap", false);
@@ -534,7 +543,7 @@ Widget* WidgetLoader::convertXmlElementToWidget(const TiXmlElement* elem, Widget
   return widget;
 }
 
-void WidgetLoader::fillWidgetWithXmlElementAttributes(const TiXmlElement* elem, Widget* root, Widget* widget)
+void WidgetLoader::fillWidgetWithXmlElementAttributes(const XMLElement* elem, Widget* root, Widget* widget)
 {
   const char* id        = elem->Attribute("id");
   const char* tooltip_dir = elem->Attribute("tooltip_dir");
@@ -671,7 +680,7 @@ void WidgetLoader::fillWidgetWithXmlElementAttributes(const TiXmlElement* elem, 
   widget->initTheme();
 }
 
-void WidgetLoader::fillWidgetWithXmlElementAttributesWithChildren(const TiXmlElement* elem, ui::Widget* root, ui::Widget* widget)
+void WidgetLoader::fillWidgetWithXmlElementAttributesWithChildren(const XMLElement* elem, ui::Widget* root, ui::Widget* widget)
 {
   fillWidgetWithXmlElementAttributes(elem, root, widget);
 
@@ -679,7 +688,7 @@ void WidgetLoader::fillWidgetWithXmlElementAttributesWithChildren(const TiXmlEle
     root = widget;
 
   // Children
-  const TiXmlElement* childElem = elem->FirstChildElement();
+  const XMLElement* childElem = elem->FirstChildElement();
   while (childElem) {
     Widget* child = convertXmlElementToWidget(childElem, root, widget, NULL);
     if (child) {
@@ -764,7 +773,7 @@ static int convert_align_value_to_flags(const char *value)
   return flags;
 }
 
-static int int_attr(const TiXmlElement* elem, const char* attribute_name, int default_value)
+static int int_attr(const XMLElement* elem, const char* attribute_name, int default_value)
 {
   const char* value = elem->Attribute(attribute_name);
 

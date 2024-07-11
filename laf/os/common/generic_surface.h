@@ -24,7 +24,7 @@ inline gfx::Color blend(const gfx::Color backdrop, gfx::Color src)
 {
   if (gfx::geta(backdrop) == 0)
     return src;
-  else if (gfx::geta(src) == 0)
+  if (gfx::geta(src) == 0)
     return backdrop;
 
   int Br, Bg, Bb, Ba;

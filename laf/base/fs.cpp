@@ -50,7 +50,7 @@ void make_all_directories(const std::string& path)
 
     if (is_file(intermediate))
       throw std::runtime_error("Error creating directory (a component is a file name)");
-    else if (!is_directory(intermediate))
+    if (!is_directory(intermediate))
       make_directory(intermediate);
   }
 }
@@ -73,7 +73,11 @@ std::string get_absolute_path(const std::string& filename)
 
 bool is_path_separator(std::string::value_type chr)
 {
-  return (chr == '\\' || chr == '/');
+  return (
+#if LAF_WINDOWS
+    chr == '\\' ||
+#endif
+    chr == '/');
 }
 
 std::string get_file_path(const std::string& filename)
@@ -118,7 +122,7 @@ std::string get_file_extension(const std::string& filename)
   for (rit=filename.rbegin(); rit!=filename.rend(); ++rit) {
     if (is_path_separator(*rit))
       return result;
-    else if (*rit == '.')
+    if (*rit == '.')
       break;
   }
 
@@ -142,7 +146,7 @@ std::string replace_extension(const std::string& filename, const std::string& ex
       break;
     // A path separator before a dot, i.e. the filename doesn't have a
     // extension.
-    else if (is_path_separator(*rit)) {
+    if (is_path_separator(*rit)) {
       rit = filename.rend();
       break;
     }
@@ -176,15 +180,14 @@ std::string get_file_title(const std::string& filename)
   for (rit=filename.rbegin(); rit!=filename.rend(); ++rit) {
     if (is_path_separator(*rit))
       break;
-    else if (*rit == '.' && last_dot == filename.end())
+    if (*rit == '.' && last_dot == filename.end())
       last_dot = rit.base()-1;
   }
 
   for (std::string::const_iterator it(rit.base()); it!=filename.end(); ++it) {
     if (it == last_dot)
       break;
-    else
-      result.push_back(*it);
+    result.push_back(*it);
   }
 
   return result;
@@ -198,14 +201,13 @@ std::string get_file_title_with_path(const std::string& filename)
   for (rit=filename.rbegin(); rit!=filename.rend(); ++rit) {
     if (is_path_separator(*rit))
       return filename;
-    else if (*rit == '.')
+    if (*rit == '.')
       break;
   }
 
   if (rit != filename.rend())
     return filename.substr(0, rit.base() - filename.begin() - 1);
-  else
-    return filename;
+  return filename;
 }
 
 std::string join_path(const std::string& path, const std::string& file)
@@ -279,7 +281,7 @@ int compare_filenames(const std::string& a, const std::string& b)
       auto b_dec2 = b_dec;
 
       int a_num = (a_chr - '0');
-      while (int c = a_dec2.next()) {
+      while (const int c = a_dec2.next()) {
         if ((c >= '0') && (c <= '9'))
           a_num = (a_num*10 + (c - '0'));
         else
@@ -287,7 +289,7 @@ int compare_filenames(const std::string& a, const std::string& b)
       }
 
       int b_num = (b_chr - '0');
-      while (int c = b_dec2.next()) {
+      while (const int c = b_dec2.next()) {
         if ((c >= '0') && (c <= '9'))
           b_num = (b_num*10 + (c - '0'));
         else
@@ -311,10 +313,9 @@ int compare_filenames(const std::string& a, const std::string& b)
 
   if (a_dec.is_end() && b_dec.is_end())
     return 0;
-  else if (a_dec.is_end())
+  if (a_dec.is_end())
     return -1;
-  else
-    return 1;
+  return 1;
 }
 
 } // namespace base

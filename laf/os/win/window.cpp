@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,6 +16,7 @@
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <shobjidl.h>
+#include <dwmapi.h> /* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) */
 
 #include <algorithm>
 #include <sstream>
@@ -62,6 +63,10 @@
 
 #ifndef INTERACTION_CONTEXT_PROPERTY_MEASUREMENT_UNITS_SCREEN
 #define INTERACTION_CONTEXT_PROPERTY_MEASUREMENT_UNITS_SCREEN 1
+#endif
+
+#ifndef INTERACTION_CONTEXT_PROPERTY_INTERACTION_UI_FEEDBACK
+#define INTERACTION_CONTEXT_PROPERTY_INTERACTION_UI_FEEDBACK_OFF 0
 #endif
 
 namespace os {
@@ -240,6 +245,13 @@ WindowWin::WindowWin(const WindowSpec& spec)
           m_ictx,
           INTERACTION_CONTEXT_PROPERTY_MEASUREMENT_UNITS,
           INTERACTION_CONTEXT_PROPERTY_MEASUREMENT_UNITS_SCREEN);
+      }
+      // Disable the Windows Ink circle feedback
+      if (SUCCEEDED(hr)) {
+        hr = winApi.SetPropertyInteractionContext(
+          m_ictx,
+          INTERACTION_CONTEXT_PROPERTY_INTERACTION_UI_FEEDBACK,
+          INTERACTION_CONTEXT_PROPERTY_INTERACTION_UI_FEEDBACK_OFF);
       }
     }
 
@@ -990,6 +1002,19 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
       return TRUE;
 
     case WM_NCACTIVATE:
+      // If the user is activating a child window, the title bar of
+      // the parent must be kept active. We control this when the
+      // parent receives a WM_NCACTIVATE with wparam==FALSE to redraw
+      // its title bar as inactive.
+      if (!wparam && lparam != -1) {
+        HWND possibleChild = reinterpret_cast<HWND>(lparam);
+        if (IsWindow(possibleChild) &&
+            GetAncestor(possibleChild, GA_ROOTOWNER) == m_hwnd) {
+          // Keep parent title bar active.
+          wparam = TRUE;
+        }
+      }
+
       // The default WM_NCACTIVATE behavior paints the default NC
       // frame borders (and resize grip if scrollbars are enabled)
       // when we activate/deactivate the window.
@@ -1751,11 +1776,15 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
         }
       }
 
-      DragFinish(hdrop);
-
       Event ev;
       ev.setType(Event::DropFiles);
       ev.setFiles(files);
+      POINT pos;
+      if (DragQueryPoint(hdrop, &pos))
+        ev.setPosition(gfx::Point(pos.x, pos.y));
+
+      DragFinish(hdrop);
+
       queueEvent(ev);
       break;
     }
@@ -2531,6 +2560,16 @@ HWND WindowWin::createHwnd(WindowWin* self, const WindowSpec& spec)
     nullptr,
     GetModuleHandle(nullptr),
     reinterpret_cast<LPVOID>(self));
+
+/* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) BEGIN */
+  #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+  #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+  #endif
+  BOOL value = TRUE;
+  ::DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &value, sizeof(value));
+  /* Tekisasu-Graphics: dark mode win32 titlebar (https://docs.microsoft.com/en-us/windows/apps/desktop/modernize/apply-windows-themes) END */
+
+
   if (!hwnd)
     return nullptr;
 

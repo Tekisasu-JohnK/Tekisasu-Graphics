@@ -75,12 +75,9 @@ Rect Region::bounds() const
 Region::Overlap Region::contains(const Rect& rect) const
 {
   auto rc = SkIRect::MakeXYWH(rect.x, rect.y, rect.w, rect.h);
-  if (m_region.contains(rc))
-    return In;
-  else if (m_region.intersects(rc))
-    return Part;
-  else
-    return Out;
+  if (m_region.contains(rc)) return In;
+  if (m_region.intersects(rc)) return Part;
+  return Out;
 }
 
 } // namespace gfx

@@ -274,8 +274,8 @@ KeySym x11_keysym_to_scancode(const KeyScancode scancode)
     case kKeyX: return XK_x;
     case kKeyY: return XK_y;
     case kKeyZ: return XK_z;
+    default: return 0;
   }
-  return 0;
 }
 
 bool x11_is_key_pressed(const KeyScancode scancode)
@@ -357,8 +357,8 @@ int x11_get_unicode_from_scancode(const KeyScancode scancode)
     case kKeyX: return 'x';
     case kKeyY: return 'y';
     case kKeyZ: return 'z';
+    default: return 0;
   }
-  return 0;
 }
 
 KeyModifiers get_modifiers_from_x(const int state)

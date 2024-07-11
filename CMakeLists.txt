@@ -1,5 +1,5 @@
 # Aseprite
-# Copyright (C) 2018-2022  Igara Studio S.A.
+# Copyright (C) 2018-2024  Igara Studio S.A.
 # Copyright (C) 2001-2018  David Capello
 
 cmake_minimum_required(VERSION 3.16)
@@ -49,7 +49,7 @@ option(USE_SHARED_FREETYPE "Use shared FreeType library" off)
 option(USE_SHARED_HARFBUZZ "Use shared HarfBuzz library" off)
 option(ENABLE_ASEPRITE_EXE "Compile main Aseprite executable" on)
 option(ENABLE_MEMLEAK      "Enable memory-leaks detector (only for developers)" off)
-option(ENABLE_NEWS         "Enable the news in Home tab" on)
+option(ENABLE_NEWS         "Enable the news in Home tab" off)
 option(ENABLE_UPDATER      "Enable automatic check for updates" off)
 option(ENABLE_SCRIPTING    "Compile with scripting support" on)
 option(ENABLE_WEBSOCKET    "Compile with websocket support" on)
@@ -65,7 +65,7 @@ option(ENABLE_CLANG_TIDY   "Enable static analysis" off)
 option(ENABLE_CCACHE       "Use CCache to improve recompilation speed (optional)" on)
 option(ENABLE_SENTRY       "Use Sentry SDK to report crashes" off)
 option(ENABLE_WEBP         "Enable support to load/save .webp files" on)
-option(ENABLE_PSD          "Enable experimental support for .psd files" off)
+option(ENABLE_PSD          "Enable experimental support for .psd files" on)
 option(ENABLE_DESKTOP_INTEGRATION  "Enable desktop integration modules" off)
 option(ENABLE_QT_THUMBNAILER       "Enable kde5/qt5 thumnailer" off)
 set(CUSTOM_WEBSITE_URL "" CACHE STRING "Enable custom local webserver to check updates")
@@ -101,7 +101,7 @@ if(NOT LAF_OS_BACKEND)
 endif()
 
 if(ENABLE_DRM AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/drm/CMakeLists.txt)
-  message(FATAL_ERROR "Your Tekisasu Graphics repository is incomplete, clone the drm repository")
+  message(FATAL_ERROR "Your Aseprite repository is incomplete, clone the drm repository")
 endif()
 
 ######################################################################
@@ -163,7 +163,7 @@ set(PIXMAN_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pixman)
 set(FREETYPE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/freetype2)
 set(HARFBUZZ_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/harfbuzz)
 set(SIMPLEINI_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/third_party/simpleini)
-set(TINYXML_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinyxml)
+set(TINYXML_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinyxml2)
 set(ZLIB_DIR            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib)
 
 # Search in the "cmake" directory for additional CMake modules.
@@ -225,12 +225,12 @@ endif()
 include_directories(${PNG_INCLUDE_DIRS})
 add_definitions(-DPNG_NO_MMX_CODE) # Do not use MMX optimizations in PNG code
 
-# tinyxml
+# tinyxml2
 if(USE_SHARED_TINYXML)
-  find_library(TINYXML_LIBRARY NAMES tinyxml)
-  find_path(TINYXML_INCLUDE_DIR NAMES tinyxml.h)
+  find_library(TINYXML_LIBRARY NAMES tinyxml2)
+  find_path(TINYXML_INCLUDE_DIR NAMES tinyxml2.h)
 else()
-  set(TINYXML_LIBRARY tinyxml)
+  set(TINYXML_LIBRARY tinyxml2)
   set(TINYXML_INCLUDE_DIR ${TINYXML_DIR})
 endif()
 include_directories(${TINYXML_INCLUDE_DIR})
@@ -293,7 +293,7 @@ if(USE_SHARED_CMARK)
   find_path(CMARK_INCLUDE_DIRS NAMES cmark.h)
 else()
   add_definitions(-DCMARK_STATIC_DEFINE)
-  set(CMARK_LIBRARIES cmark_static)
+  set(CMARK_LIBRARIES cmark)
 endif()
 
 if(REQUIRE_CURL)

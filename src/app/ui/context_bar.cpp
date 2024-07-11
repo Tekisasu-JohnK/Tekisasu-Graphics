@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -34,6 +34,7 @@
 #include "app/tools/tool.h"
 #include "app/tools/tool_box.h"
 #include "app/tools/tool_loop_modifiers.h"
+#include "app/ui/alpha_entry.h"
 #include "app/ui/brush_popup.h"
 #include "app/ui/button_set.h"
 #include "app/ui/color_button.h"
@@ -411,8 +412,8 @@ protected:
 
     HBox box;
     ButtonSet buttonset(2);
-    buttonset.addItem("4-Connected");
-    buttonset.addItem("8-connected");
+    buttonset.addItem(Strings::context_bar_pixel_connectivity_4());
+    buttonset.addItem(Strings::context_bar_pixel_connectivity_8());
     box.addChild(&buttonset);
     menu.addChild(&box);
 
@@ -710,9 +711,9 @@ private:
   obs::scoped_connection m_conn;
 };
 
-class ContextBar::InkOpacityField : public IntEntry {
+class ContextBar::InkOpacityField : public AlphaEntry {
 public:
-  InkOpacityField() : IntEntry(0, 255) {
+  InkOpacityField() : AlphaEntry(AlphaSlider::Type::OPACITY) {
   }
 
 protected:
@@ -720,7 +721,7 @@ protected:
     if (g_updatingFromCode)
       return;
 
-    IntEntry::onValueChange();
+    AlphaEntry::onValueChange();
     base::ScopedValue lockFlag(g_updatingFromCode, true);
 
     int newValue = getValue();
@@ -1432,17 +1433,33 @@ protected:
 class ContextBar::EyedropperField : public HBox {
 public:
   EyedropperField() {
-    m_channel.addItem("Color+Alpha");
-    m_channel.addItem("Color");
-    m_channel.addItem("Alpha");
-    m_channel.addItem("RGB+Alpha");
-    m_channel.addItem("RGB");
-    m_channel.addItem("HSV+Alpha");
-    m_channel.addItem("HSV");
-    m_channel.addItem("HSL+Alpha");
-    m_channel.addItem("HSL");
-    m_channel.addItem("Gray+Alpha");
-    m_channel.addItem("Gray");
+    const auto combined = Strings::context_bar_eyedropper_combined();
+    m_channel.addItem(fmt::format(
+                        combined,
+                        Strings::context_bar_eyedropper_color(),
+                        Strings::context_bar_eyedropper_alpha()));
+    m_channel.addItem(Strings::context_bar_eyedropper_color());
+    m_channel.addItem(Strings::context_bar_eyedropper_alpha());
+    m_channel.addItem(fmt::format(
+                        combined,
+                        Strings::context_bar_eyedropper_rgb(),
+                        Strings::context_bar_eyedropper_alpha()));
+    m_channel.addItem(Strings::context_bar_eyedropper_rgb());
+    m_channel.addItem(fmt::format(
+                        combined,
+                        Strings::context_bar_eyedropper_hsv(),
+                        Strings::context_bar_eyedropper_alpha()));
+    m_channel.addItem(Strings::context_bar_eyedropper_hsv());
+    m_channel.addItem(fmt::format(
+                        combined,
+                        Strings::context_bar_eyedropper_hsl(),
+                        Strings::context_bar_eyedropper_alpha()));
+    m_channel.addItem(Strings::context_bar_eyedropper_hsl());
+    m_channel.addItem(fmt::format(
+                        combined,
+                        Strings::context_bar_eyedropper_gray(),
+                        Strings::context_bar_eyedropper_alpha()));
+    m_channel.addItem(Strings::context_bar_eyedropper_gray());
     m_channel.addItem(Strings::context_bar_best_fit_index());
 
     m_sample.addItem(Strings::context_bar_all_layers());
@@ -1753,7 +1770,9 @@ private:
   }
 
   void updateLayout() {
-    const bool visible = (m_doc && !m_doc->sprite()->slices().empty());
+    const bool visible = (m_doc &&
+                          m_doc->sprite() &&
+                          !m_doc->sprite()->slices().empty());
     const bool relayout = (visible != m_combobox.isVisible() ||
                            visible != m_action.isVisible());
 
@@ -1854,7 +1873,7 @@ ContextBar::ContextBar(TooltipManager* tooltipManager,
   addChild(m_brushAngle = new BrushAngleField(m_brushType));
   addChild(m_brushPatternField = new BrushPatternField());
 
-  addChild(m_toleranceLabel = new Label("Tolerance:"));
+  addChild(m_toleranceLabel = new Label(Strings::general_tolerance()));
   addChild(m_tolerance = new ToleranceField());
   addChild(m_contiguous = new ContiguousField());
   addChild(m_paintBucketSettings = new PaintBucketSettingsField());
@@ -1863,7 +1882,7 @@ ContextBar::ContextBar(TooltipManager* tooltipManager,
   m_ditheringSelector->setUseCustomWidget(false); // Disable custom widget because the context bar is too small
 
   addChild(m_inkType = new InkTypeField(this));
-  addChild(m_inkOpacityLabel = new Label("Opacity:"));
+  addChild(m_inkOpacityLabel = new Label(Strings::general_opacity()));
   addChild(m_inkOpacity = new InkOpacityField());
   addChild(m_inkShades = new InkShadesField(colorBar));
 
@@ -1872,7 +1891,7 @@ ContextBar::ContextBar(TooltipManager* tooltipManager,
   addChild(m_autoSelectLayer = new AutoSelectLayerField());
 
   addChild(m_sprayBox = new HBox());
-  m_sprayBox->addChild(m_sprayLabel = new Label("Spray:"));
+  m_sprayBox->addChild(m_sprayLabel = new Label(Strings::context_bar_spray()));
   m_sprayBox->addChild(m_sprayWidth = new SprayWidthField());
   m_sprayBox->addChild(m_spraySpeed = new SpraySpeedField());
 
@@ -1898,6 +1917,8 @@ ContextBar::ContextBar(TooltipManager* tooltipManager,
     [this]{ onFgOrBgColorChange(doc::Brush::ImageColor::MainColor); });
   m_bgColorConn = pref.colorBar.bgColor.AfterChange.connect(
     [this]{ onFgOrBgColorChange(doc::Brush::ImageColor::BackgroundColor); });
+  m_alphaRangeConn = pref.range.opacity.AfterChange.connect(
+    [this]{ onOpacityRangeChange(); });
   m_keysConn = KeyboardShortcuts::instance()->UserChange.connect(
     [this, tooltipManager]{ setupTooltips(tooltipManager); });
   m_dropPixelsConn = m_dropPixels->DropPixels.connect(&ContextBar::onDropPixels, this);
@@ -2040,6 +2061,11 @@ void ContextBar::onFgOrBgColorChange(doc::Brush::ImageColor imageColor)
   }
 }
 
+void ContextBar::onOpacityRangeChange()
+{
+  updateForActiveTool();
+}
+
 void ContextBar::onDropPixels(ContextBarObserver::DropAction action)
 {
   notify_observers(&ContextBarObserver::onDropPixels, action);
@@ -2127,7 +2153,7 @@ void ContextBar::updateForTool(tools::Tool* tool)
     m_contiguous->setSelected(toolPref->contiguous());
 
     m_inkType->setInkTypeIcon(toolPref->ink());
-    m_inkOpacity->setTextf("%d", toolPref->opacity());
+    m_inkOpacity->setValue(toolPref->opacity());
 
     hasInkWithOpacity =
       ((isPaint && tools::inkHasOpacity(toolPref->ink())) ||
@@ -2231,6 +2257,7 @@ void ContextBar::updateForTool(tools::Tool* tool)
   if (supportDynamics)
     m_dynamics->updateIconFromActiveToolPref();
   m_freehandBox->setVisible(isFreehand && (supportOpacity || hasSelectOptions));
+  m_freehandAlgo->setVisible(!hasSprayOptions);
   m_toleranceLabel->setVisible(hasTolerance);
   m_tolerance->setVisible(hasTolerance);
   m_contiguous->setVisible(hasTolerance);
@@ -2604,12 +2631,14 @@ void ContextBar::setupTooltips(TooltipManager* tooltipManager)
     m_rotAlgo, Strings::context_bar_rotation_algorithm(), BOTTOM);
   tooltipManager->addTooltipFor(
     m_dynamics->at(0), Strings::context_bar_dynamics(), BOTTOM);
-  tooltipManager->addTooltipFor(m_freehandAlgo,
-                                key_tooltip("Freehand trace algorithm",
-                                            CommandId::PixelPerfectMode()), BOTTOM);
-  tooltipManager->addTooltipFor(m_contiguous,
-                                key_tooltip("Fill contiguous areas color",
-                                            CommandId::ContiguousFill()), BOTTOM);
+  tooltipManager->addTooltipFor(
+    m_freehandAlgo,
+    key_tooltip(Strings::context_bar_freehand_trace_algorithm().c_str(),
+                CommandId::PixelPerfectMode()), BOTTOM);
+  tooltipManager->addTooltipFor(
+    m_contiguous,
+    key_tooltip(Strings::context_bar_contiguous_fill().c_str(),
+                CommandId::ContiguousFill()), BOTTOM);
   tooltipManager->addTooltipFor(
     m_paintBucketSettings->at(0), Strings::context_bar_paint_bucket_option(), BOTTOM);
 

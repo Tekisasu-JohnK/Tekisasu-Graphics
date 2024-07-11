@@ -256,9 +256,8 @@ void NewLayerCommand::onExecute(Context* context)
   }
 #endif
 
-  ContextWriter writer(reader);
   LayerGroup* parent = sprite->root();
-  Layer* activeLayer = writer.layer();
+  Layer* activeLayer = reader.layer();
   SelectedLayers selLayers = site.selectedLayers();
   if (activeLayer) {
     if (activeLayer->isGroup() &&
@@ -274,9 +273,9 @@ void NewLayerCommand::onExecute(Context* context)
 
   Layer* layer = nullptr;
   {
-    Tx tx(
-      writer.context(),
-      fmt::format(Strings::commands_NewLayer(), layerPrefix()));
+    ContextWriter writer(reader);
+    Tx tx(writer,
+          fmt::format(Strings::commands_NewLayer(), layerPrefix()));
     DocApi api = document->getApi(tx);
     bool afterBackground = false;
 

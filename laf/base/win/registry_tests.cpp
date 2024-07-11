@@ -1,4 +1,5 @@
 // LAF Base Library
+// Copyright (c) 2024 Igara Studio S.A.
 // Copyright (c) 2017 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,7 +17,8 @@ TEST(Registry, OpenKey)
   try {
     hkey k = hkey::classes_root();
     k = k.open(".txt", hkey::read);
-    EXPECT_EQ("txtfile", k.string(""));
+    EXPECT_TRUE(k.string("") == "txtfile" ||
+                k.string("") == "txtfilelegacy");
     EXPECT_EQ("text/plain", k.string("Content Type"));
   }
   catch (Win32Exception& ex) {

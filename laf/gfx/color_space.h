@@ -52,9 +52,9 @@ namespace gfx {
                 HasPrimaries = 4,
                 HasICC = 8 };
 
-    ColorSpace(const Type type,
-               const Flag flags = NoFlags,
-               const float gamma = 1.0,
+    ColorSpace(Type type,
+               Flag flags = NoFlags,
+               float gamma = 1.0,
                std::vector<uint8_t>&& rawData = std::vector<uint8_t>());
 
     static ColorSpaceRef MakeNone();   // Use display color space
@@ -83,33 +83,28 @@ namespace gfx {
     size_t iccSize() const {
       if (has(HasICC))
         return m_data.size();
-      else
-        return 0;
+      return 0;
     }
 
     const void* iccData() const {
       if (has(HasICC))
-        return &m_data[0];
-      else
-        return nullptr;
+        return m_data.data();
+      return nullptr;
     }
 
     const ColorSpaceTransferFn* transferFn() const {
       if (has(HasTransferFn))
-        return (const ColorSpaceTransferFn*)&m_data[0];
-      else
-        return nullptr;
+        return (const ColorSpaceTransferFn*)m_data.data();
+      return nullptr;
     }
 
     const ColorSpacePrimaries* primaries() const {
       if (has(HasPrimaries)) {
         if (has(HasTransferFn))
           return (const ColorSpacePrimaries*)&m_data[sizeof(ColorSpaceTransferFn)];
-        else
-          return (const ColorSpacePrimaries*)&m_data[0];
+        return (const ColorSpacePrimaries*)m_data.data();
       }
-      else
-        return nullptr;
+      return nullptr;
     }
 
     bool operator==(const ColorSpace& that) const = delete;

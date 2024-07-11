@@ -19,7 +19,7 @@ thread_pool::thread_pool(const size_t n)
   , m_threads(n)
   , m_doingWork(0)
 {
-  std::unique_lock<std::mutex> lock(m_mutex);
+  const std::unique_lock lock(m_mutex);
   for (size_t i=0; i<n; ++i)
     m_threads[i] = std::thread([this]{ worker(); });
 }
@@ -31,7 +31,7 @@ thread_pool::~thread_pool()
 
 void thread_pool::execute(std::function<void()>&& func)
 {
-  std::unique_lock<std::mutex> lock(m_mutex);
+  const std::unique_lock lock(m_mutex);
   ASSERT(m_running);
   m_work.push(std::move(func));
   m_cv.notify_one();
@@ -50,7 +50,7 @@ void thread_pool::wait_all()
 void thread_pool::join_all()
 {
   {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    const std::unique_lock lock(m_mutex);
     m_running = false;
   }
   m_cv.notify_all();
@@ -75,7 +75,7 @@ void thread_pool::worker()
 {
   bool running;
   {
-    std::unique_lock<std::mutex> lock(m_mutex);
+    const std::unique_lock lock(m_mutex);
     running = m_running;
   }
   while (running) {
@@ -108,7 +108,7 @@ void thread_pool::worker()
 
     // Decrement m_doingWork only if we've incremented it
     if (func) {
-      std::unique_lock<std::mutex> lock(m_mutex);
+      const std::unique_lock lock(m_mutex);
       --m_doingWork;
       m_cvWait.notify_all();
     }

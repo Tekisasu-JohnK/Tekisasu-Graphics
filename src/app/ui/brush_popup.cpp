@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2023  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -181,7 +181,7 @@ private:
     menu.addChild(&deleteAllItem);
     menu.addChild(new Label(""));
     menu.addChild(
-      new Separator(Strings::brush_slot_params_saved_parameters(), HORIZONTAL));
+      new Separator(Strings::brush_slot_params_title(), HORIZONTAL));
 
     app::gen::BrushSlotParams params;
     menu.addChild(&params);
@@ -290,7 +290,8 @@ private:
   void onClick() override {
     Menu menu;
 
-    menu.addChild(new Separator("Parameters to Save", HORIZONTAL));
+    menu.addChild(
+      new Separator(Strings::brush_slot_params_title(), HORIZONTAL));
 
     app::gen::BrushSlotParams params;
     menu.addChild(&params);
@@ -466,7 +467,9 @@ os::SurfaceRef BrushPopup::createSurfaceForBrush(const BrushRef& origBrush,
   BrushRef brush = origBrush;
   if (brush) {
     if (brush->type() != kImageBrushType && brush->size() > kMaxSize) {
-      brush.reset(new Brush(*brush));
+      // Clone with shared images, as setSize() will re-create the
+      // images and the brush is no kImageBrushType anyway.
+      brush = brush->cloneWithSharedImages();
       brush->setSize(kMaxSize);
     }
     // Show the original image in the popup (without the image colors

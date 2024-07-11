@@ -30,6 +30,7 @@ endif()
 
 option(LAF_WITH_EXAMPLES "Enable LAF examples" ON)
 option(LAF_WITH_TESTS "Enable LAF tests" ON)
+option(LAF_WITH_CLIP "Enable clip module (required for future drag-and-drop feature)" ON)
 set(LAF_BACKEND ${LAF_DEFAULT_BACKEND} CACHE STRING "Select laf backend")
 set_property(CACHE LAF_BACKEND PROPERTY STRINGS "none" "skia")
 
@@ -49,6 +50,16 @@ else()
   if(NOT HARFBUZZ_LIBRARIES)
     find_package(HarfBuzz)
   endif()
+endif()
+
+if(LAF_WITH_CLIP)
+  # Disable clip examples and tests
+  set(CLIP_EXAMPLES OFF CACHE BOOL "Compile clip examples")
+  set(CLIP_TESTS OFF CACHE BOOL "Compile clip tests")
+  if(PNG_LIBRARY)
+    set(CLIP_X11_PNG_LIBRARY "${PNG_LIBRARY}")
+  endif()
+  add_subdirectory(clip)
 endif()
 
 add_subdirectory(third_party)

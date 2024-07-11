@@ -162,7 +162,7 @@ namespace os {
     // Performs the user action to move or resize the window. It's
     // useful in case that you want to design your own regions to
     // resize or move/drag the window.
-    virtual void performWindowAction(const WindowAction action,
+    virtual void performWindowAction(WindowAction action,
                                      const Event* event = nullptr) = 0;
 
     // Set/get the specific information to restore the exact same

@@ -119,16 +119,14 @@ int SkiaSurface::width() const
 {
   if (m_surface)
     return m_surface->width();
-  else
-    return m_bitmap.width();
+  return m_bitmap.width();
 }
 
 int SkiaSurface::height() const
 {
   if (m_surface)
     return m_surface->height();
-  else
-    return m_bitmap.height();
+  return m_bitmap.height();
 }
 
 const ColorSpaceRef& SkiaSurface::colorSpace() const
@@ -157,8 +155,7 @@ gfx::Rect SkiaSurface::getClipBounds() const
   SkIRect rc;
   if (m_canvas->getDeviceClipBounds(&rc))
     return gfx::Rect(rc.x(), rc.y(), rc.width(), rc.height());
-  else
-    return gfx::Rect();
+  return gfx::Rect();
 }
 
 void SkiaSurface::saveClip()
@@ -267,8 +264,7 @@ uint8_t* SkiaSurface::getData(int x, int y) const
 {
   if (m_bitmap.isNull())
     return nullptr;
-  else
-    return (uint8_t*)m_bitmap.getAddr32(x, y);
+  return (uint8_t*)m_bitmap.getAddr32(x, y);
 }
 
 void SkiaSurface::getFormat(SurfaceFormatData* formatData) const
@@ -783,11 +779,10 @@ const SkImage* SkiaSurface::getOrCreateTextureImage() const
 
   if (m_image && m_image->isValid(win->sk_grCtx()))
     return m_image.get();
-  else if (uploadBitmapAsTexture() &&
-           m_image && m_image->isValid(win->sk_grCtx()))
+  if (uploadBitmapAsTexture() &&
+      m_image && m_image->isValid(win->sk_grCtx()))
     return m_image.get();
-  else
-    return nullptr;
+  return nullptr;
 }
 
 bool SkiaSurface::uploadBitmapAsTexture() const

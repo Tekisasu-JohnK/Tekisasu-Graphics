@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -776,15 +776,23 @@ public:
     }
     update_windows_color_profile_from_preferences();
 
+    m_pref.range.alpha(static_cast<app::gen::AlphaRange>(alpha()->getSelectedItemIndex()));
+    m_pref.range.opacity(static_cast<app::gen::AlphaRange>(opacity()->getSelectedItemIndex()));
+
     // Change sprite grid bounds
     if (m_context &&
         m_context->activeDocument() &&
         m_context->activeDocument()->sprite() &&
         m_context->activeDocument()->sprite()->gridBounds() != gridBounds()) {
-      ContextWriter writer(m_context);
-      Tx tx(m_context, Strings::commands_GridSettings(), ModifyDocument);
-      tx(new cmd::SetGridBounds(writer.sprite(), gridBounds()));
-      tx.commit();
+      try {
+        ContextWriter writer(m_context, 1000);
+        Tx tx(writer, Strings::commands_GridSettings(), ModifyDocument);
+        tx(new cmd::SetGridBounds(writer.sprite(), gridBounds()));
+        tx.commit();
+      }
+      catch (const std::exception& ex) {
+        Console::showException(ex);
+      }
     }
 
     m_curPref->show.grid(gridVisible()->isSelected());
@@ -1073,6 +1081,9 @@ private:
     filesWithCs()->setEnabled(state);
     missingCsLabel()->setEnabled(state);
     missingCs()->setEnabled(state);
+
+    alpha()->setSelectedItemIndex(static_cast<int>(m_pref.range.alpha()));
+    opacity()->setSelectedItemIndex(static_cast<int>(m_pref.range.opacity()));
   }
 
   void onResetColorManagement() {
@@ -1306,9 +1317,20 @@ private:
     if (language()->getItemCount() > 0)
       return;
 
-    // Select current language by lang ID
+    // Check if the current language exists, in other case select English.
     Strings* strings = Strings::instance();
     std::string curLang = strings->currentLanguage();
+    bool found = false;
+    for (const LangInfo& lang : strings->availableLanguages()) {
+      if (lang.id == curLang) {
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      curLang = Strings::kDefLanguage;
+
+    // Select current language by lang ID
     for (const LangInfo& lang : strings->availableLanguages()) {
       int i = language()->addItem(new LangItem(lang));
       if (lang.id == curLang)

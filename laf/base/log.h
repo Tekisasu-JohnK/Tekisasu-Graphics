@@ -33,14 +33,14 @@ enum LogLevel {
 namespace base {
 
   void set_log_filename(const char* filename);
-  void set_log_level(const LogLevel level);
+  void set_log_level(LogLevel level);
   LogLevel get_log_level();
 
 } // namespace base
 
 // E.g. LOG("text in information log level\n");
 void LOG(const char* format, ...);
-void LOG(const LogLevel level, const char* format, ...);
+void LOG(LogLevel level, const char* format, ...);
 
 inline void LOG(int) {
   // This is in case LOG() is used with an integer value instead of

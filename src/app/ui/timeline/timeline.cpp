@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -696,7 +696,9 @@ bool Timeline::onProcessMessage(Message* msg)
           bool newVisibleState = !allLayersVisible();
           for (Layer* topLayer : m_sprite->root()->layers()) {
             if (topLayer->isVisible() != newVisibleState) {
-              topLayer->setVisible(newVisibleState);
+              m_document->setLayerVisibilityWithNotifications(
+                topLayer, newVisibleState);
+
               if (topLayer->isGroup())
                 regenRows = true;
             }
@@ -825,11 +827,11 @@ bool Timeline::onProcessMessage(Message* msg)
                 for (Row& row : m_rows) {
                   Layer* l = row.layer();
                   if (l->hasFlags(LayerFlags::Internal_WasVisible)) {
-                    l->setVisible(true);
+                    m_document->setLayerVisibilityWithNotifications(l, true);
                     l->switchFlags(LayerFlags::Internal_WasVisible, false);
                   }
                   else {
-                    l->setVisible(false);
+                    m_document->setLayerVisibilityWithNotifications(l, false);
                   }
                 }
               }
@@ -838,7 +840,7 @@ bool Timeline::onProcessMessage(Message* msg)
                 for (Row& row : m_rows) {
                   Layer* l = row.layer();
                   l->switchFlags(LayerFlags::Internal_WasVisible, l->isVisible());
-                  l->setVisible(false);
+                  m_document->setLayerVisibilityWithNotifications(l, false);
                 }
               }
 
@@ -1345,7 +1347,7 @@ bool Timeline::onProcessMessage(Message* msg)
               else if (mouseMsg->left()) {
                 Command* command = Commands::instance()
                   ->byId(CommandId::FrameTagProperties());
-                UIContext::instance()->executeCommand(command, params);
+                m_context->executeCommand(command, params);
               }
             }
             break;
@@ -1387,12 +1389,18 @@ bool Timeline::onProcessMessage(Message* msg)
             if (tag) {
               if ((m_state == STATE_RESIZING_TAG_LEFT && tag->fromFrame() != m_resizeTagData.from) ||
                   (m_state == STATE_RESIZING_TAG_RIGHT && tag->toFrame() != m_resizeTagData.to)) {
-                Tx tx(UIContext::instance(), Strings::commands_FrameTagProperties());
-                tx(new cmd::SetTagRange(
-                     tag,
-                     (m_state == STATE_RESIZING_TAG_LEFT ? m_resizeTagData.from: tag->fromFrame()),
-                     (m_state == STATE_RESIZING_TAG_RIGHT ? m_resizeTagData.to: tag->toFrame())));
-                tx.commit();
+                try {
+                  ContextWriter writer(m_context);
+                  Tx tx(writer, Strings::commands_FrameTagProperties());
+                  tx(new cmd::SetTagRange(
+                       tag,
+                       (m_state == STATE_RESIZING_TAG_LEFT ? m_resizeTagData.from: tag->fromFrame()),
+                       (m_state == STATE_RESIZING_TAG_RIGHT ? m_resizeTagData.to: tag->toFrame())));
+                  tx.commit();
+                }
+                catch (const base::Exception& e) {
+                  Console::showException(e);
+                }
 
                 regenerateRows();
               }
@@ -1428,7 +1436,7 @@ bool Timeline::onProcessMessage(Message* msg)
           Command* command = Commands::instance()
             ->byId(CommandId::LayerProperties());
 
-          UIContext::instance()->executeCommand(command);
+          m_context->executeCommand(command);
           return true;
         }
 
@@ -1438,7 +1446,7 @@ bool Timeline::onProcessMessage(Message* msg)
           Params params;
           params.set("frame", "current");
 
-          UIContext::instance()->executeCommand(command, params);
+          m_context->executeCommand(command, params);
           return true;
         }
 
@@ -1446,7 +1454,7 @@ bool Timeline::onProcessMessage(Message* msg)
           Command* command = Commands::instance()
             ->byId(CommandId::CelProperties());
 
-          UIContext::instance()->executeCommand(command);
+          m_context->executeCommand(command);
           return true;
         }
 
@@ -2015,6 +2023,14 @@ void Timeline::onLayerCollapsedChanged(DocEvent& ev)
   invalidate();
 }
 
+void Timeline::onAfterLayerVisibilityChange(DocEvent& ev)
+{
+  layer_t layerIdx = getLayerIndex(ev.layer());
+  if (layerIdx >= 0)
+    invalidateRect(getPartBounds(Hit(PART_ROW_EYE_ICON, layerIdx))
+                   .offset(origin()));
+}
+
 void Timeline::onStateChanged(Editor* editor)
 {
   m_aniControls.updateUsingEditor(editor);
@@ -2077,7 +2093,10 @@ void Timeline::setCursor(ui::Message* msg, const Hit& hit)
     ui::set_mouse_cursor(kSizeECursor);
   }
   else if (hit.part == PART_RANGE_OUTLINE) {
-    ui::set_mouse_cursor(kMoveCursor);
+    if (is_copy_key_pressed(msg))
+      ui::set_mouse_cursor(kArrowPlusCursor);
+    else
+      ui::set_mouse_cursor(kMoveCursor);
   }
   else if (hit.part == PART_SEPARATOR) {
     ui::set_mouse_cursor(kSizeWECursor);
@@ -4389,6 +4408,7 @@ bool Timeline::onPaste(Context* ctx)
       m_redrawMarchingAntsOnly = false;
       invalidate();
     }
+
     clipboard->paste(ctx, true);
     return true;
   }
@@ -4473,12 +4493,10 @@ void Timeline::setLayerVisibleFlag(const layer_t l, const bool state)
   if (!layer)
     return;
 
-  bool redrawEditors = false;
   bool regenRows = false;
 
   if (layer->isVisible() != state) {
-    layer->setVisible(state);
-    redrawEditors = true;
+    m_document->setLayerVisibilityWithNotifications(layer, state);
 
     // Regenerate rows because might change the flag of the children
     // (the flag is propagated to the children in m_inheritedFlags).
@@ -4491,9 +4509,8 @@ void Timeline::setLayerVisibleFlag(const layer_t l, const bool state)
       layer = layer->parent();
       while (layer) {
         if (!layer->isVisible()) {
-          layer->setVisible(true);
+          m_document->setLayerVisibilityWithNotifications(layer, true);
           regenRows = true;
-          redrawEditors = true;
         }
         layer = layer->parent();
       }
@@ -4504,9 +4521,6 @@ void Timeline::setLayerVisibleFlag(const layer_t l, const bool state)
     regenerateRows();
     invalidate();
   }
-
-  if (redrawEditors)
-    m_document->notifyGeneralUpdate();
 }
 
 void Timeline::setLayerEditableFlag(const layer_t l, const bool state)
