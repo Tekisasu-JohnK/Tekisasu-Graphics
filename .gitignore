@@ -1,0 +1,16 @@
+*.a
+*.o
+*.lib
+*.obj
+*.pdb
+*.dll
+*.ilk
+*.suo
+*.exe
+*.exe.manifest
+*.log
+*.res
+.DS_Store
+.vs
+tests/_test*
+build
