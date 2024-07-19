@@ -66,7 +66,7 @@ class StatusBar::AboutStatusBar : public HBox {
 public:
   AboutStatusBar()
     : m_label(fmt::format("{} {} by ", get_app_name(), get_app_version()))
-    , m_link("", "Igara Studio")
+    , m_link("", "Tekisasu")
   {
     m_link.Click.connect(
       []{
