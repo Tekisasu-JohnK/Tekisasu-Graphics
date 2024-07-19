@@ -19,14 +19,14 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "Comments", "https://www.aseprite.org/"
-            VALUE "CompanyName", "Igara Studio S.A."
-            VALUE "FileDescription", "Aseprite"
+            VALUE "Comments", "https://dev.tekisasu.com/"
+            VALUE "CompanyName", "Tekisasu"
+            VALUE "FileDescription", "Tekisasu Graphics"
             VALUE "FileVersion", "1,3,7,0"
-            VALUE "InternalName", "aseprite"
-            VALUE "LegalCopyright", "Copyright (C) 2001-2024 Igara Studio S.A."
-            VALUE "OriginalFilename", "aseprite.exe"
-            VALUE "ProductName", "Aseprite"
+            VALUE "InternalName", "tekisasu-graphics"
+            VALUE "LegalCopyright", "Copyright (C) 2021-present Tekisasu, Copyright (C) 2001-2024 Igara Studio S.A."
+            VALUE "OriginalFilename", "Tekisasu-Graphics.exe"
+            VALUE "ProductName", "Tekisasu Graphics"
             VALUE "ProductVersion", "1,3,7,0"
         END
     END
