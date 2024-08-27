@@ -41,10 +41,6 @@
 
 #define LAF_X11_DOUBLE_CLICK_TIMEOUT 250
 
-// TODO the window name should be customized from the CMakeLists.txt
-//      properties (see OS_WND_CLASS_NAME too)
-#define LAF_X11_WM_CLASS "Aseprite"
-
 const int _NET_WM_STATE_REMOVE = 0;
 const int _NET_WM_STATE_ADD    = 1;
 
@@ -164,6 +160,14 @@ std::string decode_url(const std::string& in)
 
   base::trim_string(out, out);
   return out;
+}
+
+std::string get_x11_wm_class_name()
+{
+  if (auto sys = instance())
+    return sys->appName();
+  // On X11 the class name can be empty.
+  return std::string();
 }
 
 } // anonymous namespace
@@ -294,7 +298,7 @@ WindowX11::WindowX11(::Display* display, const WindowSpec& spec)
   if (!m_window)
     throw std::runtime_error("Cannot create X11 window");
 
-  setWMClass(LAF_X11_WM_CLASS);
+  setWMClass(get_x11_wm_class_name());
 
   // Special frame for this window
   if (spec.floating()) {
@@ -472,13 +476,20 @@ void WindowX11::setScale(const int scale)
 
 bool WindowX11::isVisible() const
 {
-  // TODO
-  return true;
+  XWindowAttributes attr;
+  memset(&attr, 0, sizeof(attr));
+  Status status = XGetWindowAttributes(m_display, m_window, &attr);
+  return ((attr.map_state & IsViewable) == IsViewable);
 }
 
 void WindowX11::setVisible(bool visible)
 {
-  // TODO
+  if (visible) {
+    XMapWindow(m_display, m_window);
+  }
+  else {
+    XUnmapWindow(m_display, m_window);
+  }
 }
 
 void WindowX11::activate()

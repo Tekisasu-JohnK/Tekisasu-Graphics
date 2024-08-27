@@ -1,5 +1,5 @@
 // LAF Library
-// Copyright (c) 2019-2022  Igara Studio S.A.
+// Copyright (c) 2019-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -24,7 +24,7 @@ void draw_window(os::Window* window)
   os::draw_text(surface, nullptr, "Hello World", rc.center(),
                 &p, os::TextAlign::Center);
 
-  if (window->isGpuAccelerated())
+  if (window->gpuAcceleration())
     os::draw_text(surface, nullptr, "(GPU)", rc.center()+gfx::Point(0, 24),
                   &p, os::TextAlign::Center);
 
@@ -96,7 +96,7 @@ int app_main(int argc, char* argv[])
             break;
 
           case os::kKeyG:
-            system->setGpuAcceleration(!system->gpuAcceleration());
+            window->setGpuAcceleration(!window->gpuAcceleration());
             // TODO change window backend immediately
             redraw = true;
             break;

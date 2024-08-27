@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2012-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,6 +16,7 @@
 #include "os/skia/skia_font_manager.h"
 #include "os/skia/skia_surface.h"
 #include "os/skia/skia_window.h"
+#include "os/surface_format.h"
 #include "os/window_spec.h"
 
 #if LAF_WINDOWS
@@ -41,8 +42,7 @@ namespace os {
 class SkiaSystem final : public SkiaSystemBase {
 public:
   SkiaSystem()
-    : m_defaultWindow(nullptr)
-    , m_gpuAcceleration(false) {
+    : m_defaultWindow(nullptr) {
     SkGraphics::Init();
   }
 
@@ -66,19 +66,12 @@ public:
       );
   }
 
-  bool gpuAcceleration() const override {
-    return m_gpuAcceleration;
-  }
-
-  void setGpuAcceleration(bool state) override {
-    m_gpuAcceleration = state;
-  }
-
-  void setTabletAPI(TabletAPI api) override {
+  void setTabletOptions(const TabletOptions& options) override {
 #if LAF_WINDOWS
-    SkiaSystemBase::setTabletAPI(api);
+    SkiaSystemBase::setTabletOptions(options);
     if (SkiaWindow* window = dynamic_cast<SkiaWindow*>(defaultWindow())) {
-      window->onTabletAPIChange();
+      // TODO notify all windows
+      window->onTabletOptionsChange();
     }
 #endif
   }
@@ -164,7 +157,6 @@ public:
 private:
   SkiaWindow* m_defaultWindow;
   Ref<FontManager> m_fontManager;
-  bool m_gpuAcceleration;
   ColorSpaceRef m_windowCS;
 };
 

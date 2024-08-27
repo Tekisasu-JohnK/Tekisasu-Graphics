@@ -6,7 +6,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-2019, macos-latest, ubuntu-latest]
         build_type: [debug,release]
         benchmark: [false]
         sanitizer: [""]
@@ -21,8 +21,8 @@ jobs:
             build_type: release
             benchmark: true
     steps:
-    - uses: actions/checkout@v2
-    - uses: seanmiddleditch/gha-setup-ninja@master
+    - uses: actions/checkout@v4
+    - uses: aseprite/get-ninja@main
     - uses: ilammy/msvc-dev-cmd@v1
       if: runner.os == 'Windows'
     - name: Generating Makefiles
@@ -34,9 +34,7 @@ jobs:
           -DCMAKE_EXE_LINKER_FLAGS=${{ matrix.sanitizer }} \
           -DOBSERVABLE_BENCHMARKS=${{ matrix.benchmark }}
     - name: Compiling
-      shell: bash
-      run: |
-        ninja
+      run: cmake --build .
     - name: Running Tests
       shell: bash
       run: |

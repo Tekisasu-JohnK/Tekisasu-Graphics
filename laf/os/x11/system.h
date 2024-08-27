@@ -22,6 +22,13 @@ class SystemX11 : public CommonSystem {
 public:
   ~SystemX11();
 
+  void setTabletOptions(const TabletOptions& options) override {
+    m_tabletOptions = options;
+  }
+  TabletOptions tabletOptions() const override {
+    return m_tabletOptions;
+  }
+
   bool isKeyPressed(KeyScancode scancode) override {
     return x11_is_key_pressed(scancode);
   }
@@ -84,6 +91,8 @@ public:
       list.push_back(make_ref<ScreenX11>(screen));
   }
 
+private:
+  TabletOptions m_tabletOptions;
 };
 
 } // namespace os

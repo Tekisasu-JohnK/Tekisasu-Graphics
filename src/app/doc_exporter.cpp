@@ -623,6 +623,7 @@ void DocExporter::reset()
   m_splitTags = false;
   m_listTags = false;
   m_listLayers = false;
+  m_listLayerHierarchy = false;
   m_listSlices = false;
   m_documents.clear();
 }
@@ -1487,7 +1488,7 @@ void DocExporter::createDataFile(const Samples& samples,
   }
 
   // meta.layers
-  if (m_listLayers) {
+  if (m_listLayers || m_listLayerHierarchy) {
     LayerList metaLayers;
     for (auto& item : m_documents) {
       if (item.isOneImageOnly())
@@ -1569,6 +1570,9 @@ void DocExporter::createDataFile(const Samples& samples,
               os << ", ";
 
             os << "{ \"frame\": " << cel->frame();
+            if (cel->opacity() != 255) {
+              os << ", \"opacity\": " << cel->opacity();
+            }
             if (cel->zIndex() != 0) {
               os << ", \"zIndex\": " << cel->zIndex();
             }

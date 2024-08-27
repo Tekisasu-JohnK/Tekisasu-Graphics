@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -12,7 +12,7 @@
 
 #include "base/log.h"
 #include "base/string.h"
-#include "os/x11/x11.h"
+#include "os/system.h"
 
 #include <cstring>
 
@@ -72,7 +72,12 @@ void XInput::load(::Display* display)
   if (!devices)
     return;
 
-  std::string userDefinedTablet = X11::instance()->userDefinedTablet();
+  auto system = instance();
+  ASSERT(system);
+  if (!system)
+    return;
+
+  std::string userDefinedTablet = system->tabletOptions().detectStylusPattern;
   if (!userDefinedTablet.empty())
     userDefinedTablet = base::string_to_lower(userDefinedTablet);
 

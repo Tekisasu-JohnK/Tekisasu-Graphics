@@ -1,7 +1,7 @@
 # Clip Library
 # Copyright (c) 2015-2024 David Capello
 
-cmake_minimum_required(VERSION 3.1.2)
+cmake_minimum_required(VERSION 3.5)
 
 project(clip LANGUAGES CXX)
 
@@ -15,6 +15,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
 endif()
 
 option(CLIP_ENABLE_IMAGE "Compile with support to copy/paste images" on)
+if(WIN32)
+  option(CLIP_ENABLE_LIST_FORMATS "Compile with support to list clipboard formats" off)
+endif()
 option(CLIP_EXAMPLES "Compile clip examples" on)
 option(CLIP_TESTS "Compile clip tests" on)
 if(UNIX AND NOT APPLE)
@@ -26,6 +29,10 @@ add_library(clip clip.cpp)
 if(CLIP_ENABLE_IMAGE)
   target_sources(clip PRIVATE image.cpp)
   target_compile_definitions(clip PUBLIC -DCLIP_ENABLE_IMAGE=1)
+endif()
+
+if(CLIP_ENABLE_LIST_FORMATS)
+  target_compile_definitions(clip PUBLIC -DCLIP_ENABLE_LIST_FORMATS=1)
 endif()
 
 if(WIN32)

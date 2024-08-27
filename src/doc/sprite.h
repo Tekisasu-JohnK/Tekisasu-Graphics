@@ -127,7 +127,14 @@ namespace doc {
     static void SetDefaultRgbMapAlgorithm(const RgbMapAlgorithm mapAlgo);
 
     const gfx::Rect& gridBounds() const { return m_gridBounds; }
-    void setGridBounds(const gfx::Rect& rc) { m_gridBounds = rc; }
+    void setGridBounds(const gfx::Rect& rc) {
+      m_gridBounds = rc;
+      // Prevent setting an empty grid bounds
+      if (m_gridBounds.w <= 0)
+        m_gridBounds.w = 1;
+      if (m_gridBounds.h <= 0)
+        m_gridBounds.h = 1;
+    }
 
     virtual int getMemSize() const override;
 
@@ -219,6 +226,7 @@ namespace doc {
     LayerList allVisibleReferenceLayers() const;
     LayerList allBrowsableLayers() const;
     LayerList allTilemaps() const;
+    std::string visibleLayerHierarchyAsString() const;
 
     CelsRange cels() const;
     CelsRange cels(frame_t frame) const;

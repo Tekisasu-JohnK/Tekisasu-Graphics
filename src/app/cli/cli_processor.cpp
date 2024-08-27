@@ -303,6 +303,10 @@ int CliProcessor::process(Context* ctx)
         else if (opt == &m_options.tag()) {
           cof.tag = value.value();
         }
+        // --play-subtags
+        else if (opt == &m_options.playSubtags()) {
+          cof.playSubtags = true;
+        }
         // --frame-range from,to
         else if (opt == &m_options.frameRange()) {
           std::vector<std::string> splitRange;
@@ -582,6 +586,13 @@ int CliProcessor::process(Context* ctx)
             m_exporter->setListLayers(true);
           else
             cof.listLayers = true;
+        }
+        // --list-layer-hierarchy
+        else if (opt == &m_options.listLayerHierarchy()) {
+          if (m_exporter)
+            m_exporter->setListLayerHierarchy(true);
+          else
+            cof.listLayerHierarchy = true;
         }
         // --list-tags
         else if (opt == &m_options.listTags()) {

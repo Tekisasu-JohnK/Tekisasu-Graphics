@@ -44,10 +44,6 @@
 
 #include <algorithm>
 
-// TODO the window name should be customized from the CMakeLists.txt
-//      properties (see LAF_X11_WM_CLASS too)
-#define OS_WND_CLASS_NAME L"Aseprite.Window"
-
 #define KEY_TRACE(...)
 #define MOUSE_TRACE(...)
 #define TOUCH_TRACE(...)
@@ -135,6 +131,17 @@ static BOOL CALLBACK log_monitor_info(HMONITOR monitor,
         iccFilename.c_str());
   }
   return TRUE;
+}
+
+std::wstring get_wnd_class_name()
+{
+  if (auto sys = instance()) {
+    if (!sys->appName().empty())
+      return base::from_utf8(sys->appName());
+  }
+  // On Windows the class name cannot be empty, if we use an empty
+  // class the window class registration will fail.
+  return std::wstring(L"laf");
 }
 
 // Keys used to detect if the Windows 11 dark mode is selected.
@@ -318,7 +325,9 @@ WindowWin::~WindowWin()
 
   // If this assert fails it's highly probable that an os::WindowRef
   // was kept alive in some kind of memory leak (or just inside an
-  // os::Event in the os::EventQueue).
+  // os::Event in the os::EventQueue). Also this can happen when
+  // declaring a os::WindowRef before calling os::make_system(),
+  // because of deletion order when destructors got called.
   ASSERT(sys);
 
   if (sys) {
@@ -343,8 +352,9 @@ os::ScreenRef WindowWin::screen() const
 
 os::ColorSpaceRef WindowWin::colorSpace() const
 {
-  if (auto defaultCS = os::instance()->windowsColorSpace())
-    return defaultCS;
+  if (os::instance())
+    if (auto defaultCS = os::instance()->windowsColorSpace())
+      return defaultCS;
 
   if (m_hwnd) {
     HMONITOR monitor = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
@@ -608,6 +618,26 @@ void WindowWin::setMousePosition(const gfx::Point& position)
   system()->_setInternalMousePosition(gfx::Point(pos.x, pos.y));
 }
 
+void WindowWin::onSetDragTarget()
+{
+  HRESULT result;
+  // Drag target was set, then register for drag and drop.
+  if (hasDragTarget()) {
+    m_dragTargetAdapter = std::make_unique<DragTargetAdapter>(this);
+    result = RegisterDragDrop(m_hwnd, reinterpret_cast<LPDROPTARGET>(m_dragTargetAdapter.get()));
+    if (result != S_OK) {
+      LOG(LogLevel::ERROR, "Could not register window for Drag & Drop: %d\n", result);
+    }
+  }
+  else { // Drag target was unset (set to nullptr), then revoke DnD registration.
+    m_dragTargetAdapter = nullptr;
+    result = RevokeDragDrop(m_hwnd);
+    if (result != S_OK) {
+      LOG(LogLevel::ERROR, "Could not revoke Drag & Drop: %d\n", result);
+    }
+  }
+}
+
 bool WindowWin::setCursor(NativeCursor cursor)
 {
   HCURSOR hcursor = NULL;
@@ -835,10 +865,10 @@ void WindowWin::setInterpretOneFingerGestureAsMouseMovement(bool state)
   }
 }
 
-void WindowWin::onTabletAPIChange()
+void WindowWin::onTabletOptionsChange()
 {
-  LOG("WIN: On window %p tablet API change %d\n",
-      m_hwnd, int(system()->tabletAPI()));
+  LOG("WIN: On window %p tablet options change tablet API=%d\n",
+      m_hwnd, int(tabletAPI()));
 
   closeWintabCtx();
   openWintabCtx();
@@ -859,7 +889,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
 
     case WM_CREATE: {
       LOG("WIN: Creating window %p (tablet API %d)\n",
-          m_hwnd, int(system()->tabletAPI()));
+          m_hwnd, int(tabletAPI()));
       openWintabCtx();
 
       if (m_borderless &&
@@ -1271,7 +1301,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
                   ev.position().x, ev.position().y,
                   ev.button(), (int)m_pointerType);
 
-      if (system()->tabletAPI() == TabletAPI::WintabPackets &&
+      if (tabletAPI() == TabletAPI::WintabPackets &&
           same_mouse_event(ev, m_lastWintabEvent)) {
         MOUSE_TRACE(" - IGNORED (WinTab)\n");
       }
@@ -1306,7 +1336,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
                   ev.position().x, ev.position().y,
                   ev.button());
 
-      if (system()->tabletAPI() == TabletAPI::WintabPackets &&
+      if (tabletAPI() == TabletAPI::WintabPackets &&
           same_mouse_event(ev, m_lastWintabEvent)) {
         MOUSE_TRACE(" - IGNORED (WinTab)\n");
       }
@@ -1917,7 +1947,6 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
     }
 
     case WT_PACKET: {
-      const TabletAPI tabletAPI = system()->tabletAPI();
       auto& api = system()->wintabApi();
       HCTX ctx = (HCTX)lparam;
       if (m_packets.size() < api.packetQueueSize())
@@ -1950,7 +1979,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
         }
         m_pointerType = wt_packet_pkcursor_to_pointer_type(packet.pkCursor);
 
-        if (tabletAPI == TabletAPI::WintabPackets) {
+        if (tabletAPI() == TabletAPI::WintabPackets) {
           POINT pos = { packet.pkX,
                         // Wintab API uses lower-left corner as the origin
                         (api.outBounds().h-1) - packet.pkY };
@@ -1996,8 +2025,7 @@ LRESULT WindowWin::wndProc(UINT msg, WPARAM wparam, LPARAM lparam)
     }
 
     case WT_INFOCHANGE: {
-      const TabletAPI tabletAPI = system()->tabletAPI();
-      MOUSE_TRACE("WT_INFOCHANGE tablet API %d\n", int(tabletAPI));
+      MOUSE_TRACE("WT_INFOCHANGE tablet API %d\n", int(tabletAPI()));
 
       if (m_hpenctx) {
         closeWintabCtx();
@@ -2033,7 +2061,11 @@ bool WindowWin::pointerEvent(WPARAM wparam, Event& ev, POINTER_INFO& pi)
   if (!m_usePointerApi)
     return false;
 
-  auto& winApi = system()->winApi();
+  auto sys = system();
+  if (!sys)
+    return false;
+
+  auto& winApi = sys->winApi();
   if (!winApi.GetPointerInfo(GET_POINTERID_WPARAM(wparam), &pi))
     return false;
 
@@ -2042,6 +2074,15 @@ bool WindowWin::pointerEvent(WPARAM wparam, Event& ev, POINTER_INFO& pi)
   ev.setModifiers(get_modifiers_from_last_win32_message());
   ev.setPosition(gfx::Point((pi.ptPixelLocation.x - rc.left) / m_scale,
                             (pi.ptPixelLocation.y - rc.top) / m_scale));
+
+  // Calling SetCursorPos() when we receive a pointer event from the
+  // stylus can fix issues live streaming with OBS and a stylus, where
+  // the captured mouse position is always obtained through
+  // GetCursorPos() but we are in other position with the stylus.
+  if (sys->tabletOptions().setCursorFix) {
+    SetCursorPos(pi.ptPixelLocation.x,
+                 pi.ptPixelLocation.y);
+  }
 
   switch (pi.pointerType) {
     case PT_MOUSE: {
@@ -2110,8 +2151,7 @@ void WindowWin::handleMouseMove(Event& ev)
 
   ev.setType(Event::MouseMove);
 
-  auto sys = system();
-  if (sys->tabletAPI() == TabletAPI::WintabPackets &&
+  if (tabletAPI() == TabletAPI::WintabPackets &&
       same_mouse_event(ev, m_lastWintabEvent)) {
     MOUSE_TRACE(" - IGNORED (WinTab)\n");
   }
@@ -2119,7 +2159,7 @@ void WindowWin::handleMouseMove(Event& ev)
     queueEvent(ev);
     m_lastWintabEvent.setType(Event::None);
 
-    sys->_setInternalMousePosition(ev);
+    system()->_setInternalMousePosition(ev);
   }
 }
 
@@ -2413,17 +2453,20 @@ void WindowWin::checkDarkModeChange()
 
 void WindowWin::openWintabCtx()
 {
-  const TabletAPI tabletAPI = system()->tabletAPI();
-  if (tabletAPI == TabletAPI::Wintab ||
-      tabletAPI == TabletAPI::WintabPackets) {
+  auto sys = system();
+  TabletOptions options = sys->tabletOptions();
+  if (options.api == TabletAPI::Wintab ||
+      options.api == TabletAPI::WintabPackets) {
     // Attach Wacom context
-    auto& api = system()->wintabApi();
+    auto& api = sys->wintabApi();
     m_hpenctx = api.open(
       m_hwnd,
       true); // We want to move the cursor with the pen in any case
 
-    if (api.crashedBefore())
-      system()->setTabletAPI(TabletAPI::Default);
+    if (api.crashedBefore()) {
+      options.api = TabletAPI::Default;
+      sys->setTabletOptions(options);
+    }
   }
 }
 
@@ -2453,13 +2496,22 @@ void WindowWin::notifyFullScreenStateToShell()
   taskbar->MarkFullscreenWindow(m_hwnd, m_fullscreen ? TRUE: FALSE);
 }
 
+TabletAPI WindowWin::tabletAPI() const
+{
+  if (auto sys = system())
+    return sys->tabletOptions().api;
+  else
+    return TabletAPI::Default;
+}
+
 //static
 void WindowWin::registerClass()
 {
   HMODULE instance = GetModuleHandle(nullptr);
+  const auto className = get_wnd_class_name();
 
   WNDCLASSEX wcex;
-  if (GetClassInfoEx(instance, OS_WND_CLASS_NAME, &wcex))
+  if (GetClassInfoEx(instance, className.c_str(), &wcex))
     return;                 // Already registered
 
   wcex.cbSize        = sizeof(WNDCLASSEX);
@@ -2472,7 +2524,7 @@ void WindowWin::registerClass()
   wcex.hCursor       = NULL;
   wcex.hbrBackground = (HBRUSH)(COLOR_WINDOWFRAME+1);
   wcex.lpszMenuName  = nullptr;
-  wcex.lpszClassName = OS_WND_CLASS_NAME;
+  wcex.lpszClassName = className.c_str();
   wcex.hIconSm       = nullptr;
 
   if (RegisterClassEx(&wcex) == 0)
@@ -2549,9 +2601,10 @@ HWND WindowWin::createHwnd(WindowWin* self, const WindowSpec& spec)
     rc.h = CW_USEDEFAULT;
   }
 
+  const auto className = get_wnd_class_name();
   HWND hwnd = CreateWindowEx(
     exStyle,
-    OS_WND_CLASS_NAME,
+    className.c_str(),
     L"",
     style,
     rc.x, rc.y, rc.w, rc.h,

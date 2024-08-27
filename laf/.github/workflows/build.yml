@@ -23,12 +23,11 @@ jobs:
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]] ; then
           if [[ "${{ matrix.backend }}" == "skia" ]] ; then
-            choco install wget
+            choco install wget -y --no-progress
             wget https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip
             unzip Skia-Windows-Release-x64.zip -d skia
           fi
         elif [[ "${{ runner.os }}" == "macOS" ]] ; then
-          brew install pixman freetype harfbuzz zlib
           if [[ "${{ matrix.backend }}" == "skia" ]] ; then
             wget https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-macOS-Release-arm64.zip
             unzip Skia-macOS-Release-arm64.zip -d skia
@@ -74,6 +73,7 @@ jobs:
             -DSKIA_DIR=skia
         else
           cmake . -G Ninja \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DLAF_BACKEND=${{ matrix.backend }} \
             -DSKIA_DIR=skia

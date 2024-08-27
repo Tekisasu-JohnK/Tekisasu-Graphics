@@ -37,6 +37,7 @@
       <link text="Igara Studio S.A." url="https://igara.com/" />
     </hbox>
     <link text="https://www.aseprite.org/" url="https://www.aseprite.org/" />
+    <separator horizontal="true" />
     <hbox>
       <boxfiller />
       <button text="@general.close" closewindow="true" id="ok" magnet="true" minwidth="60" />

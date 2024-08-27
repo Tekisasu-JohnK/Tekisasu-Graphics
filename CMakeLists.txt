@@ -60,6 +60,7 @@ option(ENABLE_DRM          "Compile the DRM-enabled version (e.g. for automatic 
 option(ENABLE_STEAM        "Compile with Steam library" off)
 option(ENABLE_DEVMODE      "Compile vesion for developers" off)
 option(ENABLE_UI           "Compile UI (turn off to compile CLI-only version)" on)
+option(ENABLE_I18N_STRINGS "Clone i18n strings repo (https://github.com/aseprite/strings) to bin/data/strings.git" off)
 option(FULLSCREEN_PLATFORM "Enable fullscreen by default" off)
 option(ENABLE_CLANG_TIDY   "Enable static analysis" off)
 option(ENABLE_CCACHE       "Use CCache to improve recompilation speed (optional)" on)
@@ -82,13 +83,18 @@ else()
   set(REQUIRE_CURL OFF)
 endif()
 
-# Select libcurl's TLS backend according to target platform
-if(REQUIRE_CURL AND ENABLE_DRM)
-  if(APPLE)
-    option(CMAKE_USE_SECTRANSP "enable Apple OS native SSL/TLS" ON)
-  endif()
+# SSL/TLS support
+if(REQUIRE_CURL AND NOT USE_SHARED_CURL)
+  # Disable OpenSSL (use native libraries only)
+  set(CMAKE_USE_OPENSSL OFF CACHE BOOL "Use OpenSSL code. Experimental")
+  set(CMAKE_USE_LIBSSH2 OFF CACHE BOOL "Use libSSH2")
+
   if(WIN32)
-    set(CMAKE_USE_SCHANNEL "enable Windows native SSL/TLS" ON)
+    set(CMAKE_USE_SCHANNEL ON CACHE BOOL "enable Windows native SSL/TLS")
+  elseif(APPLE)
+    set(CMAKE_USE_SECTRANSP ON CACHE BOOL "enable Apple OS native SSL/TLS")
+  else()
+    # TODO Linux?
   endif()
 endif()
 

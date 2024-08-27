@@ -33,21 +33,11 @@ public:
   ::XIM xim() const { return m_xim; }
   XInput* xinput();
 
-  std::string userDefinedTablet() { return m_userDefinedTablet; }
-  void setUserDefinedTablet(const std::string& str) {
-    m_userDefinedTablet = str;
-  }
-
 private:
   ::Display* m_display;
   ::XIM m_xim;
   std::unique_ptr<XInput> m_xinput;
-  std::string m_userDefinedTablet;
 };
-
-// User-defined string to detect a stylys/pen because it looks like
-// Linux doesn't offer a flag/device type to detect them (?)
-void x11_set_user_defined_string_to_detect_stylus(const std::string& str);
 
 } // namespace os
 

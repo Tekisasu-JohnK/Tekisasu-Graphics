@@ -6,6 +6,7 @@
 // Read LICENSE.txt for more information.
 
 #include "base/file_handle.h"
+#include "base/fs.h"
 #include "base/ints.h"
 #include "base/paths.h"
 #include "base/time.h"
@@ -208,11 +209,24 @@ std::string get_user_docs_folder()
 
 std::string get_canonical_path(const std::string& path)
 {
+  const std::string full = get_absolute_path(path);
   char buffer[PATH_MAX];
   // Ignore return value as realpath() returns nullptr anyway when the
   // resolved_path parameter is specified.
-  realpath(path.c_str(), buffer);
-  return buffer;
+  if (realpath(full.c_str(), buffer))
+    return buffer;                // No error, the file/dir exists
+  return std::string();
+}
+
+std::string get_absolute_path(const std::string& path)
+{
+  std::string full = path;
+  if (!full.empty() && full[0] != '/')
+    full = join_path(get_current_path(), full);
+  full = normalize_path(full);
+  if (!full.empty() && full.back() == path_separator)
+    full.erase(full.size()-1);
+  return full;
 }
 
 paths list_files(const std::string& path)

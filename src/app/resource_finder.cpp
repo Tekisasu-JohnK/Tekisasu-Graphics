@@ -90,7 +90,7 @@ void ResourceFinder::includeDataDir(const char* filename)
 #ifdef _WIN32
 
   std::snprintf(buf, sizeof(buf), "data/%s", filename);
-  includeHomeDir(buf); // %AppData%/TekisasuGraphics/data/filename
+  includeHomeDir(buf); // %AppData%/Tekisasugraphics/data/filename
   includeBinDir(buf);  // $BINDIR/data/filename
 
 #elif __APPLE__

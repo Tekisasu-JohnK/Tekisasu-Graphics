@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2024 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -18,6 +18,7 @@ namespace base {
   using FileHandle = std::shared_ptr<FILE>;
 
   FILE* open_file_raw(const std::string& filename, const std::string& mode);
+  FILE* reopen_file_raw(const std::string& filename, const std::string& mode, FILE* stream);
   FileHandle open_file(const std::string& filename, const std::string& mode);
   FileHandle open_file_with_exception(const std::string& filename, const std::string& mode);
   FileHandle open_file_with_exception_sync_on_close(const std::string& filename, const std::string& mode);

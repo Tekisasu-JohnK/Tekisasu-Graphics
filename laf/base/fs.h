@@ -17,8 +17,14 @@ namespace base {
 
   class Time;
 
-  // Default path separator (on Windows it is '\' and on Unix-like systems it is '/').
-  extern const std::string::value_type path_separator;
+  // Default path separator (on Windows it is '\' and on Unix-like
+  // systems it is '/').
+#if LAF_WINDOWS
+  static constexpr const std::string::value_type path_separator = '\\';
+#else
+  static constexpr const std::string::value_type path_separator = '/';
+#endif
+  extern const std::string::value_type* path_separators;
 
   bool is_file(const std::string& path);
   bool is_directory(const std::string& path);
@@ -48,18 +54,28 @@ namespace base {
   std::string get_lib_app_support_path();
 #endif
 
-  // If the given filename is a relative path, it converts the
-  // filename to an absolute one.
+  // Converts an existing file path to an absolute one, or returns an
+  // empty string if the file doesn't exist. It uses realpath() on
+  // POSIX-like systems and GetFullPathName() on Windows.
   std::string get_canonical_path(const std::string& path);
 
-  // TODO why get_canonical_path() is not enough?
-  std::string get_absolute_path(const std::string& filename);
+  // Returns the absolute path using lexical/string operations, and
+  // get_current_path() when needed. Doesn't require an existing file
+  // in "path". The returned path shouldn't contain "." or ".."
+  // elements (is a normalized path).
+  std::string get_absolute_path(const std::string& path);
 
   paths list_files(const std::string& path);
 
   // Returns true if the given character is a valud path separator
   // (any of '\' or '/' characters).
-  bool is_path_separator(std::string::value_type chr);
+  inline constexpr bool is_path_separator(std::string::value_type chr) {
+    return (
+#if LAF_WINDOWS
+      chr == '\\' ||
+#endif
+      chr == '/');
+  }
 
   // Returns only the path (without the last trailing slash).
   std::string get_file_path(const std::string& filename);
@@ -77,6 +93,9 @@ namespace base {
   std::string get_file_title(const std::string& filename);
   std::string get_file_title_with_path(const std::string& filename);
 
+  // Returns the relative path of the given filename from the base_path.
+  std::string get_relative_path(const std::string& filename, const std::string& base_path);
+
   // Joins two paths or a path and a file name with a path-separator.
   std::string join_path(const std::string& path, const std::string& file);
 
@@ -86,9 +105,9 @@ namespace base {
   // Replaces all separators with the system separator.
   std::string fix_path_separators(const std::string& filename);
 
-  // Calls get_canonical_path() and fix_path_separators() for the
-  // given filename.
-  std::string normalize_path(const std::string& filename);
+  // Remove superfluous path elements ("/../" and "/./") and call
+  // fix_path_separators() for the given path.
+  std::string normalize_path(const std::string& path);
 
   // Returns true if the filename contains one of the specified
   // extensions. The "extensions" parameter must be a set of possible

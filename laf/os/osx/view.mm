@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2015-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,12 +15,16 @@
 
 #include "base/debug.h"
 #include "gfx/point.h"
+#include "os/osx/dnd.h"
 #include "os/event.h"
 #include "os/event_queue.h"
 #include "os/osx/generate_drop_files.h"
 #include "os/osx/keys.h"
 #include "os/osx/window.h"
 #include "os/system.h"
+#include "os/window.h"
+
+#include <memory>
 
 namespace os {
 
@@ -144,6 +148,9 @@ using namespace os;
       [self registerForDraggedTypes:
               [NSArray arrayWithObjects:
                          NSFilenamesPboardType,
+                         NSPasteboardTypePNG,
+                         NSPasteboardTypeTIFF,
+                         NSURLPboardType,
                        nil]];
 
       // Create a CALayer for backing content with async drawing. This
@@ -650,28 +657,78 @@ using namespace os;
   }
 }
 
+os::DragEvent newDragEvent(id<NSDraggingInfo> sender)
+{
+  NSPasteboard* pasteboard = [sender draggingPasteboard];
+  std::unique_ptr<DragDataProvider> ddProvider = std::make_unique<DragDataProviderOSX>(pasteboard);
+  os::Window* window = [(WindowOSXObjc*)sender.draggingDestinationWindow impl];
+  return os::DragEvent(window,
+                       as_dropoperation([sender draggingSourceOperationMask]),
+                       drag_position(sender),
+                       ddProvider);
+}
+
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender
 {
-  return NSDragOperationCopy;
+  WindowOSXObjc* target = (WindowOSXObjc*)sender.draggingDestinationWindow;
+
+  if (!target || ![target impl]->hasDragTarget())
+    return NSDragOperationCopy;
+
+  os::DragEvent ev = newDragEvent(sender);
+  os::Window* window = [target impl];
+  window->notifyDragEnter(ev);
+  return as_nsdragoperation(ev.dropResult());
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender
+{
+  NSDragOperation value = [super draggingUpdated:sender];
+  WindowOSXObjc* target = (WindowOSXObjc*)sender.draggingDestinationWindow;
+
+  if (!target || ![target impl]->hasDragTarget())
+    return value;
+
+  os::DragEvent ev = newDragEvent(sender);
+  ev.dropResult(as_dropoperation(value));
+  os::Window* window = [target impl];
+  window->notifyDrag(ev);
+  return as_nsdragoperation(ev.dropResult());
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender
+{
+  WindowOSXObjc* target = (WindowOSXObjc*)sender.draggingDestinationWindow;
+
+  if (!target || ![target impl]->hasDragTarget())
+    return;
+
+  os::DragEvent ev = newDragEvent(sender);
+  os::Window* window = [target impl];
+  window->notifyDragLeave(ev);
 }
 
 - (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
 {
   NSPasteboard* pasteboard = [sender draggingPasteboard];
+  WindowOSXObjc* target = (WindowOSXObjc*)sender.draggingDestinationWindow;
 
-  if ([pasteboard.types containsObject:NSFilenamesPboardType]) {
+  // Try to generate a DropFiles event if no DragTarget is defined.
+  if (!target || ![target impl]->hasDragTarget()) {
+    if (![pasteboard.types containsObject:NSFilenamesPboardType])
+      return NO;
+
     NSArray* filenames = [pasteboard propertyListForType:NSFilenamesPboardType];
-
     os::Event ev = generate_drop_files_from_nsarray(filenames);
-    NSRect contentRect = [sender.draggingDestinationWindow contentRectForFrameRect: sender.draggingDestinationWindow.frame];
-    ev.setPosition(gfx::Point(
-      sender.draggingLocation.x,
-      contentRect.size.height - sender.draggingLocation.y));
+    ev.setPosition(drag_position(sender));
     [self queueEvent:ev];
     return YES;
   }
-  else
-    return NO;
+
+  os::DragEvent ev = newDragEvent(sender);
+  os::Window* window = [target impl];
+  window->notifyDrop(ev);
+  return ev.acceptDrop();
 }
 
 - (void)doCommandBySelector:(SEL)selector

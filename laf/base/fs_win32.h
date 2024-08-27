@@ -5,16 +5,17 @@
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
-#include <stdexcept>
-#include <windows.h>
-#include <shlobj.h>
-#include <sys/stat.h>
-
+#include "base/fs.h"
 #include "base/paths.h"
 #include "base/string.h"
 #include "base/time.h"
 #include "base/version.h"
 #include "base/win/win32_exception.h"
+
+#include <stdexcept>
+#include <windows.h>
+#include <shlobj.h>
+#include <sys/stat.h>
 
 namespace base {
 
@@ -119,8 +120,7 @@ std::string get_current_path()
   TCHAR buffer[MAX_PATH+1];
   if (::GetCurrentDirectory(sizeof(buffer)/sizeof(TCHAR), buffer))
     return to_utf8(buffer);
-  else
-    return "";
+  return std::string();
 }
 
 void set_current_path(const std::string& path)
@@ -133,8 +133,7 @@ std::string get_app_path()
   TCHAR buffer[MAX_PATH+1];
   if (::GetModuleFileName(NULL, buffer, sizeof(buffer)/sizeof(TCHAR)))
     return to_utf8(buffer);
-  else
-    return "";
+  return std::string();
 }
 
 std::string get_temp_path()
@@ -152,15 +151,29 @@ std::string get_user_docs_folder()
     buffer);
   if (hr == S_OK)
     return to_utf8(buffer);
-  else
-    return "";
+  return std::string();
 }
 
 std::string get_canonical_path(const std::string& path)
 {
+  std::string full = get_absolute_path(path);
+  DWORD attr = ::GetFileAttributes(from_utf8(full).c_str());
+  if (attr != INVALID_FILE_ATTRIBUTES)
+    return full;
+  return std::string();
+}
+
+std::string get_absolute_path(const std::string& path)
+{
+  std::string full;
+  if (path.size() > 2 && path[1] != ':')
+    full = base::join_path(base::get_current_path(), path);
+  else
+    full = path;
+
   TCHAR buffer[MAX_PATH+1];
   GetFullPathName(
-    from_utf8(path).c_str(),
+    from_utf8(full).c_str(),
     sizeof(buffer)/sizeof(TCHAR),
     buffer,
     nullptr);

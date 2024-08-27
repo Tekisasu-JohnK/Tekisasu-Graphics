@@ -67,6 +67,10 @@ void DefaultCliDelegate::afterOpenFile(const CliOpenFile& cof)
       std::cout << layer->name() << "\n";
   }
 
+  if (cof.listLayerHierarchy) {
+    std::cout << cof.document->sprite()->visibleLayerHierarchyAsString() << "\n";
+  }
+
   if (cof.listTags) {
     for (doc::Tag* tag : cof.document->sprite()->tags())
       std::cout << tag->name() << "\n";
@@ -87,6 +91,9 @@ void DefaultCliDelegate::saveFile(Context* ctx, const CliOpenFile& cof)
 
   if (cof.hasTag()) {
     params.set("frame-tag", cof.tag.c_str());
+  }
+  if (cof.playSubtags) {
+    params.set("playSubtags", "true");
   }
   if (cof.hasFrameRange()) {
     params.set("from-frame", base::convert_to<std::string>(cof.fromFrame).c_str());

@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2021-2022 Igara Studio S.A.
+// Copyright (c) 2021-2024 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -27,16 +27,18 @@
 
 namespace base {
 
+// On Windows we can use \ or / as path separators, but on Unix-like
+// platforms it's just /, as \ can be part of the file name.
 #if LAF_WINDOWS
-  const std::string::value_type path_separator = '\\';
+  const std::string::value_type* path_separators = "\\/";
 #else
-  const std::string::value_type path_separator = '/';
+  const std::string::value_type* path_separators = "/";
 #endif
 
 void make_all_directories(const std::string& path)
 {
   std::vector<std::string> parts;
-  split_string(path, parts, "/\\");
+  split_string(path, parts, path_separators);
 
   std::string intermediate;
   for (const std::string& component : parts) {
@@ -53,31 +55,6 @@ void make_all_directories(const std::string& path)
     if (!is_directory(intermediate))
       make_directory(intermediate);
   }
-}
-
-std::string get_absolute_path(const std::string& filename)
-{
-  std::string fn = filename;
-  if (fn.size() > 2 &&
-#if LAF_WINDOWS
-      fn[1] != ':'
-#else
-      fn[0] != '/'
-#endif
-      ) {
-    fn = base::join_path(base::get_current_path(), fn);
-  }
-  fn = base::get_canonical_path(fn);
-  return fn;
-}
-
-bool is_path_separator(std::string::value_type chr)
-{
-  return (
-#if LAF_WINDOWS
-    chr == '\\' ||
-#endif
-    chr == '/');
 }
 
 std::string get_file_path(const std::string& filename)
@@ -210,6 +187,40 @@ std::string get_file_title_with_path(const std::string& filename)
   return filename;
 }
 
+std::string get_relative_path(const std::string& filename, const std::string& base_path)
+{
+  std::vector<std::string> baseDirs;
+  split_string(base_path, baseDirs, path_separators);
+
+  std::vector<std::string> toParts;
+  split_string(filename, toParts, path_separators);
+
+  // Find the common prefix
+  auto itFrom = baseDirs.begin();
+  auto itTo = toParts.begin();
+
+  while (itFrom != baseDirs.end() && itTo != toParts.end() && *itFrom == *itTo) {
+    ++itFrom;
+    ++itTo;
+  }
+
+  if (itFrom == baseDirs.begin() && itTo == toParts.begin()) {
+    // No common prefix
+    return filename;
+  }
+
+  // Calculate the number of directories to go up from base path
+  std::string relativePath;
+  for (auto it = itFrom; it != baseDirs.end(); ++it)
+    relativePath = base::join_path(relativePath, "..");
+
+  // Append the remaining part of 'toPath'
+  for (auto it = itTo; it != toParts.end(); ++it)
+    relativePath = base::join_path(relativePath, *it);
+
+  return relativePath;
+}
+
 std::string join_path(const std::string& path, const std::string& file)
 {
   std::string result(path);
@@ -236,19 +247,106 @@ std::string remove_path_separator(const std::string& path)
 
 std::string fix_path_separators(const std::string& filename)
 {
-  std::string result(filename);
+  std::string result;
+  result.reserve(filename.size());
 
-  // Replace any separator with the system path separator.
-  std::replace_if(result.begin(), result.end(),
-                  is_path_separator, path_separator);
+  size_t i = 0;
 
+#if LAF_WINDOWS
+  // Network paths can start with two backslashes
+  if (filename.size() >= 2 &&
+      filename[0] == path_separator && // Check for equality to backslash (\),
+      filename[1] == path_separator) { // no for is_path_separator()
+    result.push_back(path_separator);
+    result.push_back(path_separator);
+    i += 2;
+  }
+#endif
+
+  for (; i<filename.size(); ++i) {
+    const auto chr = filename[i];
+    if (is_path_separator(chr)) {
+      if (result.empty() || !is_path_separator(result.back()))
+        result.push_back(path_separator);
+    }
+    else
+      result.push_back(chr);
+  }
   return result;
 }
 
-std::string normalize_path(const std::string& filename)
+// It tries to replicate the standard path::lexically_normal()
+// algorithm from https://en.cppreference.com/w/cpp/filesystem/path
+std::string normalize_path(const std::string& _path)
 {
-  std::string fn = base::get_canonical_path(filename);
-  fn = base::fix_path_separators(fn);
+  // Normal form of an empty path is an empty path.
+  if (_path.empty())
+    return std::string();
+
+  // Replace multiple slashes with a single path_separator.
+  std::string path = fix_path_separators(_path);
+
+  std::string fn;
+  fn.reserve(path.size());
+
+  // Add the first separator for absolute paths.
+  if (!path.empty() && path[0] == path_separator) {
+    fn.push_back(path_separator);
+
+#if LAF_WINDOWS
+    // Add the second separator for network paths.
+    if (path.size() >= 2 &&
+        path[1] == path_separator) {
+      fn.push_back(path_separator);
+    }
+#endif
+  }
+
+  std::vector<std::string> parts;
+  split_string(path, parts, path_separators);
+
+  // Last element generates a final dot or slash in normalized path.
+  bool last_dot = false;
+
+  auto n = int(parts.size());
+  for (int i=0; i<n; ++i) {
+    const auto& part = parts[i];
+
+    // Remove each dot part.
+    if (part == ".") {
+      last_dot = true;
+
+      if (i+1 == n)
+        break;
+
+      fn = join_path(fn, std::string());
+      continue;
+    }
+
+    if (!part.empty())
+      last_dot = false;
+
+    if (part != ".." && i+1 < n &&
+        parts[i+1] == "..") {
+      // Skip this "part/.."
+      ++i;
+      last_dot = true;
+    }
+    else if (!part.empty()) {
+      fn = join_path(fn, part);
+    }
+    else
+      last_dot = true;
+  }
+  if (last_dot) {
+    if (fn.empty())
+      fn = ".";
+    else if (fn.back() != path_separator &&
+             // Don't include trailing slash for ".." filename
+             get_file_name(fn) != "..") {
+      fn.push_back(path_separator);
+    }
+  }
   return fn;
 }
 

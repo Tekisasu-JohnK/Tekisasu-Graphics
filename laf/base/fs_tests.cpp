@@ -10,7 +10,45 @@
 #include "base/file_content.h"
 #include "base/fs.h"
 
+#include <cstdio>
+
+#if !LAF_MACOS
+  #define COMPARE_WITH_STD_FS 1
+#endif
+
+#if COMPARE_WITH_STD_FS
+  // We cannot use the <filesystem> on macOS yet because we are
+  // targetting macOS 10.9 platform.
+  #include <filesystem>
+  namespace fs = std::filesystem;
+#endif
+
 using namespace base;
+
+#if COMPARE_WITH_STD_FS
+// We want to test against std::filesystem for future replacement of
+// some of our functions with the standard ones.
+TEST(FS, CurrentPath)
+{
+  // Compare with <filesystem>
+  EXPECT_EQ(fs::current_path(), get_current_path());
+  EXPECT_EQ(fs::path::preferred_separator, path_separator);
+}
+#endif
+
+TEST(FS, FixPathSeparators)
+{
+  const std::string sep(1, path_separator);
+  EXPECT_EQ(sep, fix_path_separators("/"));
+  EXPECT_EQ(sep, fix_path_separators("///"));
+  EXPECT_EQ(sep+"a"+sep, fix_path_separators("//a/"));
+  EXPECT_EQ("a"+sep+"b"+sep, fix_path_separators("a///b/"));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("\\\\hostname\\a\\b", fix_path_separators("\\\\hostname\\\\a/b"));
+  EXPECT_EQ("\\\\hostname\\b", fix_path_separators("\\\\/hostname\\b"));
+#endif
+}
 
 TEST(FS, MakeDirectory)
 {
@@ -174,10 +212,107 @@ TEST(FS, GetFileTitleWithPath)
   EXPECT_EQ("C:\\",            get_file_title_with_path("C:\\.cpp"));
 }
 
+TEST(FS, GetRelativePath)
+{
+  EXPECT_EQ("C:\\foo\\bar\\test.file", get_relative_path("C:\\foo\\bar\\test.file", "D:\\another\\disk"));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("bar\\test.file",           get_relative_path("C:\\foo\\bar\\test.file", "C:\\foo"));
+  EXPECT_EQ("C:\\foo\\bar\\test.file",  get_relative_path("C:\\foo\\bar\\test.file", "D:\\another\\disk"));
+  EXPECT_EQ("..\\bar\\test.file",       get_relative_path("C:\\foo\\bar\\test.file", "C:\\foo\\another"));
+  EXPECT_EQ("..\\..\\bar\\test.file",   get_relative_path("C:\\foo\\bar\\test.file", "C:\\foo\\a\\b"));
+#else
+  EXPECT_EQ("bar/test.file",            get_relative_path("C:/foo/bar/test.file", "C:/foo"));
+  EXPECT_EQ("C:/foo/bar/test.file",     get_relative_path("C:/foo/bar/test.file", "D:/another/disk"));
+  EXPECT_EQ("../bar/test.file",         get_relative_path("/foo/bar/test.file", "/foo/another"));
+  EXPECT_EQ("../../bar/test.file",      get_relative_path("/foo/bar/test.file", "/foo/a/b"));
+#endif
+}
+
+TEST(FS, GetAbsolutePath)
+{
+  const auto cp = get_current_path();
+
+  EXPECT_EQ(join_path(cp, "a"), get_absolute_path("a"));
+  EXPECT_EQ(join_path(cp, "a"), get_absolute_path("./a"));
+  EXPECT_EQ(cp, get_absolute_path("."));
+  EXPECT_EQ(cp, get_absolute_path("./."));
+  EXPECT_EQ(cp, get_absolute_path("./a/.."));
+  EXPECT_EQ(cp, get_absolute_path(".////."));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("C:\\file", get_absolute_path("C:/path/../file"));
+#else
+  EXPECT_EQ("/file", get_absolute_path("/path/../file"));
+#endif
+}
+
+TEST(FS, GetCanonicalPath)
+{
+  const auto cp = get_current_path();
+
+  EXPECT_EQ("", get_canonical_path("./non_existent_file"));
+  EXPECT_EQ("", get_canonical_path("non_existent_file"));
+  EXPECT_EQ(cp, get_canonical_path("."));
+
+  // Creates a file so get_canonical_path() returns its absolute path
+  write_file_content("_test_existing_file.txt", (uint8_t*)"123", 3);
+  EXPECT_EQ(join_path(cp, "_test_existing_file.txt"),
+            get_canonical_path("_test_existing_file.txt"));
+}
+
+TEST(FS, NormalizePath)
+{
+  const std::string sep(1, path_separator);
+
+  EXPECT_EQ("", normalize_path(""));
+  EXPECT_EQ(".", normalize_path("."));
+  EXPECT_EQ(".", normalize_path("./."));
+  EXPECT_EQ(".", normalize_path(".///./."));
+  EXPECT_EQ(".", normalize_path(".///./"));
+
+  EXPECT_EQ("a"+sep, normalize_path("a/."));
+  EXPECT_EQ("a"+sep, normalize_path("a/"));
+  EXPECT_EQ("a", normalize_path("./a"));
+  EXPECT_EQ("a"+sep+"b"+sep+"c", normalize_path("a///b/./c"));
+
+  EXPECT_EQ("..", normalize_path(".."));
+  EXPECT_EQ(".."+sep+"..", normalize_path("../.."));
+  EXPECT_EQ(".."+sep+"..", normalize_path("../../"));
+  EXPECT_EQ(".."+sep+"..", normalize_path(".././.."));
+  EXPECT_EQ(".."+sep+"..", normalize_path("./.././../."));
+
+  EXPECT_EQ(".", normalize_path("a/.."));
+  EXPECT_EQ("..", normalize_path("../a/.."));
+  EXPECT_EQ(".."+sep+"..", normalize_path("../a/../.."));
+  EXPECT_EQ("..", normalize_path("a/../.."));
+  EXPECT_EQ(sep+"b", normalize_path("/a/../b"));
+
+#if LAF_WINDOWS
+  EXPECT_EQ("\\\\hostname\\b", normalize_path("\\\\hostname\\\\a/../b"));
+  EXPECT_EQ("\\\\hostname\\b\\a", normalize_path("\\\\/hostname\\b/a"));
+#endif
+}
+
+#if COMPARE_WITH_STD_FS
+TEST(FS, CompareNormalizePathWithStd)
+{
+  for (const char* sample : { "", ".", "./.", ".///./.", ".///./",
+                              "a/.", "a/", "./a", "a///b/./c",
+                              "..", "../..",
+                              "../../", ".././..", "./.././../.",
+                              "a/..", "../a/..", "../a/../..", "a/../..",
+                              "/a/../b" }) {
+    EXPECT_EQ(fs::path(sample).lexically_normal(),
+              normalize_path(sample))
+      << "  sample=\"" << sample << "\"";
+  }
+}
+#endif
+
 TEST(FS, JoinPath)
 {
-  std::string sep;
-  sep.push_back(path_separator);
+  const std::string sep(1, path_separator);
 
   EXPECT_EQ("",                         join_path("", ""));
   EXPECT_EQ("fn",                       join_path("", "fn"));
@@ -194,31 +329,31 @@ TEST(FS, JoinPath)
 
 TEST(FS, RemovePathSeparator)
 {
-  EXPECT_EQ("C:/foo",                   remove_path_separator("C:/foo/"));
-  EXPECT_EQ("C:\\foo\\main.cpp",        remove_path_separator("C:\\foo\\main.cpp"));
-  EXPECT_EQ("C:\\foo\\main.cpp",        remove_path_separator("C:\\foo\\main.cpp/"));
+  EXPECT_EQ("C:/foo",            remove_path_separator("C:/foo/"));
+  EXPECT_EQ("C:\\foo\\main.cpp", remove_path_separator("C:\\foo\\main.cpp"));
+  EXPECT_EQ("C:\\foo\\main.cpp", remove_path_separator("C:\\foo\\main.cpp/"));
 
 #if LAF_WINDOWS
-  EXPECT_EQ("C:\\foo",                  remove_path_separator("C:\\foo\\"));
+  EXPECT_EQ("C:\\foo",           remove_path_separator("C:\\foo\\"));
 #else
-  EXPECT_EQ("C:\\foo\\",                remove_path_separator("C:\\foo\\"));
+  EXPECT_EQ("C:\\foo\\",         remove_path_separator("C:\\foo\\"));
 #endif
 }
 
 TEST(FS, HasFileExtension)
 {
-  EXPECT_TRUE (has_file_extension("hi.png", base::paths{"png"}));
-  EXPECT_FALSE(has_file_extension("hi.png", base::paths{"pngg"}));
-  EXPECT_FALSE(has_file_extension("hi.png", base::paths{"ppng"}));
-  EXPECT_TRUE (has_file_extension("hi.jpeg", base::paths{"jpg","jpeg"}));
-  EXPECT_TRUE (has_file_extension("hi.jpg", base::paths{"jpg","jpeg"}));
-  EXPECT_FALSE(has_file_extension("hi.ase", base::paths{"jpg","jpeg"}));
-  EXPECT_TRUE (has_file_extension("hi.ase", base::paths{"jpg","jpeg","ase"}));
-  EXPECT_TRUE (has_file_extension("hi.ase", base::paths{"ase","jpg","jpeg"}));
+  EXPECT_TRUE (has_file_extension("hi.png", paths{"png"}));
+  EXPECT_FALSE(has_file_extension("hi.png", paths{"pngg"}));
+  EXPECT_FALSE(has_file_extension("hi.png", paths{"ppng"}));
+  EXPECT_TRUE (has_file_extension("hi.jpeg", paths{"jpg","jpeg"}));
+  EXPECT_TRUE (has_file_extension("hi.jpg", paths{"jpg","jpeg"}));
+  EXPECT_FALSE(has_file_extension("hi.ase", paths{"jpg","jpeg"}));
+  EXPECT_TRUE (has_file_extension("hi.ase", paths{"jpg","jpeg","ase"}));
+  EXPECT_TRUE (has_file_extension("hi.ase", paths{"ase","jpg","jpeg"}));
 
-  EXPECT_TRUE (has_file_extension("hi.png", base::paths{"Png"}));
-  EXPECT_TRUE (has_file_extension("hi.pnG", base::paths{"bmp","PNg"}));
-  EXPECT_TRUE (has_file_extension("hi.bmP", base::paths{"bMP","PNg"}));
+  EXPECT_TRUE (has_file_extension("hi.png", paths{"Png"}));
+  EXPECT_TRUE (has_file_extension("hi.pnG", paths{"bmp","PNg"}));
+  EXPECT_TRUE (has_file_extension("hi.bmP", paths{"bMP","PNg"}));
 }
 
 TEST(FS, ReplaceExtension)
@@ -267,13 +402,13 @@ TEST(FS, CopyFiles)
   std::vector<uint8_t> data = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd' };
   const std::string dst = "_test_copy_.tmp";
 
-  if (base::is_file(dst))
-    base::delete_file(dst);
+  if (is_file(dst))
+    delete_file(dst);
 
-  base::write_file_content("_test_orig_.tmp", data.data(), data.size());
-  base::copy_file("_test_orig_.tmp", dst, true);
+  write_file_content("_test_orig_.tmp", data.data(), data.size());
+  copy_file("_test_orig_.tmp", dst, true);
 
-  EXPECT_EQ(data, base::read_file_content(dst));
+  EXPECT_EQ(data, read_file_content(dst));
 }
 
 int main(int argc, char** argv)

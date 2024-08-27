@@ -1,5 +1,5 @@
 // LAF Library
-// Copyright (C) 2022  Igara Studio S.A.
+// Copyright (C) 2022-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -55,6 +55,7 @@ public:
     m_window = system->makeWindow(256, 256);
     m_window->setCursor(os::NativeCursor::Arrow);
     m_window->setTitle("Shader");
+    m_window->setGpuAcceleration(true);
     repaint();
     m_window->setVisible(true);
   }
@@ -73,8 +74,7 @@ public:
         if (ev.scancode() == os::kKeyEsc)
           return false;
         else if (ev.scancode() == os::kKeyG) {
-          os::instance()->setGpuAcceleration(
-            !os::instance()->gpuAcceleration());
+          m_window->setGpuAcceleration(!m_window->gpuAcceleration());
         }
         break;
 
@@ -92,7 +92,7 @@ public:
     SkCanvas* canvas = &static_cast<os::SkiaSurface*>(surface)->canvas();
     skiaPaint(canvas);
 
-    if (m_window->isGpuAccelerated()) {
+    if (m_window->gpuAcceleration()) {
       os::Paint p;
       p.color(gfx::rgba(0, 0, 0));
       os::draw_text(surface, nullptr, "GPU", gfx::Point(12, 12),

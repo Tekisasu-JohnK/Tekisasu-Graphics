@@ -49,6 +49,11 @@ gfx::Rect Sprite::DefaultGridBounds()
 void Sprite::SetDefaultGridBounds(const gfx::Rect& defGridBounds)
 {
   g_defaultGridBounds = defGridBounds;
+  // Prevent setting an empty grid bounds
+  if (g_defaultGridBounds.w <= 0)
+    g_defaultGridBounds.w = 1;
+  if (g_defaultGridBounds.h <= 0)
+    g_defaultGridBounds.h = 1;
 }
 
 // static
@@ -311,7 +316,7 @@ LayerImage* Sprite::backgroundLayer() const
 Layer* Sprite::firstLayer() const
 {
   Layer* layer = root()->firstLayer();
-  while (layer->isGroup())
+  while (layer && layer->isGroup())
     layer = static_cast<LayerGroup*>(layer)->firstLayer();
   return layer;
 }
@@ -771,6 +776,11 @@ LayerList Sprite::allTilemaps() const
   LayerList list;
   m_root->allTilemaps(list);
   return list;
+}
+
+std::string Sprite::visibleLayerHierarchyAsString() const
+{
+  return m_root->visibleLayerHierarchyAsString("");
 }
 
 CelsRange Sprite::cels() const

@@ -14,6 +14,7 @@
 #include "os/menus.h"
 #include "os/osx/app.h"
 #include "os/osx/logger.h"
+#include "os/osx/menus.h"
 
 namespace os {
 
