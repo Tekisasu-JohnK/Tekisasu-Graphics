@@ -2,7 +2,7 @@
 # Copyright (C) 2020  Igara Studio S.A.
 
 # Version of Aseprite
-set(VERSION "1.3.8.1-p1")
+set(VERSION "1.3.8.1-p2")
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/generated_version.h.in"
