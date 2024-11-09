@@ -668,6 +668,11 @@ os::DragEvent newDragEvent(id<NSDraggingInfo> sender)
                        ddProvider);
 }
 
+- (BOOL)wantsPeriodicDraggingUpdates
+{
+  return false;
+}
+
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender
 {
   WindowOSXObjc* target = (WindowOSXObjc*)sender.draggingDestinationWindow;

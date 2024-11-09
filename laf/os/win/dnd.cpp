@@ -33,7 +33,7 @@ DWORD as_dropeffect(const os::DropOperation op)
 
 os::DropOperation as_dropoperation(DWORD pdwEffect)
 {
-  int op = 0;
+  int op = static_cast<int>(os::DropOperation::None);
   if (pdwEffect & DROPEFFECT_COPY)
     op |= static_cast<int>(os::DropOperation::Copy);
 

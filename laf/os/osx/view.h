@@ -65,6 +65,7 @@ namespace os {
 - (void)createMouseTrackingArea;
 - (void)destroyMouseTrackingArea;
 - (void)updateCurrentCursor;
+- (BOOL)wantsPeriodicDraggingUpdates;
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender;
 - (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender;
 - (void)draggingExited:(id<NSDraggingInfo>)sender;

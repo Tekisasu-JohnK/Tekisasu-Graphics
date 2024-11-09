@@ -120,7 +120,6 @@ void OpenFileCommand::onExecute(Context* context)
   base::paths filenames;
 
   // interactive
-#ifdef ENABLE_UI
   if (context->isUIAvailable() && m_filename.empty()) {
     base::paths exts = get_readable_extensions();
 
@@ -142,9 +141,7 @@ void OpenFileCommand::onExecute(Context* context)
     if (filenames.size() > 1)
       m_repeatCheckbox = true;
   }
-  else
-#endif // ENABLE_UI
-  if (!m_filename.empty()) {
+  else if (!m_filename.empty()) {
     filenames.push_back(m_filename);
   }
 
@@ -270,6 +267,21 @@ void OpenFileCommand::onExecute(Context* context)
         App::instance()->recentFiles()->removeRecentFile(m_filename);
     }
   }
+}
+
+std::string OpenFileCommand::onGetFriendlyName() const
+{
+  // TO DO: would be better to show the last part of the path
+  // via text size hint instead of a fixed number of chars.
+  auto uiScale = Preferences::instance().general.uiScale();
+  auto scScale = Preferences::instance().general.screenScale();
+  int pos(68.0 / double(uiScale) / double(scScale));
+  return Command::onGetFriendlyName().append(
+    (m_filename.empty() ?
+      "" :
+      (": " + (m_filename.size() >= pos ?
+                 m_filename.substr(m_filename.size() - pos, pos) :
+                 m_filename))));
 }
 
 Command* CommandFactory::createOpenFileCommand()

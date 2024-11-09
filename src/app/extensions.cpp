@@ -743,10 +743,8 @@ void Extension::exitScripts()
         auto cmd = cmds->byId(item.id.c_str());
         ASSERT(cmd);
         if (cmd) {
-#ifdef ENABLE_UI
           // TODO use a signal
           AppMenus::instance()->removeMenuItemFromGroup(cmd);
-#endif // ENABLE_UI
 
           cmds->remove(cmd);
 
@@ -756,8 +754,6 @@ void Extension::exitScripts()
         }
         break;
       }
-
-#ifdef ENABLE_UI
 
       case PluginItem::MenuSeparator:
         ASSERT(item.widget);
@@ -775,8 +771,6 @@ void Extension::exitScripts()
         // TODO use a signal
         AppMenus::instance()->removeMenuGroup(item.id);
         break;
-
-#endif // ENABLE_UI
 
     }
   }
@@ -800,7 +794,7 @@ Extensions::Extensions()
   // Create and get the user extensions directory
   {
     ResourceFinder rf2;
-    rf2.includeUserDir("extensions/.");
+    rf2.includeUserDir("extensions");
     m_userExtensionsPath = rf2.getFirstOrCreateDefault();
     m_userExtensionsPath = base::normalize_path(m_userExtensionsPath);
     if (!m_userExtensionsPath.empty() &&
@@ -817,33 +811,31 @@ Extensions::Extensions()
   // Load extensions from data/ directory on all possible locations
   // (installed folder and user folder)
   while (rf.next()) {
-    auto extensionsDir = rf.filename();
+    const auto& extensionsDir = rf.filename();
 
-    if (base::is_directory(extensionsDir)) {
-      for (auto fn : base::list_files(extensionsDir)) {
-        const auto dir = base::join_path(extensionsDir, fn);
-        if (!base::is_directory(dir))
-          continue;
+    if (!base::is_directory(extensionsDir))
+      continue;
 
-        const bool isBuiltinExtension =
-          (m_userExtensionsPath != base::get_file_path(dir));
+    for (const auto& fn : base::list_files(extensionsDir, base::ItemType::Directories)) {
+      const auto dir = base::join_path(extensionsDir, fn);
+      const bool isBuiltinExtension =
+        (m_userExtensionsPath != base::get_file_path(dir));
 
-        auto fullFn = base::join_path(dir, kPackageJson);
-        fullFn = base::normalize_path(fullFn);
+      auto fullFn = base::join_path(dir, kPackageJson);
+      fullFn = base::normalize_path(fullFn);
 
-        LOG("EXT: Loading extension '%s'...\n", fullFn.c_str());
-        if (!base::is_file(fullFn)) {
-          LOG("EXT: File '%s' not found\n", fullFn.c_str());
-          continue;
-        }
+      LOG("EXT: Loading extension '%s'...\n", fullFn.c_str());
+      if (!base::is_file(fullFn)) {
+        LOG("EXT: File '%s' not found\n", fullFn.c_str());
+        continue;
+      }
 
-        try {
-          loadExtension(dir, fullFn, isBuiltinExtension);
-        }
-        catch (const std::exception& ex) {
-          LOG("EXT: Error loading JSON file: %s\n",
-              ex.what());
-        }
+      try {
+        loadExtension(dir, fullFn, isBuiltinExtension);
+      }
+      catch (const std::exception& ex) {
+        LOG("EXT: Error loading JSON file: %s\n",
+            ex.what());
       }
     }
   }

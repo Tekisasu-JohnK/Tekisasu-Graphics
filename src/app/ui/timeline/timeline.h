@@ -190,7 +190,8 @@ namespace app {
     bool onCanClear(Context* ctx) override;
     bool onCut(Context* ctx) override;
     bool onCopy(Context* ctx) override;
-    bool onPaste(Context* ctx) override;
+    bool onPaste(Context* ctx,
+                 const gfx::Point* position) override;
     bool onClear(Context* ctx) override;
     void onCancel(Context* ctx) override;
 
@@ -482,7 +483,6 @@ namespace app {
     } m_resizeTagData;
   };
 
-#ifdef ENABLE_UI
   class LockTimelineRange {
   public:
     LockTimelineRange(Timeline* timeline)
@@ -497,12 +497,6 @@ namespace app {
   private:
     Timeline* m_timeline;
   };
-#else  // !ENABLE_UI
-  class LockTimelineRange {
-  public:
-    LockTimelineRange(Timeline* timeline) { }
-  };
-#endif
 
 } // namespace app
 

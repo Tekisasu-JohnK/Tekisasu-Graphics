@@ -32,6 +32,7 @@ public:
 protected:
   void onLoadParams(const Params& params) override;
   void onExecute(Context* context) override;
+  std::string onGetFriendlyName() const override;
 
 private:
   std::string m_preset;
@@ -61,7 +62,6 @@ void LoadPaletteCommand::onExecute(Context* context)
   else if (!m_filename.empty()) {
     filename = m_filename;
   }
-#ifdef ENABLE_UI
   else if (context->isUIAvailable()) {
     base::paths exts = get_readable_palette_extensions();
     base::paths filenames;
@@ -71,7 +71,6 @@ void LoadPaletteCommand::onExecute(Context* context)
       filename = filenames.front();
     }
   }
-#endif // ENABLE_UI
 
   // Do nothing
   if (filename.empty())
@@ -88,6 +87,14 @@ void LoadPaletteCommand::onExecute(Context* context)
     Commands::instance()->byId(CommandId::SetPalette()));
   cmd->setPalette(palette.get());
   context->executeCommand(cmd);
+}
+
+std::string LoadPaletteCommand::onGetFriendlyName() const
+{
+  std::string name = Command::onGetFriendlyName();
+  if (m_preset == "default")
+    name = Strings::commands_LoadDefaultPalette();
+  return name;
 }
 
 Command* CommandFactory::createLoadPaletteCommand()

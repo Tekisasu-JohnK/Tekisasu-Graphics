@@ -1,8 +1,9 @@
-# ASEPRITE
+# TEKISASU GRAPHICS
+# Copyright (C) 2021-present Tekisasu
 # Copyright (C) 2020  Igara Studio S.A.
 
-# Version of Aseprite
-set(VERSION "1.3.8.1-p2")
+# Version of Tekisasu Graphics
+set(VERSION "1.3.9.1-p1")
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/generated_version.h.in"

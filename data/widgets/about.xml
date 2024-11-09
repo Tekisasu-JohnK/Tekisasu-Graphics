@@ -33,7 +33,7 @@
     <link text="https://dev.tekisasu.com/" url="https://dev.tekisasu.com/" />
     <separator horizontal="true" />
     <hbox>
-      <label text="Copyright (C) 2001-2022" />
+      <label text="Copyright (C) 2001-2024" />
       <link text="Igara Studio S.A." url="https://igara.com/" />
     </hbox>
     <link text="https://www.aseprite.org/" url="https://www.aseprite.org/" />

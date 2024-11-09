@@ -1,13 +1,15 @@
-/* Aseprite
+/* Tekisasu Graphics
+   Copyright (C) 2021-present Tekisasu
    Copyright (C) 2020-2024  Igara Studio S.A.
 
-   This program is distributed under the terms of
-   the End-User License Agreement for Aseprite.  */
+   This program adhered to the terms of the End-User License Agreement for Aseprite. 
+   No distribution of this program is permitted outside of Tekisasu.   
+*/
 
 #include "ver/info.h"
 #include "generated_version.h"  /* It defines the VERSION macro */
 
-#define PACKAGE                 "Tekisasu-Graphics"
+#define PACKAGE                 "Tekisasu Graphics"
 #define COPYRIGHT               "Copyright (C) 2021-present Tekisasu, Copyright (C) 2001-2024 Igara Studio S.A."
 
 #if defined(_WIN32) || defined(__APPLE__)
@@ -16,8 +18,11 @@
   #define HTTP                  "http"
 #endif
 
-#define WEBSITE               HTTP "://dev.tekisasu.com/"
-
+#ifdef CUSTOM_WEBSITE_URL
+  #define WEBSITE               CUSTOM_WEBSITE_URL /* To test web server */
+#else
+  #define WEBSITE               HTTP "://www.aseprite.org/"
+#endif
 #define WEBSITE_DOWNLOAD        WEBSITE "download/"
 #define WEBSITE_CONTRIBUTORS    WEBSITE "contributors/"
 #define WEBSITE_NEWS_RSS        HTTP "://dev.tekisasu.com/aseprite-rss/rss"
