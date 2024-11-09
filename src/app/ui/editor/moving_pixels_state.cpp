@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -578,6 +578,25 @@ bool MovingPixelsState::acceptQuickTool(tools::Tool* tool)
      tool->getInk(0)->isZoom());
 }
 
+void MovingPixelsState::onBeforeLayerVisibilityChange(Editor* editor,
+                                                      doc::Layer* layer,
+                                                      bool newState)
+{
+  if (!isActiveDocument())
+    return;
+
+  // If the layer visibility of any selected layer changes, we just
+  // drop the pixels (it's the easiest way to avoid modifying hidden
+  // pixels).
+  if (m_pixelsMovement) {
+    const Site& site = m_pixelsMovement->site();
+    if (site.layer() == layer ||
+        site.range().contains(layer)) {
+      dropPixels();
+    }
+  }
+}
+
 // Before executing any command, we drop the pixels (go back to standby).
 void MovingPixelsState::onBeforeCommandExecution(CommandExecutionEvent& ev)
 {
@@ -716,6 +735,10 @@ void MovingPixelsState::onBeforeCommandExecution(CommandExecutionEvent& ev)
       ev.cancel();
       return;
     }
+  }
+  else if (command->id() == CommandId::ToggleTilesMode()) {
+    ev.cancel();
+    return;
   }
 
   if (m_pixelsMovement)

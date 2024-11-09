@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2021-2022  Igara Studio S.A.
+// Copyright (C) 2021-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -82,11 +82,11 @@ public:
 #if SK_SUPPORT_GPU
     // Re-create OpenGL context
     m_gl.detachGL();
-    if (m_glCtx->isValid())
+    if (m_glCtx && m_glCtx->isValid())
       m_glCtx->destroyGLContext();
 
     // GPU-accelerated surface
-    if (os::instance()->gpuAcceleration()) {
+    if (m_glCtx && m_preferGpuAcceleration) {
       m_glCtx->createGLContext();
 
       if (m_glCtx->isValid()) {
@@ -149,14 +149,14 @@ public:
 #if SK_SUPPORT_GPU
     if (m_backend == Backend::NONE ||
         !m_gl.backbufferSurface() ||
-        !m_glCtx->isValid())
+        !m_glCtx ||
+        !m_glCtx->isValid()) {
       return;
+    }
 
     auto surface = static_cast<SkiaSurface*>(this->surface());
     if (!surface)
       return;
-
-    m_glCtx->makeCurrent();
 
     // Draw the small (unscaled) surface to the backbuffer surface
     // scaling it to the this->scale() factor.
@@ -174,17 +174,24 @@ public:
       dstCanvas->restore();
     }
 
-    surface->flushAndSubmit();
+    m_gl.grCtx()->flushAndSubmit();
     m_glCtx->swapBuffers();
 #endif // SK_SUPPORT_GPU
   }
 
-  bool isGpuAccelerated() const override {
+  bool gpuAcceleration() const override {
 #if SK_SUPPORT_GPU
     return (m_backend == Backend::GL);
 #else
     return false;
 #endif
+  }
+
+  void setGpuAcceleration(bool state) override {
+    m_preferGpuAcceleration = state;
+    resetSkiaSurface();
+
+    T::setGpuAcceleration(state);
   }
 
 #if SK_SUPPORT_GPU
@@ -232,6 +239,7 @@ protected:
 #endif
 
 private:
+  bool m_preferGpuAcceleration = false;
   Backend m_backend = Backend::NONE;
   // Flag used to avoid accessing to an invalid m_surface in the first
   // SkiaWindow::resize() call when the window is created (as the

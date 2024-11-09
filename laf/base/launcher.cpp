@@ -124,7 +124,7 @@ bool open_folder(const std::string& _file)
     if (!base::is_directory(file))
       file = base::get_file_path(file);
 
-    int ret = std::system(("setsid xdg-open \"" + file + "\"").c_str());
+    const int ret = std::system(("setsid xdg-open \"" + file + "\"").c_str());
     return (ret == 0);
 
   #endif

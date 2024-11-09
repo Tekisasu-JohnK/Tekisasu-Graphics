@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020-2023  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -59,8 +59,8 @@ namespace app {
       ~SkinTheme();
 
       const std::string& path() { return m_path; }
-      int preferredScreenScaling() { return m_preferredScreenScaling; }
-      int preferredUIScaling() { return m_preferredUIScaling; }
+      int preferredScreenScaling() const { return m_preferredScreenScaling; }
+      int preferredUIScaling() const { return m_preferredUIScaling; }
 
       os::Font* getDefaultFont() const override { return m_defaultFont.get(); }
       os::Font* getWidgetFont(const ui::Widget* widget) const override;
@@ -108,7 +108,7 @@ namespace app {
         if (it != m_styles.end())
           return it->second;
         else
-          return nullptr;
+          return getDefaultStyle();
       }
 
       SkinPartPtr getPartById(const std::string& id) const {

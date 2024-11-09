@@ -55,17 +55,15 @@ protected:
     if (!writer.palette())
       return;
 
-    Tx tx(writer.context(), friendlyName(), ModifyDocument);
+    Tx tx(writer, friendlyName(), ModifyDocument);
     const int beforeIndex = params().before();
     int currentEntry = picks.firstPick();
 
-#ifdef ENABLE_UI
     if (ctx->isUIAvailable()) {
       auto& fgColor = Preferences::instance().colorBar.fgColor;
       if (fgColor().getType() == app::Color::IndexType)
         currentEntry = fgColor().getIndex();
     }
-#endif
 
     doc::Palette palette(*writer.palette());
     doc::Palette newPalette(palette);
@@ -79,13 +77,11 @@ protected:
 
     ctx->setSelectedColors(picks);
 
-#ifdef ENABLE_UI
     if (ctx->isUIAvailable()) {
       auto& fgColor = Preferences::instance().colorBar.fgColor;
       if (fgColor().getType() == app::Color::IndexType)
         fgColor(Color::fromIndex(currentEntry));
     }
-#endif
 
     tx.commit();
   }

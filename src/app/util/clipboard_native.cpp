@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -15,6 +15,7 @@
 #include "base/serialization.h"
 #include "clip/clip.h"
 #include "doc/color_scales.h"
+#include "doc/file/hex_file.h"
 #include "doc/image.h"
 #include "doc/image_impl.h"
 #include "doc/image_io.h"
@@ -27,6 +28,7 @@
 #include "ui/alert.h"
 
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace app {
@@ -51,7 +53,9 @@ namespace {
   };
 
   void* native_window_handle() {
-    return os::instance()->defaultWindow()->nativeHandle();
+    if (os::instance()->defaultWindow())
+      return os::instance()->defaultWindow()->nativeHandle();
+    return nullptr;
   }
 
   void custom_error_handler(clip::ErrorCode code) {
@@ -91,7 +95,8 @@ bool Clipboard::hasNativeBitmap() const
 bool Clipboard::setNativeBitmap(const doc::Image* image,
                                 const doc::Mask* mask,
                                 const doc::Palette* palette,
-                                const doc::Tileset* tileset)
+                                const doc::Tileset* tileset,
+                                const doc::color_t indexMaskColor)
 {
   clip::lock l(native_window_handle());
   if (!l.locked())
@@ -176,7 +181,7 @@ bool Clipboard::setNativeBitmap(const doc::Image* image,
           doc::color_t c = palette->getEntry(*it);
 
           // Use alpha=0 for mask color
-          if (*it == image->maskColor())
+          if (*it == indexMaskColor)
             c &= doc::rgba_rgb_mask;
 
           *(dst++) = c;
@@ -330,6 +335,28 @@ bool Clipboard::getNativeBitmapSize(gfx::Size* size)
   }
   else
     return false;
+}
+
+bool Clipboard::setNativePalette(const doc::Palette* palette,
+                                 const doc::PalettePicks& picks)
+{
+  clip::lock l(native_window_handle());
+  if (!l.locked())
+    return false;
+
+  l.clear();
+
+  // Save the palette in hex format as text
+  std::stringstream os;
+  doc::file::save_hex_file(
+    palette, &picks,
+    true, // include '#' on each line
+    false, // don't include a EOL char at the end (so we can copy one color without \n chars)
+    os);
+
+  std::string value = os.str();
+  l.set_data(clip::text_format(), value.c_str(), value.size());
+  return true;
 }
 
 } // namespace app

@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 // Copyright (C) 2016-2017  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -52,7 +52,7 @@ WTQueueSizeSet_Func WTQueueSizeSet;
 // Detects if WTOpen() crashes (which can happen if the stylus driver
 // is in a buggy state), writes a .crash file to avoid loading
 // wintab32.dll again in the next run, until the file is deleted,
-// i.e. when the System::setTabletAPI() is called again with the
+// i.e. when the System::setTabletOptions() is called again with the
 // TabletAPI::Wintab value.
 //
 // This is also useful to restore our original
@@ -87,7 +87,7 @@ class HandleSigSegv {
 
 private:
   static std::string getFilename() {
-    std::string appName = ((SystemWin*)os::instance())->appName();
+    std::string appName = os::instance()->appName();
     return base::join_path(base::get_temp_path(),
                            appName + "-wintab32.crash");
   }

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2023  Igara Studio S.A.
+// Copyright (C) 2023-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -19,7 +19,6 @@
 #include "app/modules/palettes.h"
 #include "base/fs.h"
 #include "doc/palette.h"
-#include "fmt/format.h"
 #include "ui/alert.h"
 
 namespace app {
@@ -33,6 +32,7 @@ public:
 protected:
   void onLoadParams(const Params& params) override;
   void onExecute(Context* context) override;
+  std::string onGetFriendlyName() const override;
 
 private:
   std::string m_preset;
@@ -62,7 +62,6 @@ void LoadPaletteCommand::onExecute(Context* context)
   else if (!m_filename.empty()) {
     filename = m_filename;
   }
-#ifdef ENABLE_UI
   else if (context->isUIAvailable()) {
     base::paths exts = get_readable_palette_extensions();
     base::paths filenames;
@@ -72,7 +71,6 @@ void LoadPaletteCommand::onExecute(Context* context)
       filename = filenames.front();
     }
   }
-#endif // ENABLE_UI
 
   // Do nothing
   if (filename.empty())
@@ -81,7 +79,7 @@ void LoadPaletteCommand::onExecute(Context* context)
   std::unique_ptr<doc::Palette> palette(load_palette(filename.c_str()));
   if (!palette) {
     if (context->isUIAvailable())
-      ui::Alert::show(fmt::format(Strings::alerts_error_loading_file(), filename));
+      ui::Alert::show(Strings::alerts_error_loading_file(filename));
     return;
   }
 
@@ -89,6 +87,14 @@ void LoadPaletteCommand::onExecute(Context* context)
     Commands::instance()->byId(CommandId::SetPalette()));
   cmd->setPalette(palette.get());
   context->executeCommand(cmd);
+}
+
+std::string LoadPaletteCommand::onGetFriendlyName() const
+{
+  std::string name = Command::onGetFriendlyName();
+  if (m_preset == "default")
+    name = Strings::commands_LoadDefaultPalette();
+  return name;
 }
 
 Command* CommandFactory::createLoadPaletteCommand()

@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2021  Igara Studio S.A.
+// Copyright (c) 2021-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -12,6 +12,8 @@
 
 #if LAF_WINDOWS
   #include <windows.h>
+
+  typedef LONG (WINAPI* RtlGetVersion_Func)(OSVERSIONINFOEX*);
 #elif LAF_LINUX  // Unix-like system
   #include <sys/utsname.h>
 #endif
@@ -29,9 +31,28 @@ Platform get_platform()
 
   OSVERSIONINFOEX osv;
   osv.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-  ::GetVersionEx((OSVERSIONINFO*)&osv);
 
-  p.osVer = Version(osv.dwMajorVersion, osv.dwMinorVersion, 0, 0);
+  // It looks like GetVersionEx() returns 6.2 for all Windows versions
+  // after Windows 8 and RtlGetVersion() returns the correct version
+  // and build number for Windows 10 and 11.
+  static const auto fnRtlGetVersion = reinterpret_cast<RtlGetVersion_Func>(
+    GetProcAddress(GetModuleHandle(L"ntdll.dll"),
+                   "RtlGetVersion"));
+  if (!fnRtlGetVersion ||
+      !fnRtlGetVersion(&osv) ||
+      !osv.dwMajorVersion) {
+    OSVERSIONINFOEX osv;
+    osv.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+    // Ignore deprecated function warning
+#pragma warning(push)
+#pragma warning(disable : 4996)
+    GetVersionEx((OSVERSIONINFO*)&osv);
+#pragma warning(pop)
+  }
+
+  p.osVer = Version(osv.dwMajorVersion,
+                    osv.dwMinorVersion,
+                    osv.dwBuildNumber, 0);
   switch (osv.wProductType) {
     case VER_NT_DOMAIN_CONTROLLER:
     case VER_NT_SERVER:
@@ -93,8 +114,8 @@ Platform get_platform()
           // Last resource, use uname() function
           struct utsname utsn;
           uname(&utsn);
-          if (utsn.sysname) p.distroName = utsn.sysname;
-          if (utsn.release) p.distroVer = utsn.release;
+          p.distroName = utsn.sysname;
+          p.distroVer = utsn.release;
         }
       }
     }

@@ -49,7 +49,7 @@ void MaskAllCommand::onExecute(Context* context)
   Mask newMask;
   newMask.replace(sprite->bounds());
 
-  Tx tx(writer.context(), "Select All", DoesntModifyDocument);
+  Tx tx(writer, "Select All", DoesntModifyDocument);
   tx(new cmd::SetMask(document, &newMask));
   document->resetTransformation();
   tx.commit();
@@ -59,10 +59,7 @@ void MaskAllCommand::onExecute(Context* context)
     docPref.show.selectionEdges(true);
   }
 
-#ifdef ENABLE_UI
-  if (context->isUIAvailable())
-    update_screen_for_document(document);
-#endif
+  update_screen_for_document(document);
 }
 
 Command* CommandFactory::createMaskAllCommand()

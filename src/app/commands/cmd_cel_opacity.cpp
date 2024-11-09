@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -22,7 +22,6 @@
 #include "doc/cel.h"
 #include "doc/cels_range.h"
 #include "doc/sprite.h"
-#include "fmt/format.h"
 
 #include <string>
 
@@ -73,15 +72,13 @@ void CelOpacityCommand::onExecute(Context* context)
     return;
 
   {
-    Tx tx(writer.context(), "Set Cel Opacity");
+    Tx tx(writer, "Set Cel Opacity");
 
     // TODO the range of selected cels should be in app::Site.
     DocRange range;
 
-#ifdef ENABLE_UI
     if (context->isUIAvailable())
       range = App::instance()->timeline()->range();
-#endif
 
     if (!range.enabled()) {
       range.startRange(layer, cel->frame(), DocRange::kCels);
@@ -101,17 +98,13 @@ void CelOpacityCommand::onExecute(Context* context)
     tx.commit();
   }
 
-#ifdef ENABLE_UI
-  if (context->isUIAvailable())
-    update_screen_for_document(writer.document());
-#endif
+  update_screen_for_document(writer.document());
 }
 
 std::string CelOpacityCommand::onGetFriendlyName() const
 {
-  return fmt::format(getBaseFriendlyName(),
-                     m_opacity,
-                     int(100.0 * m_opacity / 255.0));
+  return Strings::commands_CelOpacity(m_opacity,
+                                      int(100.0 * m_opacity / 255.0));
 }
 
 Command* CommandFactory::createCelOpacityCommand()

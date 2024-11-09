@@ -55,10 +55,10 @@ SystemX11::~SystemX11()
 
 CursorRef SystemX11::getNativeCursor(NativeCursor cursor)
 {
-  int i = int(cursor);
+  const int i = int(cursor);
   if (i < 0 || i >= int(NativeCursor::Cursors))
     return nullptr;
-  else if (g_nativeCursors[i].get())
+  if (g_nativeCursors[i].get())
     return g_nativeCursors[i];
 
   ::Display* display = X11::instance()->display();
@@ -66,7 +66,7 @@ CursorRef SystemX11::getNativeCursor(NativeCursor cursor)
   switch (cursor) {
     case NativeCursor::Hidden: {
       char data = 0;
-      Pixmap image = XCreateBitmapFromData(
+      const Pixmap image = XCreateBitmapFromData(
         display, DefaultRootWindow(display), (char*)&data, 1, 1);
 
       XColor color;
@@ -163,7 +163,7 @@ CursorRef SystemX11::makeCursor(const Surface* surface,
     for (int y=0; y<h; ++y) {
       const uint32_t* src = (const uint32_t*)surface->getData(0, y/scale);
       for (int x=0, u=0; x<w; ++x, ++dst) {
-        uint32_t c = *src;
+        const uint32_t c = *src;
         *dst =
           (((c & format.alphaMask) >> format.alphaShift) << 24) |
           (((c & format.redMask  ) >> format.redShift  ) << 16) |

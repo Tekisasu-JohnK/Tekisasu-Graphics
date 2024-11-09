@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -258,7 +258,7 @@ int save_document(Context* context, Doc* document)
     FileOp::createSaveDocumentOperation(
       context,
       FileOpROI(document, document->sprite()->bounds(),
-                "", "", SelectedFrames(), false),
+                "", "", FramesSequence(), false),
       document->filename(), "",
       false));
   if (!fop)
@@ -307,13 +307,13 @@ FileOpROI::FileOpROI(const Doc* doc,
                      const gfx::Rect& bounds,
                      const std::string& sliceName,
                      const std::string& tagName,
-                     const doc::SelectedFrames& selFrames,
+                     const doc::FramesSequence& framesSeq,
                      const bool adjustByTag)
   : m_document(doc)
   , m_bounds(bounds)
   , m_slice(nullptr)
   , m_tag(nullptr)
-  , m_selFrames(selFrames)
+  , m_framesSeq(framesSeq)
 {
   if (doc) {
     if (!sliceName.empty())
@@ -324,18 +324,18 @@ FileOpROI::FileOpROI(const Doc* doc,
       m_tag = doc->sprite()->tags().getByName(tagName);
 
     if (m_tag) {
-      if (m_selFrames.empty())
-        m_selFrames.insert(m_tag->fromFrame(), m_tag->toFrame());
+      if (m_framesSeq.empty())
+        m_framesSeq.insert(m_tag->fromFrame(), m_tag->toFrame());
       else if (adjustByTag)
-        m_selFrames.displace(m_tag->fromFrame());
+        m_framesSeq.displace(m_tag->fromFrame());
 
-      m_selFrames =
-        m_selFrames.filter(std::max(0, m_tag->fromFrame()),
+      m_framesSeq =
+        m_framesSeq.filter(std::max(0, m_tag->fromFrame()),
                            std::min(m_tag->toFrame(), doc->sprite()->lastFrame()));
     }
     // All frames if selected frames is empty
-    else if (m_selFrames.empty())
-      m_selFrames.insert(0, doc->sprite()->lastFrame());
+    else if (m_framesSeq.empty())
+      m_framesSeq.insert(0, doc->sprite()->lastFrame());
   }
 }
 
@@ -360,7 +360,7 @@ gfx::Size FileOpROI::fileCanvasSize() const
 {
   if (m_slice) {
     gfx::Size size;
-    for (auto frame : m_selFrames)
+    for (auto frame : m_framesSeq)
       size |= frameBounds(frame).size();
     return size;
   }
@@ -433,7 +433,6 @@ FileOp* FileOp::createLoadDocumentOperation(Context* context,
         }
       }
 
-#ifdef ENABLE_UI
       // TODO add a better dialog to edit file-names
       if ((flags & FILE_LOAD_SEQUENCE_ASK) &&
           context &&
@@ -514,7 +513,6 @@ FileOp* FileOp::createLoadDocumentOperation(Context* context,
           }
         }
       }
-#endif // ENABLE_UI
     }
   }
   else {
@@ -695,7 +693,6 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
 
   // Show the confirmation alert
   if (!warnings.empty()) {
-#ifdef ENABLE_UI
     // Interative
     if (context && context->isUIAvailable()) {
       int ret;
@@ -704,8 +701,7 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
       // show the alert dialog.
       if (fatal) {
         ui::Alert::show(
-          fmt::format(
-            Strings::alerts_file_format_doesnt_support_error(),
+          Strings::alerts_file_format_doesnt_support_error(
             format->name(),
             warnings));
         ret = 1;
@@ -714,8 +710,7 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
         ret = OptionalAlert::show(
           Preferences::instance().saveFile.showFileFormatDoesntSupportAlert,
           1, // Yes is the default option when the alert dialog is disabled
-          fmt::format(
-            Strings::alerts_file_format_doesnt_support_warning(),
+          Strings::alerts_file_format_doesnt_support_warning(
             format->name(),
             warnings));
       }
@@ -726,9 +721,7 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
         return nullptr;
     }
     // No interactive & fatal error?
-    else
-#endif // ENABLE_UI
-    if (fatal) {
+    else if (fatal) {
       // Return nullptr as the operation cannot be done because a
       // fatal error/conversion was found, e.g. the format doesn't
       // support the color mode of the sprite.
@@ -759,7 +752,7 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
 
     frame_t outputFrame = 0;
 
-    for (frame_t frame : fop->m_roi.selectedFrames()) {
+    for (frame_t frame : fop->m_roi.framesSequence()) {
       Tag* innerTag = (fop->m_roi.tag() ? fop->m_roi.tag(): sprite->tags().innerTag(frame));
       Tag* outerTag = (fop->m_roi.tag() ? fop->m_roi.tag(): sprite->tags().outerTag(frame));
       FilenameInfo fnInfo;
@@ -779,20 +772,17 @@ FileOp* FileOp::createSaveDocumentOperation(const Context* context,
       ++outputFrame;
     }
 
-#ifdef ENABLE_UI
     if (context && context->isUIAvailable() &&
         fop->m_seq.filename_list.size() > 1 &&
         OptionalAlert::show(
           Preferences::instance().saveFile.showExportAnimationInSequenceAlert,
           1,
-          fmt::format(
-            Strings::alerts_export_animation_in_sequence(),
+          Strings::alerts_export_animation_in_sequence(
             int(fop->m_seq.filename_list.size()),
             base::get_file_name(fop->m_seq.filename_list[0]),
             base::get_file_name(fop->m_seq.filename_list[1]))) != 1) {
       return nullptr;
     }
-#endif // ENABLE_UI
   }
   else
     fop->m_filename = filename;
@@ -1027,7 +1017,7 @@ void FileOp::operate(IFileOpProgress* progress)
       render.setNewBlend(m_config.newBlend);
 
       frame_t outputFrame = 0;
-      for (frame_t frame : m_roi.selectedFrames()) {
+      for (frame_t frame : m_roi.framesSequence()) {
         gfx::Rect bounds = m_roi.frameBounds(frame);
         if (bounds.isEmpty())
           continue; // Skip frame because there is no slice key
@@ -1122,13 +1112,13 @@ void FileOp::operate(IFileOpProgress* progress)
 void FileOp::done()
 {
   // Finally done.
-  std::lock_guard lock(m_mutex);
+  const std::lock_guard lock(m_mutex);
   m_done = true;
 }
 
 void FileOp::stop()
 {
-  std::lock_guard lock(m_mutex);
+  const std::lock_guard lock(m_mutex);
   if (!m_done)
     m_stop = true;
 }
@@ -1195,7 +1185,6 @@ void FileOp::postLoad()
     if (this->hasEmbeddedColorProfile()) {
       behavior = m_config.filesWithProfile;
       if (behavior == app::gen::ColorProfileBehavior::ASK) {
-#ifdef ENABLE_UI
         if (m_context && m_context->isUIAvailable()) {
           app::gen::AskForColorProfile window;
           window.spriteWithoutProfile()->setVisible(false);
@@ -1210,9 +1199,7 @@ void FileOp::postLoad()
           else
             behavior = app::gen::ColorProfileBehavior::DISABLE;
         }
-        else
-#endif // ENABLE_UI
-        {
+        else {
           behavior = app::gen::ColorProfileBehavior::EMBEDDED;
         }
       }
@@ -1221,7 +1208,6 @@ void FileOp::postLoad()
     else {
       behavior = m_config.missingProfile;
       if (behavior == app::gen::ColorProfileBehavior::ASK) {
-#ifdef ENABLE_UI
         if (m_context && m_context->isUIAvailable()) {
           app::gen::AskForColorProfile window;
           window.spriteWithProfile()->setVisible(false);
@@ -1235,9 +1221,7 @@ void FileOp::postLoad()
             behavior = app::gen::ColorProfileBehavior::DISABLE;
           }
         }
-        else
-#endif // ENABLE_UI
-        {
+        else {
           behavior = app::gen::ColorProfileBehavior::ASSIGN;
         }
       }
@@ -1286,14 +1270,11 @@ void FileOp::postLoad()
     // disk state.
     m_document->impossibleToBackToSavedState();
 
-#ifdef ENABLE_UI
     if (m_context && m_context->isUIAvailable()) {
       IncompatFileWindow window;
       window.show(m_incompatibilityError);
     }
-    else
-#endif // ENABLE_UI
-    {
+    else {
       setError(m_incompatibilityError.c_str());
     }
 
@@ -1375,6 +1356,11 @@ ImageRef FileOp::sequenceImageToLoad(
       // Add the layer
       sprite->root()->addLayer(layer);
 
+      // Assign RgbMap
+      if (sprite->pixelFormat() == IMAGE_INDEXED)
+        sprite->rgbMap(0, Sprite::RgbMapFor(sprite->isOpaque()),
+                       m_config.rgbMapAlgorithm,
+                       m_config.fitCriteria);
       // Done
       createDocument(sprite);
       m_seq.layer = layer;
@@ -1443,7 +1429,7 @@ void FileOp::setError(const char *format, ...)
 
   // Concatenate the new error
   {
-    std::lock_guard lock(m_mutex);
+    const std::lock_guard lock(m_mutex);
     // Add a newline char automatically if it's needed
     if (!m_error.empty() && m_error.back() != '\n')
       m_error.push_back('\n');
@@ -1455,7 +1441,7 @@ void FileOp::setIncompatibilityError(const std::string& msg)
 {
   // Concatenate the new error
   {
-    std::lock_guard lock(m_mutex);
+    const std::lock_guard lock(m_mutex);
     // Add a newline char automatically if it's needed
     if (!m_incompatibilityError.empty() && m_incompatibilityError.back() != '\n')
       m_incompatibilityError.push_back('\n');
@@ -1465,7 +1451,7 @@ void FileOp::setIncompatibilityError(const std::string& msg)
 
 void FileOp::setProgress(double progress)
 {
-  std::lock_guard lock(m_mutex);
+  const std::lock_guard lock(m_mutex);
 
   if (isSequence()) {
     m_progress =
@@ -1494,7 +1480,7 @@ double FileOp::progress() const
 {
   double progress;
   {
-    std::lock_guard lock(m_mutex);
+    const std::lock_guard lock(m_mutex);
     progress = m_progress;
   }
   return progress;
@@ -1506,7 +1492,7 @@ bool FileOp::isDone() const
 {
   bool done;
   {
-    std::lock_guard lock(m_mutex);
+    const std::lock_guard lock(m_mutex);
     done = m_done;
   }
   return done;

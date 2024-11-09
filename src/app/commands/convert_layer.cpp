@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2021-2023  Igara Studio S.A.
+// Copyright (C) 2021-2024  Igara Studio S.A.
 //
 // This program is distributed under the terms of
 // the End-User License Agreement for Aseprite.
@@ -146,7 +146,6 @@ void ConvertLayerCommand::onExecute(Context* ctx)
   Grid grid0 = site.grid();
   grid0.origin(gfx::Point(0, 0));
 
-#if ENABLE_UI
   if (params().to() == ConvertLayerParam::Tilemap &&
       ctx->isUIAvailable() &&
       params().ui() &&
@@ -175,12 +174,11 @@ void ConvertLayerCommand::onExecute(Context* ctx)
     baseIndex = tilesetInfo.baseIndex;
     matchFlags = tilesetInfo.matchFlags;
   }
-#endif
 
   ContextWriter writer(ctx);
   Doc* document(writer.document());
   {
-    Tx tx(ctx, friendlyName());
+    Tx tx(writer, friendlyName());
 
     switch (params().to()) {
 
@@ -261,10 +259,7 @@ void ConvertLayerCommand::onExecute(Context* ctx)
     tx.commit();
   }
 
-#ifdef ENABLE_UI
-  if (ctx->isUIAvailable())
-    update_screen_for_document(document);
-#endif
+  update_screen_for_document(document);
 }
 
 void ConvertLayerCommand::copyCels(Tx& tx,
@@ -303,7 +298,7 @@ std::string ConvertLayerCommand::onGetFriendlyName() const
     case ConvertLayerParam::Background: return Strings::commands_ConvertLayer_Background(); break;
     case ConvertLayerParam::Layer:      return Strings::commands_ConvertLayer_Layer(); break;
     case ConvertLayerParam::Tilemap:    return Strings::commands_ConvertLayer_Tilemap(); break;
-    default: return getBaseFriendlyName();
+    default: return Strings::commands_ConvertLayer();
   }
 }
 

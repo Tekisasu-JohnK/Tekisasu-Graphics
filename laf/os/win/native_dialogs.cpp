@@ -266,7 +266,9 @@ private:
       DWORD err = CommDlgExtendedError();
       if (err) {
         std::vector<char> buf(1024);
-        sprintf(&buf[0], "Error using GetOpen/SaveFileName Win32 API. Code: %d", err);
+        std::snprintf(
+          buf.data(), buf.size(),
+          "Error using GetOpen/SaveFileName Win32 API. Code: %d", err);
         os::error_message(&buf[0]);
         return E_FAIL;
       }

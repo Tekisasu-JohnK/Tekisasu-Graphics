@@ -43,13 +43,13 @@ Sha1 Sha1::calculateFromFile(const std::string& fileName)
   unsigned char buf[1024];
   while (file.good()) {
     file.read((char*)buf, 1024);
-    unsigned int len = (unsigned int)file.gcount();
+    const unsigned int len = (unsigned int)file.gcount();
     if (len > 0)
       SHA1Input(&sha, buf, len);
   }
 
   vector<uint8_t> digest(HashSize);
-  SHA1Result(&sha, &digest[0]);
+  SHA1Result(&sha, digest.data());
 
   return Sha1(digest);
 }
@@ -62,7 +62,7 @@ Sha1 Sha1::calculateFromString(const std::string& text)
   SHA1Input(&sha, (uint8_t*)text.c_str(), (unsigned int)text.size());
 
   std::vector<uint8_t> digest(HashSize);
-  SHA1Result(&sha, &digest[0]);
+  SHA1Result(&sha, digest.data());
 
   return Sha1(digest);
 }

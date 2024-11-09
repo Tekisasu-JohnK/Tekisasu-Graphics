@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020-2021 Igara Studio S.A.
+// Copyright (c) 2020-2024 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -42,8 +42,7 @@ static void throw_cannot_open_exception(const string& filename, const string& mo
 {
   if (mode.find('w') != string::npos)
     throw std::runtime_error("Cannot save file " + filename + " in the given location");
-  else
-    throw std::runtime_error("Cannot open file " + filename);
+  throw std::runtime_error("Cannot open file " + filename);
 }
 
 FILE* open_file_raw(const string& filename, const string& mode)
@@ -53,6 +52,19 @@ FILE* open_file_raw(const string& filename, const string& mode)
                  from_utf8(mode).c_str());
 #else
   return fopen(filename.c_str(), mode.c_str());
+#endif
+}
+
+FILE* reopen_file_raw(const string& filename, const string& mode, FILE* stream)
+{
+#if LAF_WINDOWS
+  return _wfreopen((!filename.empty() ? from_utf8(filename).c_str(): nullptr),
+                   from_utf8(mode).c_str(),
+                   stream);
+#else
+  return freopen((!filename.empty() ? filename.c_str(): nullptr),
+                 mode.c_str(),
+                 stream);
 #endif
 }
 

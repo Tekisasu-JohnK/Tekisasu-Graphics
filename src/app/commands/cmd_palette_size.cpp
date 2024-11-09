@@ -60,7 +60,6 @@ void PaletteSizeCommand::onExecute(Context* context)
   Palette palette(*reader.palette());
   int ncolors = (m_size != 0 ? m_size: palette.size());
 
-#ifdef ENABLE_UI
   if (m_size == 0 && context->isUIAvailable()) {
     app::gen::PaletteSize window;
     window.colors()->setTextf("%d", ncolors);
@@ -70,7 +69,6 @@ void PaletteSizeCommand::onExecute(Context* context)
 
     ncolors = window.colors()->textInt();
   }
-#endif
 
   if (ncolors == palette.size())
     return;
@@ -78,7 +76,7 @@ void PaletteSizeCommand::onExecute(Context* context)
   palette.resize(std::clamp(ncolors, 1, std::numeric_limits<int>::max()));
 
   ContextWriter writer(reader);
-  Tx tx(context, "Palette Size", ModifyDocument);
+  Tx tx(writer, "Palette Size", ModifyDocument);
   tx(new cmd::SetPalette(writer.sprite(), frame, &palette));
   tx.commit();
 }

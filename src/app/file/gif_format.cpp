@@ -1104,9 +1104,9 @@ public:
     m_currentImage = m_images[1].get();
     m_nextImage = m_images[2].get();
 
-    auto frame_beg = m_fop->roi().selectedFrames().begin();
+    auto frame_beg = m_fop->roi().framesSequence().begin();
 #if _DEBUG
-    auto frame_end = m_fop->roi().selectedFrames().end();
+    auto frame_end = m_fop->roi().framesSequence().end();
 #endif
     auto frame_it = frame_beg;
 
@@ -1637,7 +1637,6 @@ bool GifFormat::onSave(FileOp* fop)
 FormatOptionsPtr GifFormat::onAskUserForFormatOptions(FileOp* fop)
 {
   auto opts = fop->formatOptionsOfDocument<GifOptions>();
-#ifdef ENABLE_UI
   if (fop->context() && fop->context()->isUIAvailable()) {
     try {
       auto& pref = Preferences::instance();
@@ -1688,7 +1687,6 @@ FormatOptionsPtr GifFormat::onAskUserForFormatOptions(FileOp* fop)
       return std::shared_ptr<GifOptions>(nullptr);
     }
   }
-#endif // ENABLE_UI
   return opts;
 }
 

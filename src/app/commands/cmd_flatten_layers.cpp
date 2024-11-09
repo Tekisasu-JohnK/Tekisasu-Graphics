@@ -57,7 +57,7 @@ void FlattenLayersCommand::onExecute(Context* context)
   ContextWriter writer(context);
   Sprite* sprite = writer.sprite();
   {
-    Tx tx(writer.context(), "Flatten Layers");
+    Tx tx(writer, "Flatten Layers");
 
     // TODO the range of selected layers should be in app::Site.
     DocRange range;
@@ -68,10 +68,8 @@ void FlattenLayersCommand::onExecute(Context* context)
           range.selectLayer(layer);
     }
     else {
-#ifdef ENABLE_UI
       if (context->isUIAvailable())
         range = App::instance()->timeline()->range();
-#endif
 
       // If the range is not selected or we have only one image layer
       // selected, we'll flatten all layers.
@@ -83,15 +81,15 @@ void FlattenLayersCommand::onExecute(Context* context)
       }
     }
     const bool newBlend = Preferences::instance().experimental.newBlend();
+    cmd::FlattenLayers::Options options;
+    options.newBlendMethod = newBlend;
     tx(new cmd::FlattenLayers(sprite,
                               range.selectedLayers(),
-                              newBlend));
+                              options));
     tx.commit();
   }
 
-#ifdef ENABLE_UI
   update_screen_for_document(writer.document());
-#endif
 }
 
 std::string FlattenLayersCommand::onGetFriendlyName() const

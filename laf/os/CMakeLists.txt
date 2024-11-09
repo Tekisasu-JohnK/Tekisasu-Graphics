@@ -1,5 +1,5 @@
 # LAF OS
-# Copyright (C) 2018-2023  Igara Studio S.A.
+# Copyright (C) 2018-2024  Igara Studio S.A.
 # Copyright (C) 2012-2018  David Capello
 
 ######################################################################
@@ -8,11 +8,14 @@
 set(LAF_OS_SOURCES
   common/event_queue.cpp
   common/main.cpp
+  common/system.cpp
+  dnd.cpp
   system.cpp
   window.cpp)
 if(WIN32)
   list(APPEND LAF_OS_SOURCES
     win/color_space.cpp
+    win/dnd.cpp
     win/event_queue.cpp
     win/keys.cpp
     win/native_dialogs.cpp
@@ -28,6 +31,7 @@ elseif(APPLE)
     list(APPEND LAF_OS_SOURCES
       osx/app.mm
       osx/app_delegate.mm
+      osx/dnd.mm
       osx/color_space.mm
       osx/event_queue.mm
       osx/keys.mm
@@ -89,6 +93,11 @@ endif()
 
 add_library(laf-os ${LAF_OS_SOURCES})
 target_link_libraries(laf-os laf-gfx laf-base)
+if(LAF_WITH_CLIP)
+  target_link_libraries(laf-os clip)
+  target_compile_definitions(laf-os PUBLIC
+    LAF_WITH_CLIP)
+endif()
 if(FREETYPE_LIBRARIES AND HARFBUZZ_LIBRARIES)
   target_link_libraries(laf-os laf-ft)
   target_compile_definitions(laf-os PRIVATE

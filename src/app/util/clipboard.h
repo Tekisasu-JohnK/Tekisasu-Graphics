@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2021  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -74,7 +74,9 @@ namespace app {
                      const doc::Tileset* tileset);
     void copyPalette(const doc::Palette* palette,
                      const doc::PalettePicks& picks);
-    void paste(Context* ctx, const bool interactive);
+    void paste(Context* ctx,
+               const bool interactive,
+               const gfx::Point* position = nullptr);
 
     doc::ImageRef getImage(doc::Palette* palette);
 
@@ -106,12 +108,16 @@ namespace app {
     bool setNativeBitmap(const doc::Image* image,
                          const doc::Mask* mask,
                          const doc::Palette* palette,
-                         const doc::Tileset* tileset = nullptr);
+                         const doc::Tileset* tileset,
+                         const doc::color_t indexMaskColor);
     bool getNativeBitmap(doc::Image** image,
                          doc::Mask** mask,
                          doc::Palette** palette,
                          doc::Tileset** tileset);
     bool getNativeBitmapSize(gfx::Size* size);
+
+    bool setNativePalette(const doc::Palette* palette,
+                          const doc::PalettePicks& picks);
 
     struct Data;
     std::unique_ptr<Data> m_data;

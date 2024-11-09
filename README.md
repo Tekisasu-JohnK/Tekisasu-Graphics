@@ -1,6 +1,7 @@
 # Aseprite
 
 [![build](https://github.com/aseprite/aseprite/actions/workflows/build.yml/badge.svg)](https://github.com/aseprite/aseprite/actions/workflows/build.yml)
+[![Translation Status](https://hosted.weblate.org/widget/aseprite/aseprite/svg-badge.svg)](https://hosted.weblate.org/engage/aseprite/)
 [![Discourse Community](https://img.shields.io/badge/discourse-community-brightgreen.svg?style=flat)](https://community.aseprite.org/)
 [![Discord Server](https://discordapp.com/api/guilds/324979738533822464/embed.png)](https://discord.gg/Yb2CeX8)
 
@@ -85,7 +86,7 @@ It tries to replicate some pixel-art algorithms:
 Thanks to [third-party open source projects](docs/LICENSES.md), to
 [contributors](https://www.aseprite.org/contributors/), and all the
 people who have contributed ideas, patches, bugs report, feature
-requests, donations, and help me to develop Aseprite.
+requests, donations, and help us to develop Aseprite.
 
 ## License
 

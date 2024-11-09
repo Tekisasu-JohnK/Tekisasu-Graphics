@@ -143,10 +143,10 @@ bool ColorSpace::nearlyEqual(const ColorSpace& that) const
 {
   if (m_type != that.m_type)
     return false;
-  else if (m_type == None)
+  if (m_type == None)
     return true;
-  else if (m_type == sRGB ||
-           m_type == RGB) {
+  if (m_type == sRGB ||
+      m_type == RGB) {
     // Gamma
     if (has(HasGamma) && that.has(HasGamma)) {
       if (!nearly_equal(gamma(), that.gamma()))
@@ -173,7 +173,7 @@ bool ColorSpace::nearlyEqual(const ColorSpace& that) const
     }
     return true;
   }
-  else if (m_type == ICC) {
+  if (m_type == ICC) {
     return (m_data == that.m_data);
   }
   return false;

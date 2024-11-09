@@ -51,12 +51,10 @@ bool FillCommand::onEnabled(Context* ctx)
                       ContextFlags::ActiveLayerIsImage)) {
     return true;
   }
-#if ENABLE_UI
-  auto editor = Editor::activeEditor();
+  auto* editor = Editor::activeEditor();
   if (editor && editor->isMovingPixels()) {
     return true;
   }
-#endif
   return false;
 }
 
@@ -81,7 +79,7 @@ void FillCommand::onExecute(Context* ctx)
     color = color_utils::color_for_layer(pref.colorBar.fgColor(), layer);
 
   {
-    Tx tx(writer.context(), "Fill Selection with Foreground Color");
+    Tx tx(writer, "Fill Selection with Foreground Color");
     {
       ExpandCelCanvas expand(
         site, layer,

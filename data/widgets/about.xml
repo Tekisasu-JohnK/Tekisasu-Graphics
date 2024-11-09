@@ -1,16 +1,16 @@
 <!-- Aseprite -->
-<!-- Copyright (C) 2018-2022  Igara Studio S.A. -->
+<!-- Copyright (C) 2018-2024  Igara Studio S.A. -->
 <!-- Copyright (C) 2018  David Capello -->
 <gui i18nwarnings="false">
 <window id="about" text="About">
   <vbox>
     <label text="" id="title" />
-    <label text="Tekisasu Toolchain" />
+    <label text="Animated sprite editor &amp;&amp; pixel art tool" />
     <hbox homogeneous="true">
       <hbox>
 	<vbox expansive="true">
           <separator text="Developer Team" horizontal="true" />
-          <link text="Tekisasu Games" url="https://dev.tekisasu.com" />
+          <link text="Tekisasu" url="https://dev.tekisasu.com" />
           <link text="David Capello" url="https://twitter.com/davidcapello" />
           <link text="Gaspar Capello" url="https://twitter.com/Gasparoken" />
           <link text="Martín Capello" url="https://twitter.com/martincapell0" />
@@ -21,21 +21,23 @@
       <vbox>
         <separator text="Credits" horizontal="true" cell_hspan="2" />
         <link text="Contributors" url="" id="credits" />
+        <link text="Translators" url="" id="i18n_credits" />
         <link text="Open Source Projects" url="" id="licenses" />
       </vbox>
     </hbox>
     <separator horizontal="true" />
     <hbox>
-      <label text="Copyright (C) 2021-2023" />
+      <label text="Copyright (C) 2021-present" />
       <link text="Tekisasu" url="https://tekisasu.com/" />
     </hbox>
     <link text="https://dev.tekisasu.com/" url="https://dev.tekisasu.com/" />
     <separator horizontal="true" />
     <hbox>
-      <label text="Copyright (C) 2001-2022" />
+      <label text="Copyright (C) 2001-2024" />
       <link text="Igara Studio S.A." url="https://igara.com/" />
     </hbox>
     <link text="https://www.aseprite.org/" url="https://www.aseprite.org/" />
+    <separator horizontal="true" />
     <hbox>
       <boxfiller />
       <button text="@general.close" closewindow="true" id="ok" magnet="true" minwidth="60" />

@@ -52,8 +52,8 @@ Size PackingRects::bestFit(base::task_token& token,
   bool fit = false;
   while (!token.canceled()) {
     if (w*h >= neededArea) {
-      Size sizeCandidate = Size(w + 2 * m_borderPadding,
-                                h + 2 * m_borderPadding);
+      const Size sizeCandidate = Size(w + 2 * m_borderPadding,
+                                      h + 2 * m_borderPadding);
       fit = pack(sizeCandidate, token);
       if (fit) {
         size = sizeCandidate;
@@ -96,7 +96,7 @@ bool PackingRects::pack(const Size& size,
 
   gfx::Region rgn(m_bounds);
   i = 0;
-  for (auto rcPtr : rectPtrs) {
+  for (auto* rcPtr : rectPtrs) {
     if (token.canceled())
       return false;
     token.set_progress(float(i) / int(rectPtrs.size()));
@@ -106,7 +106,7 @@ bool PackingRects::pack(const Size& size,
     // The rectangles are treated as its original size +
     // conditional extra border of <shapePadding> during placement.
     for (int v = 0; v <= m_bounds.h - rc.h; ++v) {
-      int hShapePadding =
+      const int hShapePadding =
         (v == (m_bounds.h - rc.h) ? 0 : m_shapePadding);
       for (int u = 0; u <= m_bounds.w - rc.w; ++u) {
         if (token.canceled())
@@ -119,14 +119,15 @@ bool PackingRects::pack(const Size& size,
         // This fix resolves the special cases of exporting with
         // sheet type 'Packed' + 'Trim Cels' true +
         // 'Shape padding' > 0 + series of particular image sizes.
-        int wShapePadding =
+        const int wShapePadding =
           (u == (m_bounds.w - rc.w) ? 0 : m_shapePadding);
-        gfx::Rect possible(m_bounds.x + u,
-                           m_bounds.y + v,
-                           rc.w + wShapePadding,
-                           rc.h + hShapePadding);
+        const gfx::Rect possible(
+          m_bounds.x + u,
+          m_bounds.y + v,
+          rc.w + wShapePadding,
+          rc.h + hShapePadding);
 
-        Region::Overlap overlap = rgn.contains(possible);
+        const Region::Overlap overlap = rgn.contains(possible);
         if (overlap == Region::In) {
           rc = Rect(m_bounds.x + u, m_bounds.y + v, rc.w, rc.h);
           rgn.createSubtraction(rgn, gfx::Region(Rect(possible)));

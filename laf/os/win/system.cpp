@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2023  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -8,12 +8,16 @@
 #include "config.h"
 #endif
 
+#include "base/log.h"
 #include "os/win/system.h"
 
 #include "gfx/color.h"
 #include "os/win/screen.h"
 
 #include <limits>
+
+#pragma push_macro("ERROR")
+#undef ERROR
 
 namespace os {
 
@@ -155,22 +159,30 @@ SystemWin::SystemWin()
 
 SystemWin::~SystemWin()
 {
+  if (m_appMode == AppMode::GUI) {
+    OleUninitialize();
+  }
   destroyInstance();
 }
 
-void SystemWin::setAppName(const std::string& appName)
+void SystemWin::setAppMode(AppMode appMode)
 {
-  m_appName = appName;
+  m_appMode = appMode;
+  if (m_appMode == AppMode::GUI) {
+    HRESULT result = OleInitialize(nullptr);
+    if (result != S_OK && result != S_FALSE)
+      LOG(LogLevel::ERROR, "WIN: Could not initialize OLE (%d)", result);
+  }
 }
 
-void SystemWin::setTabletAPI(TabletAPI api)
+void SystemWin::setTabletOptions(const TabletOptions& options)
 {
-  m_tabletAPI = api;
+  m_tabletOptions = options;
 
   // If the user selects the wintab API again, we remove any possible
   // file indicating a crash in the past.
-  if (m_tabletAPI == TabletAPI::Wintab ||
-      m_tabletAPI == TabletAPI::WintabPackets) {
+  if (m_tabletOptions.api == TabletAPI::Wintab ||
+      m_tabletOptions.api == TabletAPI::WintabPackets) {
     m_wintabApi.resetCrashFileIfPresent();
   }
 }
@@ -316,3 +328,5 @@ void SystemWin::_setInternalMousePosition(const Event& ev)
 }
 
 } // namespace os
+
+#pragma pop_macro("ERROR")

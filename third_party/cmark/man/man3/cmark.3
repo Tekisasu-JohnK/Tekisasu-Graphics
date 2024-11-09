@@ -1,4 +1,4 @@
-.TH cmark 3 "February 09, 2020" "LOCAL" "Library Functions Manual"
+.TH cmark 3 "January 28, 2024" "cmark 0.31.0" "Library Functions Manual"
 .SH
 NAME
 .PP
@@ -57,7 +57,7 @@ typedef enum {
   CMARK_NODE_IMAGE,
 
   CMARK_NODE_FIRST_INLINE = CMARK_NODE_TEXT,
-  CMARK_NODE_LAST_INLINE = CMARK_NODE_IMAGE,
+  CMARK_NODE_LAST_INLINE = CMARK_NODE_IMAGE
 } cmark_node_type;
 .RE
 \f[]
@@ -116,7 +116,7 @@ Defines the memory allocation functions to be used by CMark when parsing
 and allocating a document tree
 
 .PP
-\fIcmark_mem *\f[] \fBcmark_get_default_mem_allocator\f[](\fI\f[])
+\fIcmark_mem *\f[] \fBcmark_get_default_mem_allocator\f[](\fIvoid\f[])
 
 .PP
 Returns a pointer to the default memory allocator.
@@ -585,10 +585,10 @@ Streaming interface:
 cmark_parser *parser = cmark_parser_new(CMARK_OPT_DEFAULT);
 FILE *fp = fopen("myfile.md", "rb");
 while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
-	   cmark_parser_feed(parser, buffer, bytes);
-	   if (bytes < sizeof(buffer)) {
-	       break;
-	   }
+    cmark_parser_feed(parser, buffer, bytes);
+    if (bytes < sizeof(buffer)) {
+        break;
+    }
 }
 document = cmark_parser_finish(parser);
 cmark_parser_free(parser);
@@ -606,6 +606,52 @@ Creates a new parser object.
 
 .PP
 Creates a new parser object with the given memory allocator
+.PP
+A generalization of \f[C]cmark_parser_new\f[]:
+.IP
+.nf
+\f[C]
+cmark_parser_new(options)
+\f[]
+.fi
+.PP
+is the same as:
+.IP
+.nf
+\f[C]
+cmark_parser_new_with_mem(options, cmark_get_default_mem_allocator())
+\f[]
+.fi
+
+.PP
+\fIcmark_parser *\f[] \fBcmark_parser_new_with_mem_into_root\f[](\fIint options\f[], \fIcmark_mem *mem\f[], \fIcmark_node *root\f[])
+
+.PP
+Creates a new parser object with the given node to use as the root node
+of the parsed AST.
+.PP
+When parsing, children are always appended, not prepended; that means if
+\f[C]root\f[] already has children, the newly\-parsed children will
+appear after the given children.
+.PP
+A generalization of \f[C]cmark_parser_new_with_mem\f[]:
+.IP
+.nf
+\f[C]
+cmark_parser_new_with_mem(options, mem)
+\f[]
+.fi
+.PP
+is approximately the same as:
+.IP
+.nf
+\f[C]
+cmark_parser_new_with_mem_into_root(options, mem, cmark_node_new(CMARK_NODE_DOCUMENT))
+\f[]
+.fi
+.PP
+This is useful for creating a single document out of multiple parsed
+document fragments.
 
 .PP
 \fIvoid\f[] \fBcmark_parser_free\f[](\fIcmark_parser *parser\f[])
@@ -803,8 +849,8 @@ with the replacement character U+FFFD.
 .fi
 
 .PP
-Convert straight quotes to curly, \-\-\- to em dashes, \-\- to en
-dashes.
+Convert straight quotes to curly, \f[C]\-\-\-\f[] to em dashes,
+\f[C]\-\-\f[] to en dashes.
 
 .SS
 Version information

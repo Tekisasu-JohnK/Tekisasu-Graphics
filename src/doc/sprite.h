@@ -1,5 +1,5 @@
 // Aseprite Document Library
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -13,6 +13,7 @@
 #include "doc/cel_data.h"
 #include "doc/cel_list.h"
 #include "doc/color.h"
+#include "doc/fit_criteria.h"
 #include "doc/frame.h"
 #include "doc/image_buffer.h"
 #include "doc/image_ref.h"
@@ -93,6 +94,7 @@ namespace doc {
     PixelFormat pixelFormat() const { return (PixelFormat)m_spec.colorMode(); }
     ColorMode colorMode() const { return m_spec.colorMode(); }
     const PixelRatio& pixelRatio() const { return m_pixelRatio; }
+    bool hasPixelRatio() const;
     gfx::Size size() const { return m_spec.size(); }
     gfx::Rect bounds() const { return m_spec.bounds(); }
     int width() const { return m_spec.width(); }
@@ -105,7 +107,7 @@ namespace doc {
     void setColorSpace(const gfx::ColorSpaceRef& colorSpace);
 
     // This method is only required/used for the template functions app::script::UserData_set_text/color.
-    const Sprite* sprite() const { return this; }
+    Sprite* sprite() const { return const_cast<Sprite*>(this); }
 
     // Returns true if the sprite has a background layer and it's visible
     bool isOpaque() const;
@@ -126,7 +128,14 @@ namespace doc {
     static void SetDefaultRgbMapAlgorithm(const RgbMapAlgorithm mapAlgo);
 
     const gfx::Rect& gridBounds() const { return m_gridBounds; }
-    void setGridBounds(const gfx::Rect& rc) { m_gridBounds = rc; }
+    void setGridBounds(const gfx::Rect& rc) {
+      m_gridBounds = rc;
+      // Prevent setting an empty grid bounds
+      if (m_gridBounds.w <= 0)
+        m_gridBounds.w = 1;
+      if (m_gridBounds.h <= 0)
+        m_gridBounds.h = 1;
+    }
 
     virtual int getMemSize() const override;
 
@@ -159,7 +168,8 @@ namespace doc {
                    const RgbMapFor forLayer) const;
     RgbMap* rgbMap(const frame_t frame,
                    const RgbMapFor forLayer,
-                   RgbMapAlgorithm mapAlgo) const;
+                   const RgbMapAlgorithm mapAlgo,
+                   const FitCriteria fitCriteria = FitCriteria::DEFAULT) const;
 
     ////////////////////////////////////////
     // Frames
@@ -218,6 +228,7 @@ namespace doc {
     LayerList allVisibleReferenceLayers() const;
     LayerList allBrowsableLayers() const;
     LayerList allTilemaps() const;
+    std::string visibleLayerHierarchyAsString() const;
 
     CelsRange cels() const;
     CelsRange cels(frame_t frame) const;
@@ -254,7 +265,6 @@ namespace doc {
     gfx::Rect m_gridBounds;                // grid settings
 
     // Current rgb map
-    mutable RgbMapAlgorithm m_rgbMapAlgorithm;
     mutable std::unique_ptr<RgbMap> m_rgbMap;
 
     Tags m_tags;

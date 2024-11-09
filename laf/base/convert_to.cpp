@@ -88,8 +88,8 @@ template<> Uuid convert_to(const std::string& from)
   Uuid uuid;
   int i = 0;
   for (int j=0; j<int(from.size()) && i<16; ) {
-    int a = hex_to_int(from[j++]);
-    int b = hex_to_int(from[j++]);
+    const int a = hex_to_int(from[j++]);
+    const int b = hex_to_int(from[j++]);
     (uuid.bytes())[i++] = ((a << 4) | b);
 
     // Skip

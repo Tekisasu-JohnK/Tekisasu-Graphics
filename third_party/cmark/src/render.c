@@ -6,13 +6,13 @@
 #include "node.h"
 #include "cmark_ctype.h"
 
-static CMARK_INLINE void S_cr(cmark_renderer *renderer) {
+static inline void S_cr(cmark_renderer *renderer) {
   if (renderer->need_cr < 1) {
     renderer->need_cr = 1;
   }
 }
 
-static CMARK_INLINE void S_blankline(cmark_renderer *renderer) {
+static inline void S_blankline(cmark_renderer *renderer) {
   if (renderer->need_cr < 2) {
     renderer->need_cr = 2;
   }
@@ -20,7 +20,7 @@ static CMARK_INLINE void S_blankline(cmark_renderer *renderer) {
 
 static void S_out(cmark_renderer *renderer, const char *source, bool wrap,
                   cmark_escaping escape) {
-  int length = strlen(source);
+  int length = (int)strlen(source);
   unsigned char nextc;
   int32_t c;
   int i = 0;
@@ -163,9 +163,10 @@ char *cmark_render(cmark_node *root, int options, int width,
   cmark_iter *iter = cmark_iter_new(root);
 
   cmark_renderer renderer = {options,
-	                     mem,   &buf, &pref, 0,           width,
-                             0,     0,    true,  true,        false,
-                             false, outc, S_cr,  S_blankline, S_out};
+                             mem,    &buf,    &pref,      0,      width,
+                             0,      0,       true,       true,   false,
+                             false,  NULL,
+                             outc,   S_cr,    S_blankline, S_out};
 
   while ((ev_type = cmark_iter_next(iter)) != CMARK_EVENT_DONE) {
     cur = cmark_iter_get_node(iter);

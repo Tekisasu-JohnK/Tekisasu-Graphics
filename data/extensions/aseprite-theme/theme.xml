@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <theme name="Default" screenscaling="1" uiscaling="2">
     <authors>
-        <author name="Tekisasu" url="https://dev.tekisasu.com" />
+        <author name="Tekisasu" url="https://dev.tekisasu.com/" />
         <author name="David Capello" url="https://davidcapello.com/" />
         <author name="Ilija Melentijevic" url="https://ilkke.net/" />
     </authors>
     <fonts>
-        <font id="default" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="7" />
-        <font id="mini" name="RobotoMono-Medium" type="truetype" file="RobotoMono-Medium.ttf" antialias="true" size="7" />
+        <font id="default" name="Inter_18pt-Regular" type="truetype" file="Inter_18pt-Regular.ttf" antialias="true" size="7" />
+        <font id="mini" name="Inter_18pt-Regular" type="truetype" file="Inter_18pt-Regular.ttf" antialias="true" size="7" />
     </fonts>
     <dimensions>
         <dim id="scrollbar_size" value="12" />
@@ -36,7 +36,7 @@
         <color id="disabled" value="#858585" />
         <color id="face" value="#bbbfc4" />
         <color id="hot_face" value="#faf0e6" />
-        <color id="selected" value="#23acd2" />
+        <color id="selected" value="#046bd1" />
         <color id="selected_text" value="#273b41" />
         <color id="separator_label" value="#2c4c91" />
         <color id="background" value="#ffffff" />
@@ -45,20 +45,20 @@
         <color id="textbox_code_face" value="#eeeeee" />
         <color id="entry_suffix" value="#c6c6c6" />
         <color id="link_text" value="#2c4c91" />
-        <color id="link_hover" value="#23acd2" />
+        <color id="link_hover" value="#046bd1" />
         <color id="button_normal_text" value="#000000" />
         <color id="button_hot_text" value="#000000" />
         <color id="button_selected_text" value="#ffffff" />
-        <color id="check_hot_face" value="#23acd2" />
+        <color id="check_hot_face" value="#046bd1" />
         <color id="check_focus_face" value="#c6c6c6" />
-        <color id="radio_hot_face" value="#23acd2" />
+        <color id="radio_hot_face" value="#046bd1" />
         <color id="radio_focus_face" value="#c6c6c6" />
         <color id="menuitem_normal_text" value="#000000" />
         <color id="menuitem_normal_face" value="#bbbfc4" />
         <color id="menuitem_hot_text" value="#000000" />
-        <color id="menuitem_hot_face" value="#23acd2" />
-        <color id="menuitem_highlight_text" value="#000000" />
-        <color id="menuitem_highlight_face" value="#23acd2" />
+        <color id="menuitem_hot_face" value="#8f9ca8" />
+        <color id="menuitem_highlight_text" value="#ffffff" />
+        <color id="menuitem_highlight_face" value="#046bd1" />
         <color id="window_face" value="#bbbfc4" />
         <color id="window_titlebar_text" value="#000000" />
         <color id="window_titlebar_face" value="#8d949d" />
@@ -68,8 +68,8 @@
         <color id="editor_view_face" value="#000000" />
         <color id="listitem_normal_text" value="#000000" />
         <color id="listitem_normal_face" value="#ffffff" />
-        <color id="listitem_selected_text" value="#000000" />
-        <color id="listitem_selected_face" value="#23acd2" />
+        <color id="listitem_selected_text" value="#ffffff" />
+        <color id="listitem_selected_face" value="#046bd1" />
         <color id="slider_empty_text" value="#000000" />
         <color id="slider_full_text" value="#ffffff" />
         <color id="tab_normal_text" value="#000000" />
@@ -83,7 +83,7 @@
         <color id="filelist_odd_row_text" value="#000000" />
         <color id="filelist_odd_row_face" value="#ffffff" />
         <color id="filelist_selected_row_text" value="#000000" />
-        <color id="filelist_selected_row_face" value="#23acd2" />
+        <color id="filelist_selected_row_face" value="#046bd1" />
         <color id="filelist_disabled_row_text" value="#ffc8c8" />
         <color id="workspace" value="#8d949d" />
         <color id="workspace_text" value="#2e3942" />
@@ -168,6 +168,7 @@
         <part id="window_play_icon" x="21" y="11" w="5" h="6" />
         <part id="window_stop_icon" x="26" y="11" w="5" h="6" />
         <part id="window_center_icon" x="31" y="11" w="5" h="6" />
+        <part id="window_help_icon" x="36" y="11" w="5" h="6" />
         <part id="slider_full" x="0" y="144" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
         <part id="slider_empty" x="16" y="144" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
         <part id="slider_full_focused" x="0" y="160" w1="5" w2="6" w3="5" h1="5" h2="5" h3="6" />
@@ -386,6 +387,7 @@
         <part id="icon_slice" x="248" y="264" w="8" h="8" />
         <part id="icon_aspect_ratio" x="256" y="264" w="10" h="8" />
         <part id="icon_delta" x="266" y="264" w="6" h="8" />
+        <part id="icon_add" x="184" y="200" w="5" h="5" />
         <part id="tool_rectangular_marquee" x="144" y="0" w="16" h="16" />
         <part id="tool_elliptical_marquee" x="160" y="0" w="16" h="16" />
         <part id="tool_lasso" x="176" y="0" w="16" h="16" />
@@ -494,6 +496,12 @@
             <icon part="window_stop_icon" color="button_normal_text" />
             <icon part="window_stop_icon" color="button_hot_text" state="mouse" />
             <icon part="window_stop_icon" color="button_selected_text" state="selected" />
+        </style>
+        <style id="window_help_button" extends="window_button" margin-top="3" margin-right="2">
+            <newlayer />
+            <icon part="window_help_icon" color="button_normal_text" />
+            <icon part="window_help_icon" color="button_hot_text" state="mouse" />
+            <icon part="window_help_icon" color="button_selected_text" state="selected" />
         </style>
         <style id="popup_window">
             <background color="window_face" />
@@ -681,7 +689,7 @@
             <background color="check_hot_face" state="selected" />
             <icon part="pal_options" />
         </style>
-        <style id="new_frame_button" extends="mini_button" />
+        <style id="new_frame_button" extends="mini_button" padding-left="2" width="11" />
         <style id="color_button" extends="mini_button" font="mini" padding-bottom="1" />
         <style id="splitter">
             <background color="face" />

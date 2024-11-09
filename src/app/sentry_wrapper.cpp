@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2021-2023  Igara Studio S.A.
+// Copyright (C) 2021-2024  Igara Studio S.A.
 //
 // This program is distributed under the terms of
 // the End-User License Agreement for Aseprite.
@@ -97,6 +97,11 @@ bool Sentry::areThereCrashesToReport()
   if (m_dbdir.empty())
     return false;
 
+  // As we don't use sentry_clear_crashed_last_run(), this will
+  // return 1 if the last run (or any previous run) has crashed.
+  if (sentry_get_crashed_last_run() == 1)
+    return true;
+
   // If the last_crash file exists, we can say that there are
   // something to report (this file is created on Windows and Linux).
   if (base::is_file(base::join_path(m_dbdir, "last_crash")))
@@ -104,28 +109,31 @@ bool Sentry::areThereCrashesToReport()
 
   // At least one .dmp file in the completed/ directory means that
   // there was at least one crash in the past (this is for macOS).
-  for (auto f : base::list_files(base::join_path(m_dbdir, "completed"))) {
-    if (base::get_file_extension(f) == "dmp")
-      return true;
-  }
+  if (!base::list_files(base::join_path(m_dbdir, "completed"), base::ItemType::Files, "*.dmp").empty())
+    return true;
 
   // In case that "last_crash" doesn't exist we can check for some
   // .dmp file in the reports/ directory (it looks like the completed/
   // directory is not generated on Windows).
-  for (auto f : base::list_files(base::join_path(m_dbdir, "reports"))) {
-    if (base::get_file_extension(f) == "dmp")
-      return true;
-  }
+  if (!base::list_files(base::join_path(m_dbdir, "reports"), base::ItemType::Files, "*.dmp").empty())
+    return true;
+
   return false;
+}
+
+// static
+void Sentry::addBreadcrumb(const char* message)
+{
+  LOG(VERBOSE, "BC: %s\n", message);
+
+  sentry_value_t c = sentry_value_new_breadcrumb(nullptr, message);
+  sentry_add_breadcrumb(c);
 }
 
 // static
 void Sentry::addBreadcrumb(const std::string& message)
 {
-  LOG(VERBOSE, "BC: %s\n", message.c_str());
-
-  sentry_value_t c = sentry_value_new_breadcrumb(nullptr, message.c_str());
-  sentry_add_breadcrumb(c);
+  addBreadcrumb(message.c_str());
 }
 
 // static

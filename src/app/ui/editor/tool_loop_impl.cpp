@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -45,6 +45,7 @@
 #include "app/ui_context.h"
 #include "app/util/expand_cel_canvas.h"
 #include "app/util/layer_utils.h"
+#include "doc/brush.h"
 #include "doc/cel.h"
 #include "doc/image.h"
 #include "doc/layer.h"
@@ -67,8 +68,6 @@ namespace app {
 
 using namespace ui;
 
-#ifdef ENABLE_UI
-
 static void fill_toolloop_params_from_tool_preferences(ToolLoopParams& params)
 {
   ToolPreferences& toolPref =
@@ -80,8 +79,6 @@ static void fill_toolloop_params_from_tool_preferences(ToolLoopParams& params)
   params.contiguous = toolPref.contiguous();
   params.freehandAlgorithm = toolPref.freehandAlgorithm();
 }
-
-#endif // ENABLE_UI
 
 //////////////////////////////////////////////////////////////////////
 // Common properties between drawing/preview ToolLoop impl
@@ -161,9 +158,7 @@ public:
     , m_isSelectingTiles(false)
     , m_grid(grid)
     , m_gridBounds(grid.origin(), grid.tileSize())
-#ifdef ENABLE_UI
     , m_mainTilePos(editor ? -editor->mainTilePosition(): gfx::Point(0, 0))
-#endif
     , m_button(params.button)
     , m_ink(params.ink->clone())
     , m_controller(params.controller)
@@ -189,6 +184,33 @@ public:
     ASSERT(m_ink);
     ASSERT(m_controller);
 
+    // If the user right-clicks with a custom/image brush we change
+    // the image's colors of the brush to the background color.
+    //
+    // This is different from SwitchColors that makes a new brush
+    // switching fg <-> bg colors, so here we have some extra
+    // functionality with custom brushes (quickly convert the custom
+    // brush with a plain color, or in other words, replace the custom
+    // brush area with the background color).
+    if (m_brush->type() == kImageBrushType && m_button == Right) {
+      // We've to recalculate the background color to use for the
+      // brush using the specific brush image pixel format/color mode,
+      // as we cannot use m_primaryColor or m_bgColor here because
+      // those are in the sprite pixel format/color mode.
+      const color_t brushColor =
+        color_utils::color_for_target_mask(
+          Preferences::instance().colorBar.bgColor(),
+          ColorTarget(ColorTarget::TransparentLayer,
+                      m_brush->image()->pixelFormat(),
+                      -1));
+
+      // Clone the brush with new images to avoid modifying the
+      // current brush used in left-click / brush preview.
+      BrushRef newBrush = m_brush->cloneWithNewImages();
+      newBrush->setImageColor(Brush::ImageColor::BothColors, brushColor);
+      m_brush = newBrush;
+    }
+
     if (m_tilesMode) {
       // Use FloodFillPointShape or TilePointShape in tiles mode
       if (!m_pointShape->isFloodFill()) {
@@ -208,13 +230,12 @@ public:
         site.tilemapMode(TilemapMode::Pixels);
     }
 
-#ifdef ENABLE_UI // TODO add dynamics support when UI is not enabled
     if (m_controller->isFreehand() &&
         !m_pointShape->isFloodFill() &&
+        // TODO add dynamics support when UI is not enabled
         App::instance()->contextBar()) {
       m_dynamics = App::instance()->contextBar()->getDynamics();
     }
-#endif
 
     if (m_tracePolicy == tools::TracePolicy::Accumulate) {
       tools::ToolBox* toolbox = App::instance()->toolBox();
@@ -259,18 +280,15 @@ public:
       m_opacity = 255;
     }
 
-#ifdef ENABLE_UI // TODO add support when UI is not enabled
     if (params.inkType == tools::InkType::SHADING) {
+      // TODO add shading support when UI is not enabled
       m_shade = App::instance()->contextBar()->getShade();
       m_shadingRemap.reset(
         App::instance()->contextBar()->createShadeRemap(
           m_button == tools::ToolLoop::Left));
     }
-#endif
 
-#ifdef ENABLE_UI
     updateAllVisibleRegion();
-#endif
   }
 
   ~ToolLoopBase() {
@@ -363,33 +381,27 @@ public:
   doc::Remap* getShadingRemap() override { return m_shadingRemap.get(); }
 
   void limitDirtyAreaToViewport(gfx::Region& rgn) override {
-#ifdef ENABLE_UI
     rgn &= m_allVisibleRgn;
-#endif // ENABLE_UI
   }
 
   void updateDirtyArea(const gfx::Region& dirtyArea) override {
     if (!m_editor)
       return;
 
-#ifdef ENABLE_UI
     // This is necessary here so the "on sprite crosshair" is hidden,
     // we update screen pixels with the new sprite, and then we show
     // the crosshair saving the updated pixels. It fixes problems with
     // filled shape tools when we release the button, or paint-bucket
     // when we press the button.
     HideBrushPreview hide(m_editor->brushPreview());
-#endif
 
     m_document->notifySpritePixelsModified(
       m_sprite, dirtyArea, m_frame);
   }
 
   void updateStatusBar(const char* text) override {
-#ifdef ENABLE_UI
     if (auto statusBar = StatusBar::instance())
       statusBar->setStatusText(0, text);
-#endif
   }
 
   gfx::Point statusBarPositionOffset() override {
@@ -397,27 +409,18 @@ public:
   }
 
   render::DitheringMatrix getDitheringMatrix() override {
-#ifdef ENABLE_UI // TODO add support when UI is not enabled
+    // TODO add support when UI is not enabled
     return App::instance()->contextBar()->ditheringMatrix();
-#else
-    return render::DitheringMatrix();
-#endif
   }
 
   render::DitheringAlgorithmBase* getDitheringAlgorithm() override {
-#ifdef ENABLE_UI // TODO add support when UI is not enabled
+    // TODO add support when UI is not enabled
     return App::instance()->contextBar()->ditheringAlgorithm();
-#else
-    return nullptr;
-#endif
   }
 
   render::GradientType getGradientType() override {
-#ifdef ENABLE_UI // TODO add support when UI is not enabled
+    // TODO add support when UI is not enabled
     return App::instance()->contextBar()->gradientType();
-#else
-    return render::GradientType::Linear;
-#endif
   }
 
   tools::DynamicsOptions getDynamics() override {
@@ -430,7 +433,6 @@ public:
     return m_tiledModeHelper;
   }
 
-#ifdef ENABLE_UI
 protected:
   void updateAllVisibleRegion() {
     m_allVisibleRgn.clear();
@@ -445,15 +447,14 @@ protected:
       }
     }
   }
-#endif // ENABLE_UI
 
 };
 
 //////////////////////////////////////////////////////////////////////
 // For drawing
 
-class ToolLoopImpl : public ToolLoopBase,
-                     public EditorObserver {
+class ToolLoopImpl final : public ToolLoopBase,
+                           public EditorObserver {
   Context* m_context;
   bool m_filled;
   bool m_previewFilled;
@@ -477,7 +478,9 @@ public:
                const bool saveLastPoint)
     : ToolLoopBase(editor, site, grid, params)
     , m_context(context)
-    , m_tx(m_context,
+    , m_tx(Tx::DontLockDoc,
+           m_context,
+           m_context->activeDocument(),
            m_tool->getText().c_str(),
            ((m_ink->isSelection() ||
              m_ink->isEyedropper() ||
@@ -515,6 +518,9 @@ public:
       }
     }
 
+    // 'isSelectionPreview = true' if the intention is to show a preview
+    // of Selection tools or Slice tool.
+    const bool isSelectionPreview = m_ink->isSelection() || m_ink->isSlice();
     m_expandCelCanvas.reset(new ExpandCelCanvas(
       site, m_layer,
       m_docPref.tiled.mode(),
@@ -528,10 +534,10 @@ public:
         (m_layer->isTilemap() &&
          site.tilemapMode() == TilemapMode::Pixels &&
          site.tilesetMode() == TilesetMode::Manual &&
-         !m_ink->isSelection() ? ExpandCelCanvas::TilesetPreview:
-                                 ExpandCelCanvas::None) |
-        (m_ink->isSelection() ? ExpandCelCanvas::SelectionPreview:
-                                ExpandCelCanvas::None))));
+         !isSelectionPreview ? ExpandCelCanvas::TilesetPreview:
+                               ExpandCelCanvas::None) |
+        (isSelectionPreview ? ExpandCelCanvas::SelectionPreview:
+                              ExpandCelCanvas::None))));
 
     if (!m_floodfillSrcImage)
       m_floodfillSrcImage = const_cast<Image*>(getSrcImage());
@@ -553,7 +559,7 @@ public:
     m_sprayWidth = m_toolPref.spray.width();
     m_spraySpeed = m_toolPref.spray.speed();
 
-    if (m_ink->isSelection()) {
+    if (isSelectionPreview) {
       m_useMask = false;
     }
     else {
@@ -561,7 +567,7 @@ public:
     }
 
     // Start with an empty mask if the user is selecting with "default selection mode"
-    if (m_ink->isSelection() &&
+    if (isSelectionPreview &&
         (!m_document->isMaskVisible() ||
          (int(getModifiers()) & int(tools::ToolLoopModifiers::kReplaceSelection)))) {
       Mask emptyMask;
@@ -578,18 +584,17 @@ public:
                                                     m_mask->bounds().y-m_celOrigin.y):
                                          gfx::Point(0, 0));
 
-#ifdef ENABLE_UI
     if (m_editor)
       m_editor->add_observer(this);
-#endif
   }
 
   ~ToolLoopImpl() {
-#ifdef ENABLE_UI
     if (m_editor)
       m_editor->remove_observer(this);
-#endif
 
+    // getSrcImage() is a virtual member function but ToolLoopImpl is
+    // marked as final to avoid not calling a derived version from
+    // this destructor.
     if (m_floodfillSrcImage != getSrcImage())
       delete m_floodfillSrcImage;
   }
@@ -647,12 +652,8 @@ public:
       rollback();
     }
 
-#ifdef ENABLE_UI
     if (redraw)
       update_screen_for_document(m_document);
-#else
-    (void)redraw;               // To avoid warning about unused variable
-#endif
   }
 
   void rollback() override {
@@ -664,9 +665,7 @@ public:
     catch (const LockedDocException& ex) {
       Console::showException(ex);
     }
-#ifdef ENABLE_UI
     update_screen_for_document(m_document);
-#endif
   }
 
   const Cel* getCel() override { return m_expandCelCanvas->getCel(); }
@@ -706,7 +705,7 @@ public:
   int getSpraySpeed() override { return m_spraySpeed; }
 
   void onSliceRect(const gfx::Rect& bounds) override {
-#ifdef ENABLE_UI // TODO add support for slice tool from batch scripts without UI?
+    // TODO add support for slice tool from batch scripts without UI?
     if (m_editor && getMouseButton() == ToolLoop::Left) {
       // Try to select slices, but if it returns false, it means that
       // there are no slices in the box to be selected, so we show a
@@ -730,7 +729,6 @@ public:
         return;
       }
     }
-#endif
 
     // Cancel the operation (do not create a new transaction for this
     // no-op, e.g. just change the set of selected slices).
@@ -739,7 +737,6 @@ public:
 
 private:
 
-#ifdef ENABLE_UI
   // EditorObserver impl
   void onScrollChanged(Editor* editor) override { updateAllVisibleRegion(); }
   void onZoomChanged(Editor* editor) override { updateAllVisibleRegion(); }
@@ -754,14 +751,11 @@ private:
 
     return fmt::format("{} {}", prefix, max+1);
   }
-#endif  // ENABLE_UI
 
 };
 
 //////////////////////////////////////////////////////////////////////
 // For user UI painting
-
-#ifdef ENABLE_UI
 
 // TODO add inks for tilemaps
 static void adjust_ink_for_tilemaps(const Site& site,
@@ -833,9 +827,7 @@ tools::ToolLoop* create_tool_loop(
       if (toolPref.floodfill.referTo() ==
           app::gen::FillReferTo::ACTIVE_LAYER) {
         StatusBar::instance()->showTip(
-          1000,
-          fmt::format(Strings::statusbar_tips_layer_x_is_hidden(),
-                      layer->name()));
+          1000, Strings::statusbar_tips_layer_x_is_hidden(layer->name()));
         return nullptr;
       }
     }
@@ -847,8 +839,7 @@ tools::ToolLoop* create_tool_loop(
     else if (layer->isReference()) {
       StatusBar::instance()->showTip(
         1000,
-        fmt::format(Strings::statusbar_tips_unmodifiable_reference_layer(),
-                    layer->name()));
+        Strings::statusbar_tips_unmodifiable_reference_layer(layer->name()));
       return nullptr;
     }
   }
@@ -910,8 +901,6 @@ tools::ToolLoop* create_tool_loop(
   }
 }
 
-#endif // ENABLE_UI
-
 //////////////////////////////////////////////////////////////////////
 // For scripting
 
@@ -950,9 +939,7 @@ tools::ToolLoop* create_tool_loop_for_script(
 //////////////////////////////////////////////////////////////////////
 // For UI preview
 
-#ifdef ENABLE_UI
-
-class PreviewToolLoopImpl : public ToolLoopBase {
+class PreviewToolLoopImpl final : public ToolLoopBase {
   Image* m_image;
 
 public:
@@ -1078,8 +1065,6 @@ tools::ToolLoop* create_tool_loop_preview(
     return nullptr;
   }
 }
-
-#endif // ENABLE_UI
 
 //////////////////////////////////////////////////////////////////////
 

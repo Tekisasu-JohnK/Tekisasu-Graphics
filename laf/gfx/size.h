@@ -49,7 +49,7 @@ public:
                  std::min(h, sz.h));
   }
 
-  const SizeT& operator=(const SizeT& sz) {
+  SizeT& operator=(const SizeT& sz) {
     w = sz.w;
     h = sz.h;
     return *this;

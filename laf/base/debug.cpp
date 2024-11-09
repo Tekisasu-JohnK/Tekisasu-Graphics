@@ -60,7 +60,7 @@ void base_trace(const char* msg, ...)
   va_list ap;
   va_start(ap, msg);
   char buf[4096];
-  vsprintf(buf, msg, ap);
+  vsnprintf(buf, sizeof(buf), msg, ap);
   va_end(ap);
 
 #if LAF_WINDOWS

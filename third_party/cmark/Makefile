@@ -17,7 +17,7 @@ CMARK=$(BUILDDIR)/src/cmark
 CMARK_FUZZ=$(BUILDDIR)/src/cmark-fuzz
 PROG?=$(CMARK)
 VERSION?=$(SPECVERSION)
-RELEASE?=CommonMark-$(VERSION)
+RELEASE?=cmark-$(VERSION)
 INSTALL_PREFIX?=/usr/local
 CLANG_CHECK?=clang-check
 CLANG_FORMAT=clang-format -style llvm -sort-includes=0 -i
@@ -41,7 +41,8 @@ $(BUILDDIR):
 		-G "$(GENERATOR)" \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX) \
-		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+		-DBUILD_SHARED_LIBS=YES
 
 install: $(BUILDDIR)
 	$(MAKE) -C $(BUILDDIR) install
@@ -52,7 +53,9 @@ uninstall: $(BUILDDIR)/install_manifest.txt
 debug:
 	mkdir -p $(BUILDDIR); \
 	cd $(BUILDDIR); \
-	cmake .. -DCMAKE_BUILD_TYPE=Debug; \
+	cmake .. \
+		-DCMAKE_BUILD_TYPE=Debug \
+		-DBUILD_SHARED_LIBS=YES; \
 	$(MAKE)
 
 ubsan:
@@ -79,18 +82,26 @@ afl:
 	cd $(BUILDDIR) && cmake .. -DCMARK_TESTS=0 -DCMAKE_C_COMPILER=$(AFL_PATH)/afl-clang
 	$(MAKE)
 	$(AFL_PATH)/afl-fuzz \
-	    -i test/afl_test_cases \
-	    -o test/afl_results \
-	    -x test/fuzzing_dictionary \
+	    -i fuzz/afl_test_cases \
+	    -o fuzz/afl_results \
+	    -x fuzz/dictionary \
 	    -t 100 \
 	    $(CMARK) $(CMARK_OPTS)
 
 libFuzzer:
-	@[ -n "$(LIB_FUZZER_PATH)" ] || { echo '$$LIB_FUZZER_PATH not set'; false; }
-	mkdir -p $(BUILDDIR)
-	cd $(BUILDDIR) && cmake -DCMAKE_BUILD_TYPE=Asan -DCMARK_LIB_FUZZER=ON -DCMAKE_LIB_FUZZER_PATH=$(LIB_FUZZER_PATH) ..
-	$(MAKE) -j2 -C $(BUILDDIR) cmark-fuzz
-	test/run-cmark-fuzz $(CMARK_FUZZ)
+	cmake \
+	    -S . -B $(BUILDDIR) \
+	    -DCMAKE_C_COMPILER=clang \
+	    -DCMAKE_CXX_COMPILER=clang++ \
+	    -DCMAKE_BUILD_TYPE=Asan \
+	    -DCMARK_LIB_FUZZER=ON
+	cmake --build $(BUILDDIR)
+	mkdir -p fuzz/corpus
+	$(BUILDDIR)/fuzz/cmark-fuzz \
+	    -dict=fuzz/dictionary \
+	    -max_len=1000 \
+	    -timeout=1 \
+	    fuzz/corpus
 
 lint: $(BUILDDIR)
 	errs=0 ; \
@@ -114,10 +125,10 @@ archive:
 clean:
 	rm -rf $(BUILDDIR) $(MINGW_BUILDDIR) $(MINGW_INSTALLDIR)
 
-# We include case_fold_switch.inc in the repository, so this shouldn't
+# We include case_fold.inc in the repository, so this shouldn't
 # normally need to be generated.
-$(SRCDIR)/case_fold_switch.inc: $(DATADIR)/CaseFolding.txt
-	perl tools/mkcasefold.pl < $< > $@
+$(SRCDIR)/case_fold.inc: $(DATADIR)/CaseFolding.txt
+	python3 tools/make_case_fold_inc.py < $< > $@
 
 # We include scanners.c in the repository, so this shouldn't
 # normally need to be generated.
@@ -128,8 +139,8 @@ $(SRCDIR)/scanners.c: $(SRCDIR)/scanners.re
 		false; \
 		;; \
 	esac
-	re2c -W -Werror --case-insensitive -b -i --no-generation-date -8 \
-		--encoding-policy substitute -o $@ $<
+	re2c -W -Werror --case-insensitive -b -i --no-generation-date \
+		-o $@ $<
 	$(CLANG_FORMAT) $@
 
 # We include entities.inc in the repository, so normally this
@@ -142,7 +153,7 @@ update-spec:
  > $(SPEC)
 
 test: $(SPEC) cmake_build
-	$(MAKE) -C $(BUILDDIR) test || (cat $(BUILDDIR)/Testing/Temporary/LastTest.log && exit 1)
+	ctest --test-dir $(BUILDDIR) --output-on-failure || (cat $(BUILDDIR)/Testing/Temporary/LastTest.log && exit 1)
 
 $(ALLTESTS): $(SPEC)
 	python3 test/spec_tests.py --spec $< --dump-tests | python3 -c 'import json; import sys; tests = json.loads(sys.stdin.read()); print("\n".join([test["markdown"] for test in tests]))' > $@

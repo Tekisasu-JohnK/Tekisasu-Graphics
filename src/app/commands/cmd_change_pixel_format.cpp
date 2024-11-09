@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -23,6 +23,7 @@
 #include "app/modules/palettes.h"
 #include "app/sprite_job.h"
 #include "app/transaction.h"
+#include "app/ui/best_fit_criteria_selector.h"
 #include "app/ui/dithering_selector.h"
 #include "app/ui/editor/editor.h"
 #include "app/ui/editor/editor_render.h"
@@ -69,7 +70,6 @@ public:
                 const doc::frame_t frame,
                 const doc::PixelFormat pixelFormat,
                 const render::Dithering& dithering,
-                const doc::RgbMapAlgorithm rgbMapAlgorithm,
                 const gen::ToGrayAlgorithm toGray,
                 const gfx::Point& pos,
                 const bool newBlend)
@@ -83,13 +83,11 @@ public:
        sprite, frame,
        pixelFormat,
        dithering,
-       rgbMapAlgorithm,
        toGray,
        newBlend]() { // Copy the matrix
         run(sprite, frame,
             pixelFormat,
             dithering,
-            rgbMapAlgorithm,
             toGray,
             newBlend);
       })
@@ -114,7 +112,6 @@ private:
            const doc::frame_t frame,
            const doc::PixelFormat pixelFormat,
            const render::Dithering& dithering,
-           const doc::RgbMapAlgorithm rgbMapAlgorithm,
            const gen::ToGrayAlgorithm toGray,
            const bool newBlend) {
     doc::ImageRef tmp(
@@ -136,9 +133,7 @@ private:
       m_image.get(),
       pixelFormat,
       dithering,
-      sprite->rgbMap(frame,
-                     sprite->rgbMapForSprite(),
-                     rgbMapAlgorithm),
+      sprite->rgbMap(frame),
       sprite->palette(frame),
       (sprite->backgroundLayer() != nullptr),
       0,
@@ -165,8 +160,6 @@ private:
   double m_progress;
   std::thread m_thread;
 };
-
-#ifdef ENABLE_UI
 
 class ConversionItem : public ListItem {
 public:
@@ -195,6 +188,7 @@ public:
     , m_selectedItem(nullptr)
     , m_ditheringSelector(nullptr)
     , m_mapAlgorithmSelector(nullptr)
+    , m_bestFitCriteriaSelector(nullptr)
     , m_imageJustCreated(true)
   {
     const auto& pref = Preferences::instance();
@@ -221,6 +215,9 @@ public:
       m_mapAlgorithmSelector = new RgbMapAlgorithmSelector;
       m_mapAlgorithmSelector->setExpansive(true);
 
+      m_bestFitCriteriaSelector = new BestFitCriteriaSelector;
+      m_bestFitCriteriaSelector->setExpansive(true);
+
       // Select default dithering method
       {
         int index = m_ditheringSelector->findItemIndex(
@@ -232,8 +229,12 @@ public:
       // Select default RgbMap algorithm
       m_mapAlgorithmSelector->algorithm(pref.quantization.rgbmapAlgorithm());
 
+      // Select default best fit criteria
+      m_bestFitCriteriaSelector->criteria(pref.quantization.fitCriteria());
+
       ditheringPlaceholder()->addChild(m_ditheringSelector);
       rgbmapAlgorithmPlaceholder()->addChild(m_mapAlgorithmSelector);
+      bestFitCriteriaPlaceholder()->addChild(m_bestFitCriteriaSelector);
 
       const bool adv = pref.quantization.advanced();
       advancedCheck()->setSelected(adv);
@@ -242,6 +243,7 @@ public:
       // Signals
       m_ditheringSelector->Change.connect([this]{ onIndexParamChange(); });
       m_mapAlgorithmSelector->Change.connect([this]{ onIndexParamChange(); });
+      m_bestFitCriteriaSelector->Change.connect([this]{ onIndexParamChange(); });
       factor()->Change.connect([this]{ onIndexParamChange(); });
 
       advancedCheck()->Click.connect(
@@ -303,6 +305,13 @@ public:
       return doc::RgbMapAlgorithm::DEFAULT;
   }
 
+  doc::FitCriteria fitCriteria() const {
+    if (m_bestFitCriteriaSelector)
+      return m_bestFitCriteriaSelector->criteria();
+    else
+      return doc::FitCriteria::DEFAULT;
+  }
+
   gen::ToGrayAlgorithm toGray() const {
     static_assert(
       int(gen::ToGrayAlgorithm::LUMA) == 0 &&
@@ -333,7 +342,7 @@ public:
       }
     }
 
-    if (m_mapAlgorithmSelector)
+    if (m_mapAlgorithmSelector || m_bestFitCriteriaSelector)
       pref.quantization.advanced(advancedCheck()->isSelected());
   }
 
@@ -398,6 +407,12 @@ private:
       visibleBounds.origin(),
       doc::BlendMode::SRC);
 
+    m_editor->sprite()->rgbMap(
+      0,
+      m_editor->sprite()->rgbMapForSprite(),
+      rgbMapAlgorithm(),
+      fitCriteria());
+
     m_editor->invalidate();
     progress()->setValue(0);
     progress()->setVisible(false);
@@ -410,7 +425,6 @@ private:
         m_editor->frame(),
         dstPixelFormat,
         dithering(),
-        rgbMapAlgorithm(),
         toGray(),
         visibleBounds.origin(),
         Preferences::instance().experimental.newBlend()));
@@ -465,10 +479,9 @@ private:
   ConversionItem* m_selectedItem;
   DitheringSelector* m_ditheringSelector;
   RgbMapAlgorithmSelector* m_mapAlgorithmSelector;
+  BestFitCriteriaSelector* m_bestFitCriteriaSelector;
   bool m_imageJustCreated;
 };
-
-#endif // ENABLE_UI
 
 } // anonymous namespace
 
@@ -484,17 +497,20 @@ protected:
   std::string onGetFriendlyName() const override;
 
 private:
-  bool m_useUI;
+  bool m_showDlg;
+  bool m_showProgress;
   doc::PixelFormat m_format;
   render::Dithering m_dithering;
   doc::RgbMapAlgorithm m_rgbmap;
+  doc::FitCriteria m_fitCriteria = FitCriteria::DEFAULT;
   gen::ToGrayAlgorithm m_toGray;
 };
 
 ChangePixelFormatCommand::ChangePixelFormatCommand()
   : Command(CommandId::ChangePixelFormat(), CmdUIOnlyFlag)
 {
-  m_useUI = true;
+  m_showDlg = true;
+  m_showProgress = true;
   m_format = IMAGE_RGB;
   m_dithering = render::Dithering();
   m_rgbmap = doc::RgbMapAlgorithm::DEFAULT;
@@ -503,15 +519,20 @@ ChangePixelFormatCommand::ChangePixelFormatCommand()
 
 void ChangePixelFormatCommand::onLoadParams(const Params& params)
 {
-  m_useUI = false;
+  m_showDlg = false;
+  m_showProgress = true;
 
   std::string format = params.get("format");
   if (format == "rgb") m_format = IMAGE_RGB;
   else if (format == "grayscale" ||
            format == "gray") m_format = IMAGE_GRAYSCALE;
   else if (format == "indexed") m_format = IMAGE_INDEXED;
-  else
-    m_useUI = true;
+  else {
+    m_showDlg = true;
+  }
+
+  if (params.has_param("ui"))
+    m_showDlg = m_showProgress = params.get_as<bool>("ui");
 
   std::string dithering = params.get("dithering");
   if (dithering == "ordered")
@@ -587,7 +608,7 @@ bool ChangePixelFormatCommand::onEnabled(Context* context)
   if (!sprite)
     return false;
 
-  if (m_useUI)
+  if (m_showDlg)
     return true;
 
   if (sprite->pixelFormat() == IMAGE_INDEXED &&
@@ -600,7 +621,7 @@ bool ChangePixelFormatCommand::onEnabled(Context* context)
 
 bool ChangePixelFormatCommand::onChecked(Context* context)
 {
-  if (m_useUI)
+  if (m_showDlg)
     return false;
 
   const ContextReader reader(context);
@@ -621,8 +642,10 @@ void ChangePixelFormatCommand::onExecute(Context* context)
 {
   bool flatten = false;
 
-#ifdef ENABLE_UI
-  if (m_useUI) {
+  if (!context->isUIAvailable()) {
+    // do nothing
+  }
+  else if (m_showDlg) {
     ColorModeWindow window(Editor::activeEditor());
 
     window.remapWindow();
@@ -638,20 +661,26 @@ void ChangePixelFormatCommand::onExecute(Context* context)
     m_format = window.pixelFormat();
     m_dithering = window.dithering();
     m_rgbmap = window.rgbMapAlgorithm();
+    m_fitCriteria = window.fitCriteria();
     m_toGray = window.toGray();
     flatten = window.flattenEnabled();
 
     window.saveOptions();
   }
-#endif // ENABLE_UI
+  else {
+    if (m_format == IMAGE_INDEXED) {
+      m_rgbmap = Preferences::instance().quantization.rgbmapAlgorithm();
+      m_fitCriteria = Preferences::instance().quantization.fitCriteria();
+    }
+  }
 
   // No conversion needed
-  if (context->activeDocument()->sprite()->pixelFormat() == m_format)
+  Doc* doc = context->activeDocument();
+  if (doc->sprite()->pixelFormat() == m_format)
     return;
 
   {
-    const ContextReader reader(context);
-    SpriteJob job(reader, Strings::color_mode_title().c_str());
+    SpriteJob job(context, doc, Strings::color_mode_title(), m_showProgress);
     Sprite* sprite(job.sprite());
 
     // TODO this was moved in the main UI thread because
@@ -662,22 +691,27 @@ void ChangePixelFormatCommand::onExecute(Context* context)
     //      https://github.com/aseprite/aseprite/issues/509
     //      https://github.com/aseprite/aseprite/issues/378
     if (flatten) {
+      Tx tx(Tx::LockDoc, context, doc);
       const bool newBlend = Preferences::instance().experimental.newBlend();
+      cmd::FlattenLayers::Options options;
+      options.newBlendMethod = newBlend;
+
       SelectedLayers selLayers;
       for (auto layer : sprite->root()->layers())
         selLayers.insert(layer);
-      job.tx()(new cmd::FlattenLayers(sprite, selLayers, newBlend));
+      tx(new cmd::FlattenLayers(sprite, selLayers, options));
     }
 
     job.startJobWithCallback(
-      [this, &job, sprite] {
-        job.tx()(
+      [this, &job, sprite](Tx& tx) {
+        tx(
           new cmd::SetPixelFormat(
             sprite, m_format,
             m_dithering,
             m_rgbmap,
             get_gray_func(m_toGray),
-            &job));             // SpriteJob is a render::TaskDelegate
+            &job,
+            m_fitCriteria));             // SpriteJob is a render::TaskDelegate
       });
     job.waitJob();
   }
@@ -690,7 +724,7 @@ std::string ChangePixelFormatCommand::onGetFriendlyName() const
 {
   std::string conversion;
 
-  if (!m_useUI) {
+  if (!m_showDlg) {
     switch (m_format) {
       case IMAGE_RGB:
         conversion = Strings::commands_ChangePixelFormat_RGB();
@@ -719,7 +753,7 @@ std::string ChangePixelFormatCommand::onGetFriendlyName() const
   else
     conversion = Strings::commands_ChangePixelFormat_MoreOptions();
 
-  return fmt::format(getBaseFriendlyName(), conversion);
+  return Strings::commands_ChangePixelFormat(conversion);
 }
 
 Command* CommandFactory::createChangePixelFormatCommand()

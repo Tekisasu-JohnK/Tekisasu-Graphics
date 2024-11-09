@@ -42,7 +42,7 @@ Time current_time()
 
 #else
 
-  std::time_t now = std::time(nullptr);
+  const std::time_t now = std::time(nullptr);
   std::tm t;
   safe_localtime(now, &t);
   return Time(

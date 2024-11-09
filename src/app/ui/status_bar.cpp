@@ -10,6 +10,7 @@
 #endif
 
 #include "app/app.h"
+#include "app/app_menus.h"
 #include "app/commands/commands.h"
 #include "app/commands/params.h"
 #include "app/context_access.h"
@@ -66,7 +67,7 @@ class StatusBar::AboutStatusBar : public HBox {
 public:
   AboutStatusBar()
     : m_label(fmt::format("{} {} by ", get_app_name(), get_app_version()))
-    , m_link("", "Igara Studio")
+    , m_link("", "Tekisasu")
   {
     m_link.Click.connect(
       []{
@@ -700,7 +701,9 @@ StatusBar::StatusBar(TooltipManager* tooltipManager)
     m_frameLabel = new Label(Strings::statusbar_tips_frame());
     m_currentFrame = new GotoFrameEntry();
     m_newFrame = new Button("+");
-    m_newFrame->Click.connect([this]{ newFrame(); });
+    m_newFrame->Click.connect(&StatusBar::newFrame, this);
+    m_newFrame->RightClick.connect(&StatusBar::showNewFramePopupMenu, this);
+
     m_zoomEntry = new ZoomEntry;
     m_zoomEntry->ZoomChange.connect(&StatusBar::onChangeZoom, this);
 
@@ -994,6 +997,11 @@ void StatusBar::newFrame()
 {
   Command* cmd = Commands::instance()->byId(CommandId::NewFrame());
   UIContext::instance()->executeCommandFromMenuOrShortcut(cmd);
+}
+
+void StatusBar::showNewFramePopupMenu()
+{
+  AppMenus::instance()->getNewFrameMenu()->showPopup(mousePosInDisplay(), display());
 }
 
 void StatusBar::onChangeZoom(const render::Zoom& zoom)

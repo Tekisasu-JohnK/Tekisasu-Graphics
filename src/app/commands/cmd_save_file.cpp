@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -41,7 +41,6 @@
 #include "doc/mask.h"
 #include "doc/sprite.h"
 #include "doc/tag.h"
-#include "fmt/format.h"
 #include "ui/ui.h"
 #include "undo/undo_state.h"
 
@@ -49,8 +48,8 @@ namespace app {
 
 class SaveFileJob : public Job, public IFileOpProgress {
 public:
-  SaveFileJob(FileOp* fop)
-    : Job(Strings::save_file_saving().c_str())
+  SaveFileJob(FileOp* fop, const bool showProgressBar)
+    : Job(Strings::save_file_saving(), showProgressBar)
     , m_fop(fop)
   {
   }
@@ -100,11 +99,11 @@ void SaveFileBaseCommand::onLoadParams(const Params& params)
       this->params().toFrame.isSet()) {
     doc::frame_t fromFrame = this->params().fromFrame();
     doc::frame_t toFrame = this->params().toFrame();
-    m_selFrames.insert(fromFrame, toFrame);
+    m_framesSeq.insert(fromFrame, toFrame);
     m_adjustFramesByTag = true;
   }
   else {
-    m_selFrames.clear();
+    m_framesSeq.clear();
     m_adjustFramesByTag = false;
   }
 }
@@ -137,7 +136,6 @@ std::string SaveFileBaseCommand::saveAsDialog(
     base::paths exts = get_writable_extensions();
     filename = initialFilename;
 
-#ifdef ENABLE_UI
     if (context->isUIAvailable()) {
     again:;
       base::paths newfilename;
@@ -157,7 +155,6 @@ std::string SaveFileBaseCommand::saveAsDialog(
         goto again;
       }
     }
-#endif // ENABLE_UI
   }
 
   if (filename.empty())
@@ -201,7 +198,6 @@ void SaveFileBaseCommand::saveDocumentInBackground(
   const ResizeOnTheFly resizeOnTheFly,
   const gfx::PointF& scale)
 {
-#ifdef ENABLE_UI
   // If the document is read only, we cannot save it directly (we have
   // to use File > Save As)
   if (document->isReadOnly() &&
@@ -209,22 +205,6 @@ void SaveFileBaseCommand::saveDocumentInBackground(
     IncompatFileWindow window;
     window.show();
     return;
-  }
-#endif // ENABLE_UI
-
-  if (params().aniDir.isSet()) {
-    switch (params().aniDir()) {
-      case AniDir::REVERSE:
-        m_selFrames = m_selFrames.makeReverse();
-        break;
-      case AniDir::PING_PONG:
-        m_selFrames = m_selFrames.makePingPong();
-        break;
-      case AniDir::PING_PONG_REVERSE:
-        m_selFrames = m_selFrames.makePingPong();
-        m_selFrames = m_selFrames.makeReverse();
-        break;
-    }
   }
 
   gfx::Rect bounds;
@@ -239,7 +219,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
 
   FileOpROI roi(document, bounds,
                 params().slice(), params().tag(),
-                m_selFrames, m_adjustFramesByTag);
+                m_framesSeq, m_adjustFramesByTag);
 
   std::unique_ptr<FileOp> fop(
     FileOp::createSaveDocumentOperation(
@@ -254,7 +234,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
   if (resizeOnTheFly == ResizeOnTheFly::On)
     fop->setOnTheFlyScale(scale);
 
-  SaveFileJob job(fop.get());
+  SaveFileJob job(fop.get(), params().ui());
   job.showProgressWindow();
 
   if (fop->hasError()) {
@@ -272,7 +252,7 @@ void SaveFileBaseCommand::saveDocumentInBackground(
     document->impossibleToBackToSavedState();
   }
   else {
-    if (context->isUIAvailable() && params().ui())
+    if (should_add_file_to_recents(context, params()))
       App::instance()->recentFiles()->addRecentFile(filename);
 
     if (markAsSaved == MarkAsSaved::On) {
@@ -281,13 +261,10 @@ void SaveFileBaseCommand::saveDocumentInBackground(
       document->incrementVersion();
     }
 
-#ifdef ENABLE_UI
     if (context->isUIAvailable() && params().ui()) {
       StatusBar::instance()->setStatusText(
-        2000, fmt::format(Strings::save_file_saved(),
-                          base::get_file_name(filename)));
+        2000, Strings::save_file_saved(base::get_file_name(filename)));
     }
-#endif
   }
 }
 
@@ -385,9 +362,9 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
   double scale = params().scale();
   gfx::Rect bounds = params().bounds();
   doc::AniDir aniDirValue = params().aniDir();
+  bool isPlaySubtags = params().playSubtags();
   bool isForTwitter = false;
 
-#if ENABLE_UI
   if (params().ui() && context->isUIAvailable()) {
     ExportFileWindow win(doc);
     bool askOverwrite = true;
@@ -442,8 +419,7 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
       int ret = OptionalAlert::show(
         Preferences::instance().exportFile.showOverwriteFilesAlert,
         1, // Yes is the default option when the alert dialog is disabled
-        fmt::format(Strings::alerts_overwrite_files_on_export(),
-                    outputFilename));
+        Strings::alerts_overwrite_files_on_export(outputFilename));
       if (ret != 1)
         goto again;
     }
@@ -462,8 +438,8 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
     applyPixelRatio = win.applyPixelRatio();
     aniDirValue = win.aniDirValue();
     isForTwitter = win.isForTwitter();
+    isPlaySubtags = win.isPlaySubtags();
   }
-#endif
 
   gfx::PointF scaleXY(scale, scale);
 
@@ -507,33 +483,33 @@ void SaveFileCopyAsCommand::onExecute(Context* context)
 
   {
     RestoreVisibleLayers layersVisibility;
+    Site site = context->activeSite();
     if (context->isUIAvailable()) {
-      Site site = context->activeSite();
-
       // Selected layers to export
       calculate_visible_layers(site,
                                layers,
                                layersIndex,
                                layersVisibility);
-
-      // m_selFrames is not empty if fromFrame/toFrame parameters are
-      // specified.
-      if (m_selFrames.empty()) {
-        // Selected frames to export
-        SelectedFrames selFrames;
-        Tag* tag = calculate_selected_frames(
-          site, frames, selFrames);
-        if (tag)
-          params().tag(tag->name());
-        m_selFrames = selFrames;
-      }
-      m_adjustFramesByTag = false;
     }
+
+    // m_selFrames is not empty if fromFrame/toFrame parameters are
+    // specified.
+    if (m_framesSeq.empty()) {
+      // Frames sequence to export
+      FramesSequence framesSeq;
+      Tag* tag = calculate_frames_sequence(
+        site, frames, framesSeq, isPlaySubtags, aniDirValue);
+      if (tag)
+        params().tag(tag->name());
+      m_framesSeq = framesSeq;
+    }
+    m_adjustFramesByTag = false;
 
     // Set other parameters
     params().aniDir(aniDirValue);
     if (!bounds.isEmpty())
       params().bounds(bounds);
+    params().playSubtags(isPlaySubtags);
 
     // TODO This should be set as options for the specific encoder
     GifEncoderDurationFix fixGif(isForTwitter);

@@ -38,7 +38,7 @@ namespace base {
       hour = minute = second = 0;
     }
 
-    Time& addSeconds(const int seconds);
+    Time& addSeconds(int seconds);
     Time& addMinutes(const int minutes) {
       return addSeconds(minutes*60);
     }
@@ -66,7 +66,7 @@ namespace base {
     bool operator<(const Time& other) const;
   };
 
-  bool safe_localtime(const std::time_t time, std::tm* result);
+  bool safe_localtime(std::time_t time, std::tm* result);
 
   Time current_time();
   tick_t current_tick();

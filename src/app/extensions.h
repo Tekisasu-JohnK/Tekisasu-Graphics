@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2020-2023  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 // Copyright (C) 2017-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -34,6 +34,7 @@ namespace app {
     std::string version;
     std::string dstPath;
     std::string commonPath;
+    bool defaultTheme = false;
   };
 
   enum DeletePluginPref { kNo, kYes };
@@ -41,6 +42,8 @@ namespace app {
   class Extension {
     friend class Extensions;
   public:
+    static const char* kAsepriteDefaultThemeExtensionName;
+    static const char* kAsepriteDefaultThemeId;
 
     enum class Category {
       None,
@@ -53,6 +56,8 @@ namespace app {
       Multiple,
       Max
     };
+
+    bool isDefaultTheme() const;
 
     class DitheringMatrixInfo {
     public:
@@ -150,7 +155,6 @@ namespace app {
     void uninstall(const DeletePluginPref delPref);
     void uninstallFiles(const std::string& path,
                         const DeletePluginPref delPref);
-    bool isDefaultTheme() const;
     void updateCategory(const Category newCategory);
 #ifdef ENABLE_SCRIPTING
     void initScripts();
@@ -218,7 +222,13 @@ namespace app {
     std::string palettePath(const std::string& palId);
     ExtensionItems palettes() const;
     const render::DitheringMatrix* ditheringMatrix(const std::string& matrixId);
-    std::vector<Extension::DitheringMatrixInfo> ditheringMatrices();
+
+    // The returned collection can be used temporarily while
+    // extensions are not installed/uninstalled. Each element is
+    // pointing to the real matrix info owned by extensions, this is
+    // needed to cache the matrix because it is lazy loaded from an
+    // image file. These pointers cannot be deleted.
+    std::vector<Extension::DitheringMatrixInfo*> ditheringMatrices();
 
     obs::signal<void(Extension*)> NewExtension;
     obs::signal<void(Extension*)> KeysChange;

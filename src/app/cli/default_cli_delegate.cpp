@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -31,6 +31,8 @@
 #ifdef ENABLE_SCRIPTING
   #include "app/app.h"
   #include "app/script/engine.h"
+  #include "app/script/script_input_chain.h"
+  #include "app/ui/input_chain.h"
 #endif
 
 #include <iostream>
@@ -67,6 +69,10 @@ void DefaultCliDelegate::afterOpenFile(const CliOpenFile& cof)
       std::cout << layer->name() << "\n";
   }
 
+  if (cof.listLayerHierarchy) {
+    std::cout << cof.document->sprite()->visibleLayerHierarchyAsString() << "\n";
+  }
+
   if (cof.listTags) {
     for (doc::Tag* tag : cof.document->sprite()->tags())
       std::cout << tag->name() << "\n";
@@ -87,6 +93,9 @@ void DefaultCliDelegate::saveFile(Context* ctx, const CliOpenFile& cof)
 
   if (cof.hasTag()) {
     params.set("frame-tag", cof.tag.c_str());
+  }
+  if (cof.playSubtags) {
+    params.set("playSubtags", "true");
   }
   if (cof.hasFrameRange()) {
     params.set("from-frame", base::convert_to<std::string>(cof.fromFrame).c_str());
@@ -136,6 +145,10 @@ void DefaultCliDelegate::exportFiles(Context* ctx, DocExporter& exporter)
 int DefaultCliDelegate::execScript(const std::string& filename,
                                    const Params& params)
 {
+  ScriptInputChain scriptInputChain;
+  if (!App::instance()->isGui()) {
+    App::instance()->inputChain().prioritize(&scriptInputChain, nullptr);
+  }
   auto engine = App::instance()->scriptEngine();
   if (!engine->evalUserFile(filename, params))
     throw base::Exception("Error executing script %s", filename.c_str());

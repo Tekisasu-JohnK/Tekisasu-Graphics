@@ -218,7 +218,7 @@ private:
                                  newUserData != m_cel->data()->userData()))) {
       try {
         ContextWriter writer(UIContext::instance());
-        Tx tx(writer.context(), "Set Cel Properties");
+        Tx tx(writer, "Set Cel Properties");
 
         DocRange range;
         if (m_range.enabled()) {
@@ -287,6 +287,7 @@ private:
       update_screen_for_document(m_document);
     }
 
+    // TODO this is similar to LayerPropertiesWindow::onCommitChange()
     m_pendingChanges = false;
   }
 

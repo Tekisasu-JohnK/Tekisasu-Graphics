@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -72,10 +72,7 @@ bool NewFileCommand::onEnabled(Context* ctx)
 {
   return
     (!params().fromClipboard()
-#ifdef ENABLE_UI
-     || (ctx->clipboard()->format() == ClipboardFormat::Image)
-#endif
-     );
+     || (ctx->clipboard()->format() == ClipboardFormat::Image));
 }
 
 void NewFileCommand::onExecute(Context* ctx)
@@ -85,13 +82,10 @@ void NewFileCommand::onExecute(Context* ctx)
   doc::ColorMode colorMode = params().colorMode();
   app::Color bgColor = app::Color::fromMask();
   doc::PixelRatio pixelRatio(1, 1);
-#ifdef ENABLE_UI
   doc::ImageRef clipboardImage;
   doc::Palette clipboardPalette(0, 256);
-#endif
   const int ncolors = get_default_palette()->size();
 
-#ifdef ENABLE_UI
   if (params().fromClipboard()) {
     clipboardImage = ctx->clipboard()->getImage(&clipboardPalette);
     if (!clipboardImage)
@@ -205,7 +199,6 @@ void NewFileCommand::onExecute(Context* ctx)
     width = w;
     height = h;
   }
-#endif // ENABLE_UI
 
   ASSERT(colorMode == ColorMode::RGB ||
          colorMode == ColorMode::GRAYSCALE ||
@@ -249,7 +242,6 @@ void NewFileCommand::onExecute(Context* ctx)
 
       set_current_palette(&oldPal, false);
     }
-#ifdef ENABLE_UI
     else if (clipboardImage) {
       LayerImage* layerImage = static_cast<LayerImage*>(layer);
       // layerImage->configureAsBackground();
@@ -265,12 +257,16 @@ void NewFileCommand::onExecute(Context* ctx)
       }
       sprite->setPalette(&clipboardPalette, false);
     }
-#endif // ENABLE_UI
 
     if (layer->isBackground())
       layer->setName(Strings::commands_NewFile_BackgroundLayer());
     else
       layer->setName(fmt::format("{} {}", Strings::commands_NewLayer_Layer(), 1));
+  }
+  if (sprite->pixelFormat() == IMAGE_INDEXED) {
+    sprite->rgbMap(0, Sprite::RgbMapFor(!layer->isBackground()),
+                   Preferences::instance().quantization.rgbmapAlgorithm(),
+                   Preferences::instance().quantization.fitCriteria());
   }
 
   // Show the sprite to the user
@@ -285,9 +281,9 @@ void NewFileCommand::onExecute(Context* ctx)
 std::string NewFileCommand::onGetFriendlyName() const
 {
   if (params().fromClipboard())
-    return fmt::format(Strings::commands_NewFile_FromClipboard());
+    return Strings::commands_NewFile_FromClipboard();
   else
-    return fmt::format(Strings::commands_NewFile());
+    return Strings::commands_NewFile();
 }
 
 Command* CommandFactory::createNewFileCommand()

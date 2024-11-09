@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2021  Igara Studio S.A.
+// Copyright (C) 2021-2024  Igara Studio S.A.
 // Copyright (C) 2016  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -14,11 +14,20 @@
 #include "os/x11/screen.h"
 #include "os/x11/x11.h"
 
+#include <X11/Xutil.h>
+
 namespace os {
 
 class SystemX11 : public CommonSystem {
 public:
   ~SystemX11();
+
+  void setTabletOptions(const TabletOptions& options) override {
+    m_tabletOptions = options;
+  }
+  TabletOptions tabletOptions() const override {
+    return m_tabletOptions;
+  }
 
   bool isKeyPressed(KeyScancode scancode) override {
     return x11_is_key_pressed(scancode);
@@ -51,28 +60,24 @@ public:
   }
 
   gfx::Color getColorFromScreen(const gfx::Point& screenPosition) const override {
-#if 0
     ::Display* display = X11::instance()->display();
     int screen = XDefaultScreen(display);
-    ::Window root = XDefaultRootWindow(display);
+    ::Window root = XRootWindow(display, screen);
 
-    // TODO XGetImage() crashes with a BadMatch error
     XImage* image = XGetImage(display, root,
                               screenPosition.x,
                               screenPosition.y, 1, 1, AllPlanes, ZPixmap);
     if (image) {
       XColor color;
-      color.pixel = XGetPixel(image, screenPosition.x, screenPosition.y);
-      XFree(image);
+      color.pixel = XGetPixel(image, 0, 0);
+      XDestroyImage(image);
 
       XQueryColor(display, XDefaultColormap(display, screen), &color);
 
       // Each red/green/blue channel is 16-bit, so we have to convert to 8-bit.
       return gfx::rgba(color.red>>8, color.green>>8, color.blue>>8);
     }
-    else
-#endif
-      return gfx::ColorNone;
+    return gfx::ColorNone;
   }
 
   ScreenRef mainScreen() override {
@@ -86,6 +91,8 @@ public:
       list.push_back(make_ref<ScreenX11>(screen));
   }
 
+private:
+  TabletOptions m_tabletOptions;
 };
 
 } // namespace os

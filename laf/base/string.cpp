@@ -1,5 +1,5 @@
 // LAF Base Library
-// Copyright (c) 2020-2022 Igara Studio S.A.
+// Copyright (c) 2020-2024 Igara Studio S.A.
 // Copyright (c) 2001-2016 David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -36,13 +36,13 @@ std::string string_vprintf(const char* format, va_list ap)
   std::vector<char> buf(1, 0);
   std::va_list ap2;
   va_copy(ap2, ap);
-  size_t required_size = std::vsnprintf(nullptr, 0, format, ap);
-  if (required_size) {
+  const size_t required_size = std::vsnprintf(nullptr, 0, format, ap);
+  if (required_size > 0) {
     buf.resize(required_size+1);
-    std::vsnprintf(&buf[0], buf.size(), format, ap2);
+    std::vsnprintf(buf.data(), buf.size(), format, ap2);
   }
   va_end(ap2);
-  return std::string(&buf[0]);
+  return std::string(buf.data());
 }
 
 std::string string_to_lower(const std::string& original)
@@ -71,7 +71,7 @@ std::string string_to_upper(const std::string& original)
 
 #ifdef LAF_WINDOWS
 
-std::string to_utf8(const wchar_t* src, const int n)
+std::string to_utf8(const wchar_t* src, const size_t n)
 {
   int required_size =
     ::WideCharToMultiByte(CP_UTF8, 0,
@@ -152,13 +152,13 @@ static std::size_t insert_utf8_char(std::string* result, wchar_t chr)
   return size;
 }
 
-std::string to_utf8(const wchar_t* src, const int n)
+std::string to_utf8(const wchar_t* src, const size_t n)
 {
   // Get required size to reserve a string so string::push_back()
   // doesn't need to reallocate its data.
   std::size_t required_size = 0;
-  auto p = src;
-  for (int i=0; i<n; ++i, ++p)
+  const auto* p = src;
+  for (size_t i=0; i<n; ++i, ++p)
     required_size += insert_utf8_char(nullptr, *p);
   if (!required_size)
     return "";
@@ -181,13 +181,13 @@ std::wstring from_utf8(const std::string& src)
 #endif
   utf8_decode decode(src);
 
-  while (int chr = decode.next()) {
+  while (const int chr = decode.next()) {
     ASSERT(buf_it != buf_end);
     *buf_it = chr;
     ++buf_it;
   }
 
-  return std::wstring(&buf[0]);
+  return std::wstring(buf.data());
 }
 
 #endif
@@ -223,20 +223,17 @@ int utf8_icmp(const std::string& a, const std::string& b, int n)
     a_chr = std::tolower(a_chr);
     b_chr = std::tolower(b_chr);
 
-    if (a_chr < b_chr)
-      return -1;
-    else if (a_chr > b_chr)
-      return 1;
+    if (a_chr < b_chr) return -1;
+    if (a_chr > b_chr) return 1;
   }
 
   if (n > 0 && i == n)
     return 0;
-  else if (a_decode.is_end() && b_decode.is_end())
+  if (a_decode.is_end() && b_decode.is_end())
     return 0;
-  else if (a_decode.is_end())
+  if (a_decode.is_end())
     return -1;
-  else
-    return 1;
+  return 1;
 }
 
 } // namespace base

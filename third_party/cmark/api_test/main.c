@@ -178,7 +178,7 @@ static void accessors(test_batch_runner *runner) {
      "set_literal suffix");
 
   char *rendered_html = cmark_render_html(doc,
-		          CMARK_OPT_DEFAULT | CMARK_OPT_UNSAFE);
+                          CMARK_OPT_DEFAULT | CMARK_OPT_UNSAFE);
   static const char expected_html[] =
       "<h3>Header</h3>\n"
       "<ol start=\"3\">\n"
@@ -911,6 +911,75 @@ static void test_feed_across_line_ending(test_batch_runner *runner) {
   cmark_node_free(document);
 }
 
+static void sub_document(test_batch_runner *runner) {
+  cmark_node *doc = cmark_node_new(CMARK_NODE_DOCUMENT);
+  cmark_node *list = cmark_node_new(CMARK_NODE_LIST);
+  OK(runner, cmark_node_append_child(doc, list), "list");
+
+  {
+    cmark_node *item = cmark_node_new(CMARK_NODE_ITEM);
+    OK(runner, cmark_node_append_child(list, item), "append_0");
+    static const char markdown[] =
+      "Hello &ldquo; <http://www.google.com>\n";
+    cmark_parser *parser = cmark_parser_new_with_mem_into_root(
+        CMARK_OPT_DEFAULT,
+        cmark_get_default_mem_allocator(),
+        item);
+    cmark_parser_feed(parser, markdown, sizeof(markdown) - 1);
+    OK(runner, cmark_parser_finish(parser) != NULL, "parser_finish_0");
+    cmark_parser_free(parser);
+  }
+
+  {
+    cmark_node *item = cmark_node_new(CMARK_NODE_ITEM);
+    OK(runner, cmark_node_append_child(list, item), "append_0");
+    static const char markdown[] =
+      "Bye &ldquo; <http://www.geocities.com>\n";
+    cmark_parser *parser = cmark_parser_new_with_mem_into_root(
+        CMARK_OPT_DEFAULT,
+        cmark_get_default_mem_allocator(),
+        item);
+    cmark_parser_feed(parser, markdown, sizeof(markdown) - 1);
+    OK(runner, cmark_parser_finish(parser) != NULL, "parser_finish_0");
+    cmark_parser_free(parser);
+  }
+
+  char *xml = cmark_render_xml(doc, CMARK_OPT_DEFAULT);
+  STR_EQ(runner, xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                      "<!DOCTYPE document SYSTEM \"CommonMark.dtd\">\n"
+                      "<document xmlns=\"http://commonmark.org/xml/1.0\">\n"
+                      "  <list type=\"bullet\" tight=\"false\">\n"
+                      "    <item>\n"
+                      "      <paragraph>\n"
+                      "        <text xml:space=\"preserve\">Hello “ </text>\n"
+                      "        <link destination=\"http://www.google.com\">\n"
+                      "          <text xml:space=\"preserve\">http://www.google.com</text>\n"
+                      "        </link>\n"
+                      "      </paragraph>\n"
+                      "    </item>\n"
+                      "    <item>\n"
+                      "      <paragraph>\n"
+                      "        <text xml:space=\"preserve\">Bye “ </text>\n"
+                      "        <link destination=\"http://www.geocities.com\">\n"
+                      "          <text xml:space=\"preserve\">http://www.geocities.com</text>\n"
+                      "        </link>\n"
+                      "      </paragraph>\n"
+                      "    </item>\n"
+                      "  </list>\n"
+                      "</document>\n",
+         "nested document XML is as expected");
+  free(xml);
+
+  char *cmark = cmark_render_commonmark(doc, CMARK_OPT_DEFAULT, 0);
+  STR_EQ(runner, cmark, "  - Hello “ <http://www.google.com>\n"
+                        "\n"
+                        "  - Bye “ <http://www.geocities.com>\n",
+         "nested document CommonMark is as expected");
+  free(cmark);
+
+  cmark_node_free(doc);
+}
+
 static void source_pos(test_batch_runner *runner) {
   static const char markdown[] =
     "# Hi *there*.\n"
@@ -1021,6 +1090,26 @@ static void source_pos_inlines(test_batch_runner *runner) {
     free(xml);
     cmark_node_free(doc);
   }
+  {
+    static const char markdown[] =
+      "` It is one backtick\n"
+      "`` They are two backticks\n";
+
+    cmark_node *doc = cmark_parse_document(markdown, sizeof(markdown) - 1, CMARK_OPT_DEFAULT);
+    char *xml = cmark_render_xml(doc, CMARK_OPT_DEFAULT | CMARK_OPT_SOURCEPOS);
+    STR_EQ(runner, xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                        "<!DOCTYPE document SYSTEM \"CommonMark.dtd\">\n"
+                        "<document sourcepos=\"1:1-2:25\" xmlns=\"http://commonmark.org/xml/1.0\">\n"
+                        "  <paragraph sourcepos=\"1:1-2:25\">\n"
+                        "    <text sourcepos=\"1:1-1:20\" xml:space=\"preserve\">` It is one backtick</text>\n"
+                        "    <softbreak />\n"
+                        "    <text sourcepos=\"2:1-2:25\" xml:space=\"preserve\">`` They are two backticks</text>\n"
+                        "  </paragraph>\n"
+                        "</document>\n",
+                        "sourcepos are as expected");
+    free(xml);
+    cmark_node_free(doc);
+  }
 }
 
 static void ref_source_pos(test_batch_runner *runner) {
@@ -1047,7 +1136,7 @@ static void ref_source_pos(test_batch_runner *runner) {
   cmark_node_free(doc);
 }
 
-int main() {
+int main(void) {
   int retval;
   test_batch_runner *runner = test_batch_runner_new();
 
@@ -1073,6 +1162,7 @@ int main() {
   test_cplusplus(runner);
   test_safe(runner);
   test_feed_across_line_ending(runner);
+  sub_document(runner);
   source_pos(runner);
   source_pos_inlines(runner);
   ref_source_pos(runner);

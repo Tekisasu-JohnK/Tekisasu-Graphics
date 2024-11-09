@@ -40,12 +40,14 @@ static void redraw_window(os::Window* window)
   int y = 12;
 
   gfx::Rect rc = window->frame();
-  std::sprintf(buf, "Frame = (%d %d %d %d)", rc.x, rc.y, rc.w, rc.h);
+  std::snprintf(buf, sizeof(buf),
+                "Frame = (%d %d %d %d)", rc.x, rc.y, rc.w, rc.h);
   os::draw_text(s, nullptr, buf, gfx::Point(0, y), &paint);
   y += 12;
 
   rc = window->contentRect();
-  std::sprintf(buf, "Content Rect = (%d %d %d %d)", rc.x, rc.y, rc.w, rc.h);
+  std::snprintf(buf, sizeof(buf),
+                "Content Rect = (%d %d %d %d)", rc.x, rc.y, rc.w, rc.h);
   os::draw_text(s, nullptr, buf, gfx::Point(0, y), &paint);
   y += 12;
 
@@ -221,6 +223,7 @@ int app_main(int argc, char* argv[])
               case os::kKeyUp:    rc.y -= rc.h; break;
               case os::kKeyRight: rc.x += rc.w; break;
               case os::kKeyDown:  rc.y += rc.h; break;
+              default: break;
             }
             ev.window()->setFrame(rc);
 
@@ -231,6 +234,8 @@ int app_main(int argc, char* argv[])
             break;
           }
 
+          default:
+            break;
         }
         break;
 

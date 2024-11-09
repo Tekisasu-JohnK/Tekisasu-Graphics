@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2016-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -11,11 +11,16 @@
 
 #include "app/ui/layer_frame_comboboxes.h"
 
+#include "app/doc.h"
 #include "app/i18n/strings.h"
+#include "app/match_words.h"
 #include "app/restore_visible_layers.h"
 #include "app/site.h"
+#include "base/fs.h"
 #include "doc/anidir.h"
+#include "doc/frames_sequence.h"
 #include "doc/layer.h"
+#include "doc/playback.h"
 #include "doc/selected_frames.h"
 #include "doc/selected_layers.h"
 #include "doc/slice.h"
@@ -81,7 +86,8 @@ void fill_area_combobox(const doc::Sprite* sprite, ui::ComboBox* area, const std
   if (defArea == kSelectedCanvas)
     area->setSelectedItemIndex(i);
 
-  for (auto slice : sprite->slices()) {
+  for (auto* slice : sort_slices_by_name(sprite->slices(),
+                                         MatchWords())) {
     if (slice->name().empty())
       continue;
 
@@ -180,6 +186,108 @@ void calculate_visible_layers(const Site& site,
   }
 }
 
+doc::Tag* calculate_frames_sequence(const Site& site,
+                                    const std::string& framesValue,
+                                    doc::FramesSequence& framesSeq,
+                                    bool playSubtags,
+                                    AniDir aniDir)
+{
+  doc::Tag* tag = nullptr;
+
+  if (!playSubtags || framesValue == kSelectedFrames) {
+    SelectedFrames selFrames;
+    tag = calculate_selected_frames(site, framesValue, selFrames);
+    framesSeq = FramesSequence(selFrames);
+    switch (aniDir) {
+      case AniDir::REVERSE:
+        framesSeq = framesSeq.makeReverse();
+        break;
+      case AniDir::PING_PONG:
+        framesSeq = framesSeq.makePingPong();
+        break;
+      case AniDir::PING_PONG_REVERSE:
+        framesSeq = framesSeq.makeReverse();
+        framesSeq = framesSeq.makePingPong();
+        break;
+    }
+  }
+  else {
+    frame_t start = 0;
+    AniDir origAniDir = aniDir;
+    int forward = 1;
+    if (framesValue == kAllFrames) {
+      tag = nullptr;
+      forward = (aniDir == AniDir::FORWARD || aniDir == AniDir::PING_PONG ? 1 : -1);
+      if (forward < 0)
+        start = site.sprite()->lastFrame();
+
+      // Look for a tag containing the first frame and determine the start frame
+      // according to the selected animation direction.
+      auto startTag = site.sprite()->tags().innerTag(start);
+      if (startTag) {
+        int startTagForward = (startTag->aniDir() == AniDir::FORWARD ||
+                               startTag->aniDir() == AniDir::PING_PONG
+                               ? 1 : -1);
+        start = forward * startTagForward > 0
+                ? startTag->fromFrame()
+                : startTag->toFrame();
+      }
+    }
+    else {
+      tag = site.sprite()->tags().getByName(framesValue);
+      // User selected a specific tag, then set its anidir to the selected
+      // direction. We save the original direction to restore it later.
+      if (tag) {
+        origAniDir = tag->aniDir();
+        tag->setAniDir(aniDir);
+        start = (aniDir == AniDir::FORWARD || aniDir == AniDir::PING_PONG
+                 ? tag->fromFrame()
+                 : tag->toFrame());
+      }
+    }
+
+    auto playback = doc::Playback(
+      site.document()->sprite(),
+      site.document()->sprite()->tags().getInternalList(),
+      start,
+      doc::Playback::PlayAll,
+      tag,
+      forward);
+    framesSeq.insert(playback.frame());
+    auto frame = playback.nextFrame();
+    while(!playback.isStopped()) {
+      framesSeq.insert(frame);
+      frame = playback.nextFrame();
+    }
+
+    if (framesValue == kAllFrames) {
+      // If the user is playing all frames and selected some of the ping-pong
+      // animation direction, then modify the animation as needed.
+      if (aniDir == AniDir::PING_PONG || aniDir == AniDir::PING_PONG_REVERSE)
+        framesSeq = framesSeq.makePingPong();
+    }
+    else if (tag) {
+      // If exported tag is ping-pong, remove last frame of the sequence to
+      // avoid playing the first frame twice.
+      if (aniDir == AniDir::PING_PONG || aniDir == AniDir::PING_PONG_REVERSE) {
+        doc::FramesSequence newSeq;
+        int i = 0;
+        int frames = framesSeq.size()-1;
+        for (auto f : framesSeq) {
+          if (i < frames)
+            newSeq.insert(f);
+          ++i;
+        }
+        framesSeq = newSeq;
+      }
+      // Restore tag's original animation direction.
+      tag->setAniDir(origAniDir);
+    }
+  }
+
+  return tag;
+}
+
 doc::Tag* calculate_selected_frames(const Site& site,
                                     const std::string& framesValue,
                                     doc::SelectedFrames& selFrames)
@@ -206,6 +314,22 @@ doc::Tag* calculate_selected_frames(const Site& site,
     selFrames.insert(0, site.sprite()->lastFrame());
 
   return tag;
+}
+
+std::vector<doc::Slice*> sort_slices_by_name(const doc::Slices& slices,
+                                             const MatchWords& match)
+{
+  std::vector<doc::Slice*> result;
+  for (auto* slice : slices) {
+    if (match(slice->name()))
+      result.push_back(slice);
+  }
+  std::sort(result.begin(),
+            result.end(),
+            [](const doc::Slice* a, const doc::Slice* b) {
+              return (base::compare_filenames(a->name(), b->name()) < 0);
+            });
+  return result;
 }
 
 } // namespace app

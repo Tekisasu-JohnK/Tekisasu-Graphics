@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2020-2022  Igara Studio S.A.
+// Copyright (C) 2020-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -12,7 +12,7 @@
 
 #include "base/log.h"
 #include "base/string.h"
-#include "os/x11/x11.h"
+#include "os/system.h"
 
 #include <cstring>
 
@@ -68,11 +68,16 @@ void XInput::load(::Display* display)
   }
 
   int ndevices = 0;
-  auto devices = XListInputDevices(display, &ndevices);
+  auto* devices = XListInputDevices(display, &ndevices);
   if (!devices)
     return;
 
-  std::string userDefinedTablet = X11::instance()->userDefinedTablet();
+  auto system = instance();
+  ASSERT(system);
+  if (!system)
+    return;
+
+  std::string userDefinedTablet = system->tabletOptions().detectStylusPattern;
   if (!userDefinedTablet.empty())
     userDefinedTablet = base::string_to_lower(userDefinedTablet);
 
@@ -107,12 +112,12 @@ void XInput::load(::Display* display)
     else
       continue;
 
-    auto p = (uint8_t*)devInfo->inputclassinfo;
+    auto* p = (uint8_t*)devInfo->inputclassinfo;
     for (int j=0; j<devInfo->num_classes; ++j, p+=((XAnyClassPtr)p)->length) {
       if (((XAnyClassPtr)p)->c_class != ValuatorClass)
         continue;
 
-      auto valuator = (XValuatorInfoPtr)p;
+      auto* valuator = (XValuatorInfoPtr)p;
       // Only for devices with 3 or more axes (axis 0 is X, 1 is Y,
       // and 2 is the pressure).
       if (valuator->num_axes < 3)
@@ -184,7 +189,7 @@ void XInput::convertExtensionEvent(const XEvent& xevent,
 
   gfx::Point pos;
   KeyModifiers modifiers = kKeyNoneModifier;
-  Event::MouseButton button = Event::NoneButton;
+  const Event::MouseButton button = Event::NoneButton;
   XID deviceid;
   int pressure;
 
@@ -192,7 +197,7 @@ void XInput::convertExtensionEvent(const XEvent& xevent,
 
     case Event::MouseDown:
     case Event::MouseUp: {
-      auto button = (const XDeviceButtonEvent*)&xevent;
+      const auto* button = (const XDeviceButtonEvent*)&xevent;
       time = button->time;
       deviceid = button->deviceid;
       pos.x = button->x / scale;
@@ -204,7 +209,7 @@ void XInput::convertExtensionEvent(const XEvent& xevent,
     }
 
     case Event::MouseMove: {
-      auto motion = (const XDeviceMotionEvent*)&xevent;
+      const auto* motion = (const XDeviceMotionEvent*)&xevent;
       time = motion->time;
       deviceid = motion->deviceid;
       pos.x = motion->x / scale;

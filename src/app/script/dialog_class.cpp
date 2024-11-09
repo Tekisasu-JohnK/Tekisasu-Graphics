@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2018  David Capello
 //
 // This program is distributed under the terms of
@@ -49,8 +49,6 @@
 #include <stack>
 #include <string>
 #include <vector>
-
-#ifdef ENABLE_UI
 
 #define TRACE_DIALOG(...) // TRACEARGS(__VA_ARGS__)
 
@@ -670,7 +668,7 @@ int Dialog_separator(lua_State* L)
   }
 
   dlg->mainWidgets.push_back(widget);
-  dlg->grid.addChildInCell(widget, 2, 1, ui::HORIZONTAL | ui::TOP);
+  dlg->currentGrid->addChildInCell(widget, 2, 1, ui::HORIZONTAL | ui::TOP);
   dlg->hbox = nullptr;
 
   lua_pushvalue(L, 1);
@@ -1336,27 +1334,22 @@ int Dialog_tab(lua_State* L)
     dlg->wipTab = new app::script::Tabs(ui::CENTER);
   }
 
-  auto tabContent = new ui::Grid(2, false);
-  tabContent->setExpansive(true);
-  tabContent->setVisible(false);
-  tabContent->setText(text);
-  tabContent->setId(id.c_str());
-  auto tabBtn = dlg->wipTab->addTab(tabContent);
-  dlg->currentGrid = tabContent;
+  auto tab = dlg->wipTab->addTab(id, text);
+  dlg->currentGrid = tab->content();
 
-  if (hasId) dlg->dataWidgets[id] = tabBtn;
+  if (hasId) dlg->dataWidgets[id] = tab;
 
   if (lua_istable(L, 2)) {
     int type = lua_getfield(L, 2, "onclick");
     if (type == LUA_TFUNCTION) {
-      Dialog_connect_signal(L, 1, tabBtn->Click,
+      Dialog_connect_signal(L, 1, tab->Click,
         [id](lua_State* L){
           lua_pushstring(L, id.c_str());
           lua_setfield(L, -2, "tab");
         });
     }
 
-    set_widget_flags(L, 2, tabBtn);
+    set_widget_flags(L, 2, tab);
   }
 
   lua_pushvalue(L, 1);
@@ -1914,5 +1907,3 @@ void close_all_dialogs()
 
 } // namespace script
 } // namespace app
-
-#endif  // ENABLE_UI

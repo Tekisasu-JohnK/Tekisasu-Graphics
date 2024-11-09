@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (c) 2019-2022  Igara Studio S.A.
+// Copyright (c) 2019-2024  Igara Studio S.A.
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
@@ -54,6 +54,18 @@ namespace os {
       Stroke,
       StrokeAndFill,
     };
+
+    // Same as SkCanvas::SrcRectConstraint
+    enum SrcEdges {
+      Strict, // Sample only inside bounds, is slower (don't use mipmaps)
+      Fast,   // Sample outside bounds, is faster (use mipmaps)
+    };
+
+    SrcEdges srcEdges() const { return m_srcEdges; }
+    void srcEdges(const SrcEdges srcEdges) { m_srcEdges = srcEdges; }
+
+  private:
+    SrcEdges m_srcEdges = SrcEdges::Strict;
   };
 
 };

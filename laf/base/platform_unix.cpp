@@ -20,30 +20,30 @@ std::map<std::string, std::string> get_linux_release_info(const std::string& fn)
 {
   std::map<std::string, std::string> values;
 
-  FileHandle f(open_file(fn.c_str(), "r"));
+  const FileHandle f(open_file(fn, "r"));
   if (!f)
     return values;
 
   std::vector<char> buf(1024);
   std::string value;
 
-  while (std::fgets(&buf[0], buf.size(), f.get())) {
+  while (std::fgets(buf.data(), buf.size(), f.get())) {
     for (auto i=buf.begin(), end=buf.end(); i != end; ++i) {
       // Commented line
       if (*i == '#')
         break;
       // Ignore initial whitespace
-      else if (*i == ' ')
+      if (*i == ' ')
         continue;
       // Read the key
-      else if (*i >= 'A' && *i <= 'Z') {
+      if (*i >= 'A' && *i <= 'Z') {
         auto j = i;
         while (j != end && ((*j >= 'A' && *j <= 'Z') ||
                             (*j >= '0' && *j <= '9') || (*j == '_'))) {
           ++j;
         }
 
-        std::string key(i, j);
+        const std::string key(i, j);
 
         // Ignore white space between "KEY ... ="
         while (j != end && *j == ' ')
@@ -57,7 +57,7 @@ std::map<std::string, std::string> get_linux_release_info(const std::string& fn)
           value.clear();
 
           if (j != end) {
-            char quote = *j;
+            const char quote = *j;
             if (quote == '\'' || quote == '\"') {
               ++j;
               while (j != end && *j != quote) {
@@ -85,9 +85,7 @@ std::map<std::string, std::string> get_linux_release_info(const std::string& fn)
         break; // Next line
       }
       // Unexpected character in this line
-      else {
-        break;
-      }
+      break;
     }
 
     // Too many key-values

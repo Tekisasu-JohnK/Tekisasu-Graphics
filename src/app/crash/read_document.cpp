@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -12,7 +12,6 @@
 #include "app/crash/read_document.h"
 
 #include "app/console.h"
-#include "app/crash/doc_format.h"
 #include "app/crash/internals.h"
 #include "app/crash/log.h"
 #include "app/doc.h"
@@ -32,6 +31,7 @@
 #include "doc/layer_tilemap.h"
 #include "doc/palette.h"
 #include "doc/palette_io.h"
+#include "doc/serial_format.h"
 #include "doc/slice.h"
 #include "doc/slice_io.h"
 #include "doc/sprite.h"
@@ -58,18 +58,26 @@ using namespace doc;
 
 namespace {
 
+// Returns true if the file was saved correctly (has the "FINE" magic
+// number), so we can ignore broken versions of objects directly.
+bool check_magic_number(const std::string& fn)
+{
+  std::ifstream s(FSTREAM_PATH(fn), std::ifstream::binary);
+  return (read32(s) == MAGIC_NUMBER);
+}
+
 class Reader : public SubObjectsIO {
 public:
   Reader(const std::string& dir,
          base::task_token* t)
-    : m_docFormatVer(DOC_FORMAT_VERSION_0)
+    : m_serial(SerialFormat::Ver0)
     , m_sprite(nullptr)
     , m_dir(dir)
     , m_docId(0)
     , m_docVersions(nullptr)
     , m_loadInfo(nullptr)
     , m_taskToken(t) {
-    for (const auto& fn : base::list_files(dir)) {
+    for (const auto& fn : base::list_files(dir, base::ItemType::Files)) {
       auto i = fn.find('-');
       if (i == std::string::npos)
         continue;               // Has no ID
@@ -82,6 +90,16 @@ public:
       ObjectVersion ver = base::convert_to<int>(fn.substr(j+1));
       if (!id || !ver)
         continue;               // Error converting strings to ID/ver
+
+      // Checking for the magic number of each file takes a long time,
+      // we can guess that all files are valid when there is no
+      // m_taskToken, i.e. when we have to just show the description
+      // of the doc in the list of backups.
+      if (m_taskToken &&
+          !check_magic_number(base::join_path(m_dir, fn))) {
+        RECO_TRACE("RECO: Ignoring invalid file %s (no magic number)\n", fn.c_str());
+        continue;
+      }
 
       ObjVersions& versions = m_objVersions[id];
       versions.add(ver);
@@ -185,10 +203,11 @@ private:
   Doc* readDocument(std::ifstream& s) {
     ObjectId sprId = read32(s);
     std::string filename = read_string(s);
-    m_docFormatVer = read16(s);
-    if (s.eof()) m_docFormatVer = DOC_FORMAT_VERSION_0;
+    m_serial = SerialFormat(read16(s));
+    if (s.eof())
+      m_serial = SerialFormat::Ver0;
 
-    RECO_TRACE("RECO: internal format version=%d\n", m_docFormatVer);
+    RECO_TRACE("RECO: internal format version=%d\n", int(m_serial));
 
     // Load DocumentInfo only
     if (m_loadInfo) {
@@ -255,7 +274,7 @@ private:
     }
 
     // IDs of all tilesets
-    if (m_docFormatVer >= DOC_FORMAT_VERSION_1) {
+    if (m_serial >= SerialFormat::Ver1) {
       int ntilesets = read32(s);
       if (ntilesets > 0 && ntilesets < 0xffffff) {
         for (int i=0; i<ntilesets; ++i) {
@@ -386,7 +405,7 @@ private:
 
     // Read Sprite User Data
     if (!s.eof()) {
-      UserData userData = read_user_data(s, m_docFormatVer);
+      UserData userData = read_user_data(s, m_serial);
       if (!userData.isEmpty())
         spr->setUserData(userData);
     }
@@ -484,7 +503,7 @@ private:
     }
 
     if (lay) {
-      UserData userData = read_user_data(s, m_docFormatVer);
+      UserData userData = read_user_data(s, m_serial);
       lay->setUserData(userData);
       return lay.release();
     }
@@ -497,7 +516,7 @@ private:
   }
 
   CelData* readCelData(std::ifstream& s) {
-    return read_celdata(s, this, false, m_docFormatVer);
+    return read_celdata(s, this, false, m_serial);
   }
 
   Image* readImage(std::ifstream& s) {
@@ -509,19 +528,19 @@ private:
   }
 
   Tileset* readTileset(std::ifstream& s) {
-    uint32_t tilesetVer;
-    Tileset* tileset = read_tileset(s, m_sprite, false, &tilesetVer, m_docFormatVer);
-    if (tileset && tilesetVer < TILESET_VER1)
+    TilesetSerialFormat tilesetVer = TilesetSerialFormat::Ver0;
+    Tileset* tileset = read_tileset(s, m_sprite, false, &tilesetVer, m_serial);
+    if (tileset && tilesetVer < TilesetSerialFormat::Ver1)
       m_updateOldTilemapWithTileset.insert(tileset->id());
     return tileset;
   }
 
   Tag* readTag(std::ifstream& s) {
-    return read_tag(s, false, m_docFormatVer);
+    return read_tag(s, false, m_serial);
   }
 
   Slice* readSlice(std::ifstream& s) {
-    return read_slice(s, false);
+    return read_slice(s, false, m_serial);
   }
 
   // Fix issues that the restoration process could produce.
@@ -573,7 +592,7 @@ private:
       return false;
   }
 
-  int m_docFormatVer;
+  SerialFormat m_serial;
   Sprite* m_sprite;    // Used to pass the sprite in LayerImage() ctor
   std::string m_dir;
   ObjectVersion m_docId;

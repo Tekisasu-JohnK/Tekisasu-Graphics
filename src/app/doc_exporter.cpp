@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -623,6 +623,7 @@ void DocExporter::reset()
   m_splitTags = false;
   m_listTags = false;
   m_listLayers = false;
+  m_listLayerHierarchy = false;
   m_listSlices = false;
   m_documents.clear();
 }
@@ -1288,13 +1289,18 @@ void DocExporter::renderTexture(Context* ctx,
     // Make the sprite compatible with the texture so the render()
     // works correctly.
     if (sample.sprite()->pixelFormat() != textureImage->pixelFormat()) {
+      RgbMapAlgorithm rgbmapAlgo =
+        Preferences::instance().quantization.rgbmapAlgorithm();
+      FitCriteria fc =
+        Preferences::instance().quantization.fitCriteria();
       cmd::SetPixelFormat(
         sample.sprite(),
         textureImage->pixelFormat(),
         render::Dithering(),
-        Sprite::DefaultRgbMapAlgorithm(), // TODO add rgbmap algorithm preference
+        rgbmapAlgo,
         nullptr, // toGray is not needed because the texture is Indexed or RGB
-        nullptr) // TODO add a delegate to show progress
+        nullptr, // TODO add a delegate to show progress
+        fc)
         .execute(ctx);
     }
 
@@ -1487,7 +1493,7 @@ void DocExporter::createDataFile(const Samples& samples,
   }
 
   // meta.layers
-  if (m_listLayers) {
+  if (m_listLayers || m_listLayerHierarchy) {
     LayerList metaLayers;
     for (auto& item : m_documents) {
       if (item.isOneImageOnly())
@@ -1569,6 +1575,9 @@ void DocExporter::createDataFile(const Samples& samples,
               os << ", ";
 
             os << "{ \"frame\": " << cel->frame();
+            if (cel->opacity() != 255) {
+              os << ", \"opacity\": " << cel->opacity();
+            }
             if (cel->zIndex() != 0) {
               os << ", \"zIndex\": " << cel->zIndex();
             }

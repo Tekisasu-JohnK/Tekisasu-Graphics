@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2021-2022  Igara Studio S.A.
+// Copyright (C) 2021-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -12,7 +12,7 @@
 #include "app/commands/command.h"
 #include "app/commands/new_params.h"
 #include "doc/anidir.h"
-#include "doc/selected_frames.h"
+#include "doc/frames_sequence.h"
 #include "gfx/point.h"
 #include "gfx/rect.h"
 
@@ -23,6 +23,7 @@ namespace app {
 
   struct SaveFileParams : public NewParams {
     Param<bool> ui { this, true, { "ui", "useUI" } };
+    Param<bool> recent { this, true, "recent" };
     Param<std::string> filename { this, std::string(), "filename" };
     Param<std::string> filenameFormat { this, std::string(), { "filenameFormat", "filename-format" } };
     Param<std::string> tag { this, std::string(), { "tag", "frame-tag" } };
@@ -33,6 +34,7 @@ namespace app {
     Param<bool> ignoreEmpty { this, false, "ignoreEmpty" };
     Param<double> scale { this, 1.0, "scale" };
     Param<gfx::Rect> bounds { this, gfx::Rect(), "bounds" };
+    Param<bool> playSubtags { this, false, "playSubtags" };
   };
 
   class SaveFileBaseCommand : public CommandWithNewParams<SaveFileParams> {
@@ -62,7 +64,7 @@ namespace app {
       const ResizeOnTheFly resizeOnTheFly = ResizeOnTheFly::Off,
       const gfx::PointF& scale = gfx::PointF(1.0, 1.0));
 
-    doc::SelectedFrames m_selFrames;
+    doc::FramesSequence m_framesSeq;
     bool m_adjustFramesByTag;
   };
 

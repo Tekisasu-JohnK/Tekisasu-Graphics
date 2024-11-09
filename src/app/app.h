@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -9,10 +9,7 @@
 #define APP_APP_H_INCLUDED
 #pragma once
 
-#ifdef ENABLE_UI
 #include "app/app_brushes.h"
-#endif
-
 #include "base/paths.h"
 #include "doc/pixel_format.h"
 #include "obs/signal.h"
@@ -101,7 +98,6 @@ namespace app {
     Extensions& extensions() const;
     crash::DataRecovery* dataRecovery() const;
 
-#ifdef ENABLE_UI
     AppBrushes& brushes() {
       ASSERT(m_brushes.get());
       return *m_brushes;
@@ -112,7 +108,6 @@ namespace app {
     void updateDisplayTitleBar();
 
     InputChain& inputChain();
-#endif
 
 #ifdef ENABLE_SCRIPTING
     script::Engine* scriptEngine() { return m_engine.get(); }
@@ -142,12 +137,13 @@ namespace app {
     std::unique_ptr<LegacyModules> m_legacy;
     bool m_isGui;
     bool m_isShell;
+#ifdef ENABLE_STEAM
+    bool m_inAppSteam = true;
+#endif
     std::unique_ptr<MainWindow> m_mainWindow;
     base::paths m_files;
-#ifdef ENABLE_UI
     std::unique_ptr<AppBrushes> m_brushes;
     std::unique_ptr<BackupIndicator> m_backupIndicator;
-#endif // ENABLE_UI
 #ifdef ENABLE_SCRIPTING
     std::unique_ptr<script::Engine> m_engine;
 #endif

@@ -126,8 +126,6 @@ void FilterManagerImpl::begin()
   updateBounds(m_mask);
 }
 
-#ifdef ENABLE_UI
-
 void FilterManagerImpl::beginForPreview()
 {
   Doc* document = m_site.document();
@@ -165,8 +163,6 @@ void FilterManagerImpl::beginForPreview()
     return;
   }
 }
-
-#endif // ENABLE_UI
 
 void FilterManagerImpl::end()
 {
@@ -353,7 +349,7 @@ void FilterManagerImpl::initTransaction()
 {
   ASSERT(!m_tx);
   m_writer.reset(new ContextWriter(m_reader));
-  m_tx.reset(new Tx(m_writer->context(),
+  m_tx.reset(new Tx(*m_writer,
                     m_filter->getName(),
                     ModifyDocument));
 }
@@ -371,8 +367,6 @@ void FilterManagerImpl::commitTransaction()
   m_tx->commit();
   m_writer.reset();
 }
-
-#ifdef ENABLE_UI
 
 void FilterManagerImpl::flush()
 {
@@ -423,8 +417,6 @@ void FilterManagerImpl::disablePreview()
     redrawColorPalette();
   }
 }
-
-#endif  // ENABLE_UI
 
 const void* FilterManagerImpl::getSourceAddress()
 {
@@ -537,15 +529,11 @@ void FilterManagerImpl::applyToPaletteIfNeeded()
   m_filter->applyToPalette(this);
 }
 
-#ifdef ENABLE_UI
-
 void FilterManagerImpl::redrawColorPalette()
 {
   set_current_palette(getNewPalette(), false);
   ColorBar::instance()->invalidate();
 }
-
-#endif // ENABLE_UI
 
 bool FilterManagerImpl::isMaskActive() const
 {

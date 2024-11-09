@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -16,6 +16,8 @@
 #include "os/native_cursor.h"
 #include "os/pointer_type.h"
 #include "os/screen.h"
+#include "os/tablet_options.h"
+#include "os/win/dnd.h"
 #include "os/win/wintab.h"
 
 #include <string>
@@ -68,9 +70,12 @@ namespace os {
     void setLayout(const std::string& layout) override;
     void setTranslateDeadKeys(bool state);
     void setInterpretOneFingerGestureAsMouseMovement(bool state) override;
-    void onTabletAPIChange();
+    void onTabletOptionsChange();
 
     NativeHandle nativeHandle() const override { return m_hwnd; }
+
+  protected:
+    void onSetDragTarget() override;
 
   private:
     bool setCursor(HCURSOR hcursor,
@@ -107,6 +112,8 @@ namespace os {
       return true;
     }
 
+    TabletAPI tabletAPI() const;
+
     virtual void onResize(const gfx::Size& sz) { }
     virtual void onStartResizing() { }
     virtual void onEndResizing() { }
@@ -137,6 +144,8 @@ namespace os {
 #else
     gfx::Rect m_restoredFrame;
 #endif
+
+    std::unique_ptr<DragTargetAdapter> m_dragTargetAdapter = nullptr;
 
     int m_scale;
     bool m_isCreated;

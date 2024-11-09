@@ -14,6 +14,11 @@
 
 #include "include/core/SkPath.h"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4244) // 'argument': conversion from 'T' to 'SkScalar', possible loss of data
+#endif
+
 namespace gfx {
 
   // Simple wrapper for SkPath
@@ -113,5 +118,9 @@ namespace gfx {
   };
 
 } // namespace gfx
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif

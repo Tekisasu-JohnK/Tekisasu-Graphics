@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (c) 2018-2021  Igara Studio S.A.
+// Copyright (c) 2018-2024  Igara Studio S.A.
 // Copyright (c) 2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -20,7 +20,8 @@ namespace os {
 
 class NoneSystem : public System {
 public:
-  void setAppName(const std::string& appName) override { }
+  const std::string& appName() const override { return m_appName; }
+  void setAppName(const std::string& appName) override { m_appName = appName; }
   void setAppMode(AppMode appMode) override { }
 
   void markCliFileAsProcessed(const std::string& fn) override { }
@@ -28,20 +29,21 @@ public:
   void activateApp() override { }
 
   Capabilities capabilities() const override { return (Capabilities)0; }
-  void setTabletAPI(TabletAPI api) override { }
-  TabletAPI tabletAPI() const override { return TabletAPI::Default; }
+  void setTabletOptions(const TabletOptions&) override { }
+  TabletOptions tabletOptions() const override { return TabletOptions(); }
   Logger* logger() override { return nullptr; }
   Menus* menus() override { return nullptr; }
   NativeDialogs* nativeDialogs() override { return nullptr; }
   EventQueue* eventQueue() override { return nullptr; }
-  bool gpuAcceleration() const override { return false; }
-  void setGpuAcceleration(bool state) override { }
   ScreenRef mainScreen() override { return nullptr; }
   void listScreens(ScreenList& screens) override { }
   Window* defaultWindow() override { return nullptr; }
   Ref<Window> makeWindow(const WindowSpec& spec) override { return nullptr; }
   Ref<Surface> makeSurface(int width, int height,
                            const os::ColorSpaceRef& colorSpace) override { return nullptr; }
+#if CLIP_ENABLE_IMAGE
+  Ref<Surface> makeSurface(const clip::image& image) override { return nullptr; }
+#endif
   Ref<Surface> makeRgbaSurface(int width, int height,
                                const os::ColorSpaceRef& colorSpace) override { return nullptr; }
   Ref<Surface> loadSurface(const char* filename) override { return nullptr; }
@@ -65,6 +67,9 @@ public:
     const os::ColorSpaceRef& src, const os::ColorSpaceRef& dst) override { return nullptr; }
   void setWindowsColorSpace(const os::ColorSpaceRef& cs) override { }
   os::ColorSpaceRef windowsColorSpace() override { return nullptr; }
+
+private:
+  std::string m_appName;
 };
 
 System* make_system_impl() {

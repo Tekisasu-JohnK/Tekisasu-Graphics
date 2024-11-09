@@ -95,8 +95,7 @@ namespace ft {
         prepareGlyph();
         return chr;
       }
-      else
-        return 0;
+      return 0;
     }
 
   private:

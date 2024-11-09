@@ -84,29 +84,19 @@ bool Version::operator<(const Version& other) const
     int number1 = (it1 != end1 ? *it1++: 0);
     int number2 = (it2 != end2 ? *it2++: 0);
 
-    if (number1 < number2)
-      return true;
-    else if (number1 > number2)
-      return false;
+    if (number1 < number2) return true;
+    if (number1 > number2) return false;
   }
 
-  if (m_prereleaseLabel.empty()) {
+  if (m_prereleaseLabel.empty())
     return false;
-  }
-  else if (other.m_prereleaseLabel.empty()) {
+  if (other.m_prereleaseLabel.empty())
     return true;
-  }
-  else {
-    int res = m_prereleaseLabel.compare(other.m_prereleaseLabel);
-    if (res < 0)
-      return true;
-    else if (res > 0)
-      return false;
-    else
-      return (m_prereleaseNumber < other.m_prereleaseNumber);
-  }
 
-  return false;
+  int res = m_prereleaseLabel.compare(other.m_prereleaseLabel);
+  if (res < 0) return true;
+  if (res > 0) return false;
+  return (m_prereleaseNumber < other.m_prereleaseNumber);
 }
 
 bool Version::operator==(const Version& other) const

@@ -41,8 +41,7 @@ const char* get_wine_version()
   }
   if (fnWineGetVersion)
     return fnWineGetVersion();
-  else
-    return nullptr;
+  return nullptr;
 }
 
 } // namespace base

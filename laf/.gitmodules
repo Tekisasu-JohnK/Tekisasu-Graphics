@@ -1,3 +1,6 @@
+[submodule "clip"]
+	path = clip
+	url = https://github.com/aseprite/clip.git
 [submodule "third_party/googletest"]
 	path = third_party/googletest
 	url = https://github.com/aseprite/googletest.git

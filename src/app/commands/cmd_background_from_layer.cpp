@@ -55,15 +55,12 @@ void BackgroundFromLayerCommand::onExecute(Context* context)
   Doc* document(writer.document());
 
   {
-    Tx tx(writer.context(), friendlyName());
+    Tx tx(writer, friendlyName());
     tx(new cmd::BackgroundFromLayer(static_cast<LayerImage*>(writer.layer())));
     tx.commit();
   }
 
-#ifdef ENABLE_UI
-  if (context->isUIAvailable())
-    update_screen_for_document(document);
-#endif
+  update_screen_for_document(document);
 }
 
 Command* CommandFactory::createBackgroundFromLayerCommand()

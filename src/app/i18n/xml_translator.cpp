@@ -1,4 +1,5 @@
 // Aseprite
+// Copyright (C) 2024  Igara Studio S.A.
 // Copyright (C) 2017  David Capello
 //
 // This program is distributed under the terms of
@@ -11,11 +12,13 @@
 #include "app/i18n/xml_translator.h"
 
 #include "app/i18n/strings.h"
-#include "tinyxml.h"
+#include "tinyxml2.h"
 
 namespace app {
 
-std::string XmlTranslator::operator()(const TiXmlElement* elem,
+using namespace tinyxml2;
+
+std::string XmlTranslator::operator()(const XMLElement* elem,
                                       const char* attrName)
 {
   const char* value = elem->Attribute(attrName);
@@ -23,9 +26,9 @@ std::string XmlTranslator::operator()(const TiXmlElement* elem,
     return std::string();
   else if (value[0] == '@') {   // Translate string
     if (value[1] == '.')
-      return Strings::instance()->translate((m_stringIdPrefix + (value+1)).c_str());
+      return Strings::Translate((m_stringIdPrefix + (value+1)).c_str());
     else
-      return Strings::instance()->translate(value+1);
+      return Strings::Translate(value+1);
   }
   else if (value[0] == '!')     // Raw string
     return std::string(value+1);

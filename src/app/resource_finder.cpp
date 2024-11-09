@@ -104,7 +104,7 @@ void ResourceFinder::includeDataDir(const char* filename)
 
 #else
 
-  // $HOME/.config/aseprite/filename
+  // $HOME/.config/Tekisasugraphics/filename
   std::snprintf(buf, sizeof(buf), "Tekisasugraphics/data/%s", filename);
   includeHomeConfigDir(buf);
 
@@ -112,7 +112,7 @@ void ResourceFinder::includeDataDir(const char* filename)
   std::snprintf(buf, sizeof(buf), "data/%s", filename);
   includeBinDir(buf);
 
-  // $BINDIR/../share/aseprite/data/filename (installed in /usr/ or /usr/local/)
+  // $BINDIR/../share/Tekisasugraphics/data/filename (installed in /usr/ or /usr/local/)
   std::snprintf(buf, sizeof(buf), "../share/Tekisasugraphics/data/%s", filename);
   includeBinDir(buf);
 
@@ -181,7 +181,7 @@ void ResourceFinder::includeUserDir(const char* filename)
     includeBinDir(filename);
   }
   else {
-    // %AppData%/Aseprite/filename
+    // %AppData%/Tekisasugraphicsfilename
     includeHomeDir(filename);
   }
 
@@ -202,7 +202,7 @@ void ResourceFinder::includeUserDir(const char* filename)
 
   #else  // !__APPLE__
 
-    // $HOME/.config/aseprite/filename
+    // $HOME/.config/Tekisasugraphics/filename
     includeHomeConfigDir((std::string("Tekisasugraphics/") + filename).c_str());
 
   #endif

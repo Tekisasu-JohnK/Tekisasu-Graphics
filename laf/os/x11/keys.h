@@ -16,12 +16,12 @@ namespace os {
 
   extern bool g_spaceBarIsPressed;
 
-  KeyScancode x11_keysym_to_scancode(const KeySym keysym);
-  KeySym x11_keysym_to_scancode(const KeyScancode scancode);
-  bool x11_is_key_pressed(const KeyScancode scancode);
-  int x11_get_unicode_from_scancode(const KeyScancode scancode);
+  KeyScancode x11_keysym_to_scancode(KeySym keysym);
+  KeySym x11_keysym_to_scancode(KeyScancode scancode);
+  bool x11_is_key_pressed(KeyScancode scancode);
+  int x11_get_unicode_from_scancode(KeyScancode scancode);
 
-  KeyModifiers get_modifiers_from_x(const int xeventState);
+  KeyModifiers get_modifiers_from_x(int xeventState);
 
 } // namespace os
 

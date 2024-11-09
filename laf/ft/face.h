@@ -89,8 +89,7 @@ namespace ft {
         codepoint = FT_Get_Char_Index(m_face, codepoint);
         return (codepoint != 0);
       }
-      else
-        return false;
+      return false;
     }
 
     Cache& cache() { return m_cache; }

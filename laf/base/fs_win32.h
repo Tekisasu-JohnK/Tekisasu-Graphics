@@ -1,20 +1,21 @@
 // LAF Base Library
-// Copyright (c) 2020 Igara Studio S.A.
+// Copyright (c) 2020-2024 Igara Studio S.A.
 // Copyright (c) 2001-2018 David Capello
 //
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
-#include <stdexcept>
-#include <windows.h>
-#include <shlobj.h>
-#include <sys/stat.h>
-
+#include "base/fs.h"
 #include "base/paths.h"
 #include "base/string.h"
 #include "base/time.h"
 #include "base/version.h"
 #include "base/win/win32_exception.h"
+
+#include <stdexcept>
+#include <windows.h>
+#include <shlobj.h>
+#include <sys/stat.h>
 
 namespace base {
 
@@ -119,8 +120,12 @@ std::string get_current_path()
   TCHAR buffer[MAX_PATH+1];
   if (::GetCurrentDirectory(sizeof(buffer)/sizeof(TCHAR), buffer))
     return to_utf8(buffer);
-  else
-    return "";
+  return std::string();
+}
+
+void set_current_path(const std::string& path)
+{
+  ::SetCurrentDirectory(from_utf8(path).c_str());
 }
 
 std::string get_app_path()
@@ -128,8 +133,7 @@ std::string get_app_path()
   TCHAR buffer[MAX_PATH+1];
   if (::GetModuleFileName(NULL, buffer, sizeof(buffer)/sizeof(TCHAR)))
     return to_utf8(buffer);
-  else
-    return "";
+  return std::string();
 }
 
 std::string get_temp_path()
@@ -147,34 +151,69 @@ std::string get_user_docs_folder()
     buffer);
   if (hr == S_OK)
     return to_utf8(buffer);
-  else
-    return "";
+  return std::string();
 }
 
 std::string get_canonical_path(const std::string& path)
 {
+  std::string full = get_absolute_path(path);
+  DWORD attr = ::GetFileAttributes(from_utf8(full).c_str());
+  if (attr != INVALID_FILE_ATTRIBUTES)
+    return full;
+  return std::string();
+}
+
+std::string get_absolute_path(const std::string& path)
+{
+  std::string full;
+  if (path.size() > 2 && path[1] != ':')
+    full = base::join_path(base::get_current_path(), path);
+  else
+    full = path;
+
   TCHAR buffer[MAX_PATH+1];
   GetFullPathName(
-    from_utf8(path).c_str(),
+    from_utf8(full).c_str(),
     sizeof(buffer)/sizeof(TCHAR),
     buffer,
     nullptr);
   return to_utf8(buffer);
 }
 
-paths list_files(const std::string& path)
+paths list_files(const std::string& path,
+                 ItemType filter,
+                 const std::string& match)
 {
   WIN32_FIND_DATA fd;
   paths files;
-  HANDLE handle = FindFirstFile(base::from_utf8(base::join_path(path, "*")).c_str(), &fd);
-  if (handle) {
-    do {
-      std::string filename = base::to_utf8(fd.cFileName);
-      if (filename != "." && filename != "..")
-        files.push_back(filename);
-    } while (FindNextFile(handle, &fd));
-    FindClose(handle);
-  }
+  HANDLE handle = FindFirstFileEx(
+    base::from_utf8(base::join_path(path, match)).c_str(),
+    FindExInfoBasic,
+    &fd,
+    (filter == ItemType::Directories) ? FindExSearchLimitToDirectories :
+                                        FindExSearchNameMatch,
+    NULL,
+    0);
+
+  if (handle == INVALID_HANDLE_VALUE)
+    return files;
+
+  do {
+    if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+      if (filter == ItemType::Files)
+        continue;
+
+      if (lstrcmpW(fd.cFileName, L".") == 0 ||
+          lstrcmpW(fd.cFileName, L"..") == 0)
+        continue;
+    }
+    else if (filter == ItemType::Directories)
+      continue;
+
+    files.push_back(base::to_utf8(fd.cFileName));
+  } while (FindNextFile(handle, &fd));
+
+  FindClose(handle);
   return files;
 }
 

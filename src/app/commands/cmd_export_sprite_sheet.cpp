@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2022  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -11,6 +11,7 @@
 
 #include "app/app.h"
 #include "app/commands/cmd_export_sprite_sheet.h"
+#include "app/console.h"
 #include "app/context.h"
 #include "app/context_access.h"
 #include "app/doc.h"
@@ -31,6 +32,7 @@
 #include "app/ui/optional_alert.h"
 #include "app/ui/status_bar.h"
 #include "app/ui/timeline/timeline.h"
+#include "app/util/layer_utils.h"
 #include "base/convert_to.h"
 #include "base/fs.h"
 #include "base/string.h"
@@ -47,15 +49,13 @@
 #include "export_sprite_sheet.xml.h"
 
 #include <limits>
-#include <sstream>
+#include <string>
 
 namespace app {
 
 using namespace ui;
 
 namespace {
-
-#ifdef ENABLE_UI
 
 enum Section {
   kSectionLayout,
@@ -92,20 +92,19 @@ bool ask_overwrite(const bool askFilename, const std::string& filename,
       (askDataname &&
        !dataname.empty() &&
        base::is_file(dataname))) {
-    std::stringstream text;
+    std::string text;
 
     if (base::is_file(filename))
-      text << "<<" << base::get_file_name(filename).c_str();
+      text += "<<" + base::get_file_name(filename);
 
     if (base::is_file(dataname))
-      text << "<<" << base::get_file_name(dataname).c_str();
+      text += "<<" + base::get_file_name(dataname);
 
     const int ret =
       OptionalAlert::show(
         Preferences::instance().spriteSheet.showOverwriteFilesAlert,
         1, // Yes is the default option when the alert dialog is disabled
-        fmt::format(Strings::alerts_overwrite_files_on_export_sprite_sheet(),
-                    text.str()));
+        Strings::alerts_overwrite_files_on_export_sprite_sheet(text));
     if (ret != 1)
       return false;
   }
@@ -139,7 +138,27 @@ ConstraintType constraint_type_from_params(const ExportSpriteSheetParams& params
   return kConstraintType_None;
 }
 
-#endif // ENABLE_UI
+void destroy_doc(Context* ctx, Doc* doc)
+{
+  try {
+    DocDestroyer destroyer(ctx, doc, 500);
+    destroyer.destroyDocument();
+  }
+  catch (const LockedDocException& ex) {
+    Console::showException(ex);
+  }
+}
+
+void insert_layers_to_selected_layers(Layer* layer, SelectedLayers& selectedLayers)
+{
+  if (layer->isGroup()) {
+    auto children = static_cast<LayerGroup*>(layer)->layers();
+    for (auto child : children)
+      insert_layers_to_selected_layers(child, selectedLayers);
+  }
+  else
+    selectedLayers.insert(layer);
+}
 
 Doc* generate_sprite_sheet_from_params(
   DocExporter& exporter,
@@ -199,11 +218,14 @@ Doc* generate_sprite_sheet_from_params(
   if (layerName != kSelectedLayers) {
     // TODO add a getLayerByName
     int i = sprite->allLayersCount();
-    for (const Layer* layer : sprite->allLayers()) {
+    for (Layer* layer : sprite->allLayers()) {
       i--;
-      if (layer->name() == layerName && (layerIndex == -1 ||
-                                         layerIndex == i)) {
-        selLayers.insert(const_cast<Layer*>(layer));
+      if (get_layer_path(layer) == layerName &&
+          (layerIndex == -1 || layerIndex == i)) {
+        if (layer->isGroup())
+          insert_layers_to_selected_layers(layer, selLayers);
+        else
+          selLayers.insert(layer);
         break;
       }
     }
@@ -292,8 +314,6 @@ std::unique_ptr<Doc> generate_sprite_sheet(
   }
   return newDocument;
 }
-
-#if ENABLE_UI
 
 class ExportSpriteSheetWindow : public app::gen::ExportSpriteSheet {
 public:
@@ -500,8 +520,7 @@ public:
       auto ctx = UIContext::instance();
       ctx->setActiveDocument(m_site.document());
 
-      DocDestroyer destroyer(ctx, m_spriteSheet.release(), 100);
-      destroyer.destroyDocument();
+      destroy_doc(ctx, m_spriteSheet.release());
     }
   }
 
@@ -1014,8 +1033,7 @@ private:
         auto ctx = UIContext::instance();
         ctx->setActiveDocument(m_site.document());
 
-        DocDestroyer destroyer(ctx, m_spriteSheet.release(), 100);
-        destroyer.destroyDocument();
+        destroy_doc(ctx, m_spriteSheet.release());
         m_editor = nullptr;
       }
       return;
@@ -1066,8 +1084,7 @@ private:
       return;
 
     if (token.canceled()) {
-      DocDestroyer destroyer(&tmpCtx, newDocument, 100);
-      destroyer.destroyDocument();
+      destroy_doc(&tmpCtx, newDocument);
       return;
     }
 
@@ -1090,8 +1107,7 @@ private:
         // old one. IN this case the newDocument contains a back
         // buffer (ImageBufferPtr) that will be discarded.
         m_executionID != executionID) {
-      DocDestroyer destroyer(context, newDocument, 100);
-      destroyer.destroyDocument();
+      destroy_doc(context, newDocument);
       return;
     }
 
@@ -1137,8 +1153,7 @@ private:
 
       m_spriteSheet->notifyGeneralUpdate();
 
-      DocDestroyer destroyer(context, newDocument, 100);
-      destroyer.destroyDocument();
+      destroy_doc(context, newDocument);
     }
 
     waitGenTaskAndDelete();
@@ -1186,8 +1201,9 @@ public:
   ExportSpriteSheetJob(
     DocExporter& exporter,
     const Site& site,
-    const ExportSpriteSheetParams& params)
-    : Job(Strings::export_sprite_sheet_generating().c_str())
+    const ExportSpriteSheetParams& params,
+    const bool showProgress)
+    : Job(Strings::export_sprite_sheet_generating(), showProgress)
     , m_exporter(exporter)
     , m_site(site)
     , m_params(params) { }
@@ -1223,8 +1239,6 @@ private:
   std::unique_ptr<Doc> m_doc;
 };
 
-#endif // ENABLE_UI
-
 } // anonymous namespace
 
 ExportSpriteSheetCommand::ExportSpriteSheetCommand(const char* id)
@@ -1243,14 +1257,6 @@ void ExportSpriteSheetCommand::onExecute(Context* context)
   auto& params = this->params();
   DocExporter exporter;
 
-#ifdef ENABLE_UI
-  // TODO if we use this line when !ENABLE_UI,
-  // Preferences::~Preferences() crashes on Linux when it wants to
-  // save the document preferences. It looks like
-  // Preferences::onRemoveDocument() is not called for some documents
-  // and when the Preferences::m_docs collection is iterated to save
-  // all DocumentPreferences, it accesses an invalid Doc* pointer (an
-  // already removed/deleted document).
   Doc* document = site.document();
   DocumentPreferences& docPref(Preferences::instance().document(document));
 
@@ -1360,13 +1366,13 @@ void ExportSpriteSheetCommand::onExecute(Context* context)
                        true, params.dataFilename()))
       return;                   // Do not overwrite
   }
-#endif
 
   exporter.setDocImageBuffer(std::make_shared<doc::ImageBuffer>());
   std::unique_ptr<Doc> newDocument;
-#ifdef ENABLE_UI
   if (context->isUIAvailable()) {
-    ExportSpriteSheetJob job(exporter, site, params);
+    ExportSpriteSheetJob job(exporter, site, params,
+                             // Progress bar can be disabled with ui=false
+                             params.ui());
     job.startJob();
     job.waitJob();
 
@@ -1379,8 +1385,10 @@ void ExportSpriteSheetCommand::onExecute(Context* context)
       statusbar->showTip(1000, Strings::export_sprite_sheet_generated());
 
     // Save the exported sprite sheet as a recent file
-    if (newDocument->isAssociatedToFile())
+    if (newDocument->isAssociatedToFile() &&
+        should_add_file_to_recents(context, params)) {
       App::instance()->recentFiles()->addRecentFile(newDocument->filename());
+    }
 
     // Copy background and grid preferences
     DocumentPreferences& newDocPref(
@@ -1390,9 +1398,7 @@ void ExportSpriteSheetCommand::onExecute(Context* context)
     newDocPref.pixelGrid = docPref.pixelGrid;
     Preferences::instance().removeDocument(newDocument.get());
   }
-  else
-#endif
-  {
+  else {
     base::task_token token;
     newDocument = generate_sprite_sheet(
       exporter, context, site, params, true, token);
@@ -1407,8 +1413,7 @@ void ExportSpriteSheetCommand::onExecute(Context* context)
     newDocument.release();
   }
   else {
-    DocDestroyer destroyer(context, newDocument.release(), 100);
-    destroyer.destroyDocument();
+    destroy_doc(context, newDocument.release());
   }
 }
 

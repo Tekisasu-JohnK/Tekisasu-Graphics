@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -35,7 +35,7 @@
 #include "ui/ui.h"
 #include "ver/info.h"
 
-#include "tinyxml.h"
+#include "tinyxml2.h"
 
 #include <cctype>
 #include <cstring>
@@ -47,6 +47,7 @@
 
 namespace app {
 
+using namespace tinyxml2;
 using namespace ui;
 
 namespace {
@@ -343,8 +344,8 @@ void AppMenus::reload()
 {
   MENUS_TRACE("MENUS: AppMenus::reload()");
 
-  XmlDocumentRef doc(GuiXml::instance()->doc());
-  TiXmlHandle handle(doc.get());
+  XMLDocument* doc = GuiXml::instance()->doc();
+  XMLHandle handle(doc);
   const char* path = GuiXml::instance()->filename();
 
   ////////////////////////////////////////
@@ -381,6 +382,7 @@ void AppMenus::reload()
   m_slicePopupMenu.reset(loadMenuById(handle, "slice_popup_menu"));
   m_palettePopupMenu.reset(loadMenuById(handle, "palette_popup_menu"));
   m_inkPopupMenu.reset(loadMenuById(handle, "ink_popup_menu"));
+  m_newFramePopupMenu.reset(loadMenuById(handle, "new_frame_popup_menu"));
 
   // Add one menu item to run each script from the user scripts/ folder
   {
@@ -389,9 +391,8 @@ void AppMenus::reload()
 #ifdef ENABLE_SCRIPTING
     // Load scripts
     ResourceFinder rf;
-    rf.includeUserDir("scripts/.");
+    rf.includeUserDir("scripts");
     std::string scriptsDir = rf.getFirstOrCreateDefault();
-    scriptsDir = base::get_file_path(scriptsDir);
     if (base::is_directory(scriptsDir)) {
       loadScriptsSubmenu(scriptsMenu->getSubmenu(), scriptsDir, true);
     }
@@ -454,9 +455,9 @@ void AppMenus::reload()
 
   LOG("MENU: Loading commands keyboard shortcuts from %s\n", path);
 
-  TiXmlElement* xmlKey = handle
-    .FirstChild("gui")
-    .FirstChild("keyboard").ToElement();
+  XMLElement* xmlKey = handle
+    .FirstChildElement("gui")
+    .FirstChildElement("keyboard").ToElement();
 
   // From a fresh start, load the default keys
   KeyboardShortcuts::instance()->clear();
@@ -716,15 +717,15 @@ void AppMenus::removeMenuItemFromGroup(Widget* menuItem)
     });
 }
 
-Menu* AppMenus::loadMenuById(TiXmlHandle& handle, const char* id)
+Menu* AppMenus::loadMenuById(XMLHandle& handle, const char* id)
 {
   ASSERT(id != NULL);
 
   // <gui><menus><menu>
-  TiXmlElement* xmlMenu = handle
-    .FirstChild("gui")
-    .FirstChild("menus")
-    .FirstChild("menu").ToElement();
+  XMLElement* xmlMenu = handle
+    .FirstChildElement("gui")
+    .FirstChildElement("menus")
+    .FirstChildElement("menu").ToElement();
   while (xmlMenu) {
     const char* menuId = xmlMenu->Attribute("id");
 
@@ -739,12 +740,12 @@ Menu* AppMenus::loadMenuById(TiXmlHandle& handle, const char* id)
   throw base::Exception("Error loading menu '%s'\nReinstall the application.", id);
 }
 
-Menu* AppMenus::convertXmlelemToMenu(TiXmlElement* elem)
+Menu* AppMenus::convertXmlelemToMenu(XMLElement* elem)
 {
   Menu* menu = new Menu();
   menu->setText(m_xmlTranslator(elem, "text"));
 
-  TiXmlElement* child = elem->FirstChildElement();
+  XMLElement* child = elem->FirstChildElement();
   while (child) {
     Widget* menuitem = convertXmlelemToMenuitem(child, menu);
     if (menuitem)
@@ -759,7 +760,7 @@ Menu* AppMenus::convertXmlelemToMenu(TiXmlElement* elem)
   return menu;
 }
 
-Widget* AppMenus::convertXmlelemToMenuitem(TiXmlElement* elem, Menu* menu)
+Widget* AppMenus::convertXmlelemToMenuitem(XMLElement* elem, Menu* menu)
 {
   const char* id = elem->Attribute("id");
   const char* group = elem->Attribute("group");
@@ -791,7 +792,7 @@ Widget* AppMenus::convertXmlelemToMenuitem(TiXmlElement* elem, Menu* menu)
   // load params
   Params params;
   if (command) {
-    TiXmlElement* xmlParam = elem->FirstChildElement("param");
+    XMLElement* xmlParam = elem->FirstChildElement("param");
     while (xmlParam) {
       const char* param_name = xmlParam->Attribute("name");
       const char* param_value = xmlParam->Attribute("value");
@@ -919,6 +920,7 @@ void AppMenus::updateMenusList()
   m_menus.push_back(m_slicePopupMenu.get());
   m_menus.push_back(m_palettePopupMenu.get());
   m_menus.push_back(m_inkPopupMenu.get());
+  m_menus.push_back(m_newFramePopupMenu.get());
 }
 
 void AppMenus::createNativeMenus()

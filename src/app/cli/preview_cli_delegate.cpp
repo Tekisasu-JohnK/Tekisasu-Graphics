@@ -67,6 +67,9 @@ void PreviewCliDelegate::afterOpenFile(const CliOpenFile& cof)
   if (cof.listLayers)
     std::cout << "  - List layers\n";
 
+  if (cof.listLayerHierarchy)
+    std::cout << "  - List layer hierarchy\n";
+
   if (cof.listTags)
     std::cout << "  - List tags\n";
 
@@ -121,12 +124,16 @@ void PreviewCliDelegate::saveFile(Context* ctx, const CliOpenFile& cof)
     std::cout << "  - Tag: '" << cof.tag << "'\n";
   }
 
+  if (cof.playSubtags) {
+    std::cout << "  - Play subtags & repeats\n";
+  }
+
   if (cof.hasSlice()) {
     std::cout << "  - Slice: '" << cof.slice << "'\n";
   }
 
   if (cof.hasFrameRange()) {
-    const auto& selFrames = cof.roi().selectedFrames();
+    const auto& selFrames = cof.roi().framesSequence();
     if (!selFrames.empty()) {
       if (selFrames.ranges() == 1)
         std::cout << "  - Frame range from "

@@ -30,7 +30,7 @@ struct same_name {
 struct same_mnemonic {
   char mnemonic;
   same_mnemonic(char mnemonic) : mnemonic(mnemonic) { }
-  bool operator()(const ProgramOptions::Option* a) {
+  bool operator()(const ProgramOptions::Option* a) const {
     return a->mnemonic() == mnemonic;
   }
 };
@@ -62,7 +62,7 @@ void ProgramOptions::parse(int argc, const char* argv[])
     size_t n = 0;
     for (; arg[n] == '-'; ++n)
       ;
-    size_t len = arg.size()-n;
+    const size_t len = arg.size()-n;
 
     // Ignore process serial number argument (-psn...) when the app is run from command line
 #if LAF_MACOS
@@ -74,7 +74,7 @@ void ProgramOptions::parse(int argc, const char* argv[])
       // First we try to find the -optionName=optionValue pair
       std::string optionName;
       std::string optionValue;
-      size_t equalSignPos = arg.find('=', n);
+      const size_t equalSignPos = arg.find('=', n);
 
       if (equalSignPos != std::string::npos) {
         optionName = arg.substr(n, equalSignPos-n);
@@ -84,7 +84,7 @@ void ProgramOptions::parse(int argc, const char* argv[])
         optionName = arg.substr(n);
       }
 
-      OptionList::iterator it =
+      const OptionList::iterator it =
         find_if(m_options.begin(), m_options.end(), same_name(optionName));
 
       // If we've found the -optionName or --optionName, we use it
@@ -113,7 +113,7 @@ void ProgramOptions::parse(int argc, const char* argv[])
         char usedBy = 0;
 
         for (size_t j=1; j<arg.size(); ++j) {
-          OptionList::iterator it =
+          const OptionList::iterator it =
             find_if(m_options.begin(), m_options.end(), same_mnemonic(arg[j]));
 
           if (it == m_options.end()) {
@@ -196,7 +196,7 @@ std::ostream& operator<<(std::ostream& os, const base::ProgramOptions& po)
   for (base::ProgramOptions::OptionList::const_iterator
          it=po.options().begin(), end=po.options().end(); it != end; ++it) {
     const base::ProgramOptions::Option* option = *it;
-    std::size_t optionWidth =
+    const std::size_t optionWidth =
       6+std::max(option->name().size(), option->alias().size())+1+
       (option->doesRequireValue() ? option->getValueName().size()+1: 0);
 
@@ -231,7 +231,8 @@ std::ostream& operator<<(std::ostream& os, const base::ProgramOptions& po)
     }
 
     if (!option->description().empty()) {
-      bool multilines = (option->description().find('\n') != std::string::npos);
+      const bool multilines =
+        (option->description().find('\n') != std::string::npos);
 
       if (!multilines) {
         os << std::setw(maxOptionWidth - optionWidth + 1) << ' ' << option->description()

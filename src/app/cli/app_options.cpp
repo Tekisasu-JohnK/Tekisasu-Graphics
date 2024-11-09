@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2018-2022  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2017  David Capello
 //
 // This program is distributed under the terms of
@@ -54,6 +54,7 @@ AppOptions::AppOptions(int argc, const char* argv[])
   , m_allLayers(m_po.add("all-layers").description("Make all layers visible\nBy default hidden layers will be ignored"))
   , m_ignoreLayer(m_po.add("ignore-layer").requiresValue("<name>").description("Exclude the given layer in the sheet\nor save as operation"))
   , m_tag(m_po.add("tag").alias("frame-tag").requiresValue("<name>").description("Include tagged frames in the sheet"))
+  , m_playSubtags(m_po.add("play-subtags").description("Play subtags and repeats when saving the frames of an animated sprite"))
   , m_frameRange(m_po.add("frame-range").requiresValue("from,to").description("Only export frames in the [from,to] range"))
   , m_ignoreEmpty(m_po.add("ignore-empty").description("Do not export empty frames/cels"))
   , m_mergeDuplicates(m_po.add("merge-duplicates").description("Merge all duplicate frames into one in the sprite sheet"))
@@ -73,12 +74,16 @@ AppOptions::AppOptions(int argc, const char* argv[])
   , m_scriptParam(m_po.add("script-param").requiresValue("name=value").description("Parameter for a script executed from the\nCLI that you can access with app.params"))
 #endif
   , m_listLayers(m_po.add("list-layers").description("List layers of the next given sprite\nor include layers in JSON data"))
+  , m_listLayerHierarchy(m_po.add("list-layer-hierarchy").description("List layers with groups of the next given sprite\nor include layers hierarchy in JSON data"))
   , m_listTags(m_po.add("list-tags").description("List tags of the next given sprite\nor include frame tags in JSON data"))
   , m_listSlices(m_po.add("list-slices").description("List slices of the next given sprite\nor include slices in JSON data"))
   , m_oneFrame(m_po.add("oneframe").description("Load just the first frame"))
   , m_exportTileset(m_po.add("export-tileset").description("Export only tilesets from visible tilemap layers"))
   , m_verbose(m_po.add("verbose").mnemonic('v').description("Explain what is being done"))
   , m_debug(m_po.add("debug").description("Extreme verbose mode and\ncopy log to desktop"))
+#ifdef ENABLE_STEAM
+  , m_noInApp(m_po.add("noinapp").description("Disable \"in game\" visibility on Steam\nDoesn't count playtime"))
+#endif
 #ifdef _WIN32
   , m_disableWintab(m_po.add("disable-wintab").description("Don't load wintab32.dll library"))
 #endif
@@ -120,6 +125,13 @@ bool AppOptions::hasExporterParams() const
     m_po.enabled(m_data) ||
     m_po.enabled(m_sheet);
 }
+
+#ifdef ENABLE_STEAM
+bool AppOptions::noInApp() const
+{
+  return m_po.enabled(m_noInApp);
+}
+#endif
 
 #ifdef _WIN32
 bool AppOptions::disableWintab() const

@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2022  Igara Studio S.A.
+// Copyright (C) 2022-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -12,9 +12,11 @@
 #include "app/modules/palettes.h"
 
 #include "app/app.h"
+#include "app/context.h"
 #include "app/extensions.h"
 #include "app/file/palette_file.h"
 #include "app/resource_finder.h"
+#include "app/site.h"
 #include "base/fs.h"
 #include "doc/image.h"
 #include "doc/palette.h"
@@ -120,9 +122,6 @@ void load_default_palette()
   set_current_palette(nullptr, true);
 }
 
-// TODO This palette isn't synced with the current sprite palette when
-//      ENABLE_UI=0 and we are running scripts, we should remove this
-//      function and use the active Site palette.
 Palette* get_current_palette()
 {
   return ase_current_palette;

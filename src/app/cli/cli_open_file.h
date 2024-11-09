@@ -37,6 +37,7 @@ namespace app {
     bool splitGrid = false;
     bool allLayers = false;
     bool listLayers = false;
+    bool listLayerHierarchy = false;
     bool listTags = false;
     bool listSlices = false;
     bool ignoreEmpty = false;
@@ -44,6 +45,7 @@ namespace app {
     bool trimByGrid = false;
     bool oneFrame = false;
     bool exportTileset = false;
+    bool playSubtags = false;
     gfx::Rect crop;
 
     bool hasTag() const {

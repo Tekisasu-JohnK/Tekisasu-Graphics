@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (c) 2018-2022  Igara Studio S.A.
+// Copyright (c) 2018-2024  Igara Studio S.A.
 // Copyright (c) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -15,8 +15,11 @@
 #include "os/common/generic_surface.h"
 #include "os/common/sprite_sheet_font.h"
 #include "os/skia/skia_color_space.h"
+#include "os/surface_format.h"
 
 #include "include/core/SkBitmap.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkColorType.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkSurface.h"
 
@@ -119,19 +122,22 @@ private:
     const Surface* src,
     const gfx::Clip& clip,
     const SkSamplingOptions& sampling,
-    const SkPaint& paint);
+    const SkPaint& paint,
+    SkCanvas::SrcRectConstraint constraint);
   void skDrawSurface(
     const Surface* src,
     const gfx::Rect& srcRect,
     const gfx::Rect& dstRect,
     const SkSamplingOptions& sampling,
-    const SkPaint& paint);
+    const SkPaint& paint,
+    SkCanvas::SrcRectConstraint constraint);
   void skDrawSurface(
     const SkiaSurface* src,
     const SkRect& srcRect,
     const SkRect& dstRect,
     const SkSamplingOptions& sampling,
-    const SkPaint& paint);
+    const SkPaint& paint,
+    SkCanvas::SrcRectConstraint constraint);
 
 #if SK_SUPPORT_GPU
   const SkImage* getOrCreateTextureImage() const;
@@ -141,12 +147,13 @@ private:
   sk_sp<SkColorSpace> skColorSpace() const {
     if (m_colorSpace)
       return static_cast<SkiaColorSpace*>(m_colorSpace.get())->skColorSpace();
-    else
-      return nullptr;
+    return nullptr;
   }
 
   SkBitmap m_bitmap;
 #if SK_SUPPORT_GPU
+  // Cached m_bitmap generation in the GPU texture.
+  mutable uint32_t m_cachedGen = 0;
   mutable sk_sp<SkImage> m_image;
 #endif
   sk_sp<SkSurface> m_surface;

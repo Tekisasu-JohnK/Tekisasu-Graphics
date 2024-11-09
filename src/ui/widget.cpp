@@ -1,5 +1,5 @@
 // Aseprite UI Library
-// Copyright (C) 2018-2023  Igara Studio S.A.
+// Copyright (C) 2018-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -27,7 +27,6 @@
 #include "ui/load_layout_event.h"
 #include "ui/manager.h"
 #include "ui/message.h"
-#include "ui/move_region.h"
 #include "ui/paint_event.h"
 #include "ui/resize_event.h"
 #include "ui/save_layout_event.h"
@@ -199,7 +198,9 @@ void Widget::setTheme(Theme* theme)
 void Widget::setStyle(Style* style)
 {
   assert_ui_thread();
-
+  ASSERT(style);
+  if (!style)
+    style = Theme::getDefaultStyle();
   m_style = style;
   m_border = m_theme->calcBorder(this, style);
   m_bgColor = m_theme->calcBgColor(this, style);

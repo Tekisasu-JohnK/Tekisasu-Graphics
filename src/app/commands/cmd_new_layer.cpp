@@ -1,5 +1,5 @@
 // Aseprite
-// Copyright (C) 2019-2023  Igara Studio S.A.
+// Copyright (C) 2019-2024  Igara Studio S.A.
 // Copyright (C) 2001-2018  David Capello
 //
 // This program is distributed under the terms of
@@ -128,11 +128,9 @@ bool NewLayerCommand::onEnabled(Context* ctx)
                        ContextFlags::HasActiveSprite))
     return false;
 
-#ifdef ENABLE_UI
   if (params().fromClipboard() &&
       ctx->clipboard()->format() != ClipboardFormat::Image)
     return false;
-#endif
 
   if ((params().viaCut() ||
        params().viaCopy()) &&
@@ -160,12 +158,10 @@ void NewLayerCommand::onExecute(Context* context)
   Sprite* sprite(reader.sprite());
   std::string name;
 
-#if ENABLE_UI
   // Show the tooltip feedback only if we are not inside a transaction
   // (e.g. we can be already in a transaction if we are running in a
   // Lua script app.transaction()).
   const bool showTooltip = (document->transaction() == nullptr);
-#endif
 
   Doc* pasteDoc = nullptr;
   Scoped destroyPasteDoc(
@@ -220,7 +216,6 @@ void NewLayerCommand::onExecute(Context* context)
   tilesetInfo.baseIndex = 1;
   tilesetInfo.matchFlags = 0;   // TODO default flags?
 
-#ifdef ENABLE_UI
   // If params specify to ask the user about the name...
   if (params().ask() && context->isUIAvailable()) {
     auto& pref = Preferences::instance();
@@ -254,11 +249,9 @@ void NewLayerCommand::onExecute(Context* context)
       tilesetSelector->saveAdvancedPreferences();
     }
   }
-#endif
 
-  ContextWriter writer(reader);
   LayerGroup* parent = sprite->root();
-  Layer* activeLayer = writer.layer();
+  Layer* activeLayer = reader.layer();
   SelectedLayers selLayers = site.selectedLayers();
   if (activeLayer) {
     if (activeLayer->isGroup() &&
@@ -274,9 +267,8 @@ void NewLayerCommand::onExecute(Context* context)
 
   Layer* layer = nullptr;
   {
-    Tx tx(
-      writer.context(),
-      fmt::format(Strings::commands_NewLayer(), layerPrefix()));
+    ContextWriter writer(reader);
+    Tx tx(writer, Strings::commands_NewLayer(layerPrefix()));
     DocApi api = document->getApi(tx);
     bool afterBackground = false;
 
@@ -425,7 +417,6 @@ void NewLayerCommand::onExecute(Context* context)
         }
       }
     }
-#ifdef ENABLE_UI
     // Paste new layer from clipboard
     else if (params().fromClipboard() && layer->isImage()) {
       context->clipboard()->paste(context, false);
@@ -437,7 +428,6 @@ void NewLayerCommand::onExecute(Context* context)
         }
       }
     }
-#endif // ENABLE_UI
     // Paste new layer from selection
     else if ((params().viaCut() || params().viaCopy())
              && document->isMaskVisible()) {
@@ -496,7 +486,6 @@ void NewLayerCommand::onExecute(Context* context)
     tx.commit();
   }
 
-#ifdef ENABLE_UI
   if (context->isUIAvailable() && showTooltip) {
     update_screen_for_document(document);
 
@@ -507,24 +496,23 @@ void NewLayerCommand::onExecute(Context* context)
 
     App::instance()->mainWindow()->popTimeline();
   }
-#endif
 }
 
 std::string NewLayerCommand::onGetFriendlyName() const
 {
   std::string text;
   if (m_place == Place::BeforeActiveLayer)
-    text = fmt::format(Strings::commands_NewLayer_BeforeActiveLayer(), layerPrefix());
+    text = Strings::commands_NewLayer_BeforeActiveLayer(layerPrefix());
   else
-    text = fmt::format(Strings::commands_NewLayer(), layerPrefix());
+    text = Strings::commands_NewLayer(layerPrefix());
   if (params().fromClipboard())
-    text = fmt::format(Strings::commands_NewLayer_FromClipboard(), text);
+    text = Strings::commands_NewLayer_FromClipboard(text);
   if (params().viaCopy())
-    text = fmt::format(Strings::commands_NewLayer_ViaCopy(), text);
+    text = Strings::commands_NewLayer_ViaCopy(text);
   if (params().viaCut())
-    text = fmt::format(Strings::commands_NewLayer_ViaCut(), text);
+    text = Strings::commands_NewLayer_ViaCut(text);
   if (params().ask())
-    text = fmt::format(Strings::commands_NewLayer_WithDialog(), text);
+    text = Strings::commands_NewLayer_WithDialog(text);
   return text;
 }
 

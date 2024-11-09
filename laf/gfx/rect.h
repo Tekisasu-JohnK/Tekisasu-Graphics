@@ -277,13 +277,12 @@ public:
   RectT createUnion(const RectT& rc) const {
     if (isEmpty())
       return rc;
-    else if (rc.isEmpty())
+    if (rc.isEmpty())
       return *this;
-    else
-      return RectT(PointT<T>(x < rc.x ? x: rc.x,
-                             y < rc.y ? y: rc.y),
-                   PointT<T>(x+w > rc.x+rc.w ? x+w: rc.x+rc.w,
-                             y+h > rc.y+rc.h ? y+h: rc.y+rc.h));
+    return RectT(PointT<T>(x < rc.x ? x: rc.x,
+                           y < rc.y ? y: rc.y),
+                 PointT<T>(x+w > rc.x+rc.w ? x+w: rc.x+rc.w,
+                           y+h > rc.y+rc.h ? y+h: rc.y+rc.h));
   }
 
   // Returns the intersection rectangle between this and rc rectangles.
@@ -293,8 +292,7 @@ public:
                              y > rc.y ? y: rc.y),
                    PointT<T>(x+w < rc.x+rc.w ? x+w: rc.x+rc.w,
                              y+h < rc.y+rc.h ? y+h: rc.y+rc.h));
-    else
-      return RectT();
+    return RectT();
   }
 
   const RectT& operator+=(const BorderT<T>& br) {
@@ -408,6 +406,81 @@ public:
       x = bounds.x;
       w = bounds.w;
     }
+    return *this;
+  }
+
+  // Slices vertically this Rect along the provided px coordinate.
+  // Sets the left and right rects in the references of the same name.
+  const RectT& sliceV(T px, RectT& left, RectT& right) const {
+    if (px < x) {
+      left = RectT();
+      right = *this;
+    }
+    else if (px > x2()) {
+      left = *this;
+      right = RectT();
+    }
+    else {
+      left = RectT(x, y, px - x, h);
+      right = RectT(px, y, x2() - px, h);
+    }
+
+    return *this;
+  }
+
+  // Slices horizontally this Rect along the provided py coordinate.
+  // Sets the top and bottom rects in the references of the same name.
+  const RectT& sliceH(T py, RectT& top, RectT& bottom) const {
+    if (py < y) {
+      top = RectT();
+      bottom = *this;
+    }
+    else if (py > y2()) {
+      top = *this;
+      bottom = RectT();
+    }
+    else {
+      top = RectT(x, y, w, py - y);
+      bottom = RectT(x, py, w, y2() - py);
+    }
+
+    return *this;
+  }
+
+  // Slices this rect in nine pieces and returns all the rects in the slices
+  // output array. The center rect defines the relative coordinates where the
+  // cuts are going to be made:
+  //
+  //     this (x, y, w=23, h=7)       slices output
+  //     +---------------------+      +--------+-----+------+
+  //     | center (9,2,w=7,h=3)|      |   [0]  | [1] |  [2] |
+  //     |        +-----+      |      +--------+-----+------+
+  //     |        |     |      |  =>  |   [3]  | [4] |  [5] |
+  //     |        +-----+      |      +--------+-----+------+
+  //     |                     |      |   [6]  | [7] |  [8] |
+  //     +---------------------+      +--------+-----+------+
+  //
+  const RectT& nineSlice(const RectT& center, RectT slices[9]) const {
+    gfx::RectT<T> left, middle, right;
+
+    {
+      gfx::RectT<T> remaining;
+      this->sliceV(x + center.x, left, remaining);
+      remaining.sliceV(x + center.x2(), middle, right);
+    }
+
+    left  .sliceH(y + center.y   , slices[0], left);
+    middle.sliceH(y + center.y   , slices[1], middle);
+    right .sliceH(y + center.y   , slices[2], right);
+
+    left  .sliceH(y + center.y2(), slices[3], left);
+    middle.sliceH(y + center.y2(), slices[4], middle);
+    right .sliceH(y + center.y2(), slices[5], right);
+
+    slices[6] = left;
+    slices[7] = middle;
+    slices[8] = right;
+
     return *this;
   }
 

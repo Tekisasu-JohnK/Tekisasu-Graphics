@@ -1,5 +1,5 @@
 // LAF OS Library
-// Copyright (c) 2018-2022  Igara Studio S.A.
+// Copyright (c) 2018-2024  Igara Studio S.A.
 // Copyright (c) 2012-2018  David Capello
 //
 // This file is released under the terms of the MIT license.
@@ -12,6 +12,7 @@
 #include "gfx/point.h"
 #include "os/color_space.h"
 #include "os/cursor.h"
+#include "os/dnd.h"
 #include "os/native_cursor.h"
 #include "os/ref.h"
 #include "os/screen.h"
@@ -118,7 +119,8 @@ namespace os {
     void invalidate();
 
     // GPU-related functions
-    virtual bool isGpuAccelerated() const = 0;
+    virtual bool gpuAcceleration() const = 0;
+    virtual void setGpuAcceleration(bool state) { }
     virtual void swapBuffers() = 0;
 
     // Focus the window to receive the keyboard input by default.
@@ -162,7 +164,7 @@ namespace os {
     // Performs the user action to move or resize the window. It's
     // useful in case that you want to design your own regions to
     // resize or move/drag the window.
-    virtual void performWindowAction(const WindowAction action,
+    virtual void performWindowAction(WindowAction action,
                                      const Event* event = nullptr) = 0;
 
     // Set/get the specific information to restore the exact same
@@ -194,6 +196,9 @@ namespace os {
     // devices like stylus can be used to move and resize the window.
     std::function<Hit(os::Window*, const gfx::Point& pos)> handleHitTest = nullptr;
 
+    void setDragTarget(DragTarget* delegate);
+    bool hasDragTarget() { return m_dragTarget != nullptr; }
+
     template<typename T>
     T* userData() { return reinterpret_cast<T*>(m_userData); }
 
@@ -204,11 +209,23 @@ namespace os {
     virtual GrDirectContext* sk_grCtx() const = 0;
 #endif
 
+    void notifyDragEnter(os::DragEvent& ev);
+    void notifyDrag(os::DragEvent& ev);
+    void notifyDragLeave(os::DragEvent& ev);
+    void notifyDrop(os::DragEvent& ev);
+
   protected:
     virtual void onQueueEvent(Event& ev);
+    virtual void onDragEnter(os::DragEvent& ev);
+    virtual void onDrag(os::DragEvent& ev);
+    virtual void onDragLeave(os::DragEvent& ev);
+    virtual void onDrop(os::DragEvent& ev);
+
+    virtual void onSetDragTarget() {}
 
   private:
     void* m_userData;
+    DragTarget* m_dragTarget = nullptr;
   };
 
 } // namespace os
