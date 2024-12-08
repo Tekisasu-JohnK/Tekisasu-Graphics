@@ -3,7 +3,7 @@
 # Copyright (C) 2020  Igara Studio S.A.
 
 # Version of Tekisasu Graphics
-set(VERSION "1.3.9.1-2411.2")
+set(VERSION "1.3.9.1-2412.7")
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/generated_version.h.in"
