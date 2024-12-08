@@ -584,7 +584,7 @@
       <option id="layer_index" type="int" default ="-1" />
       <option id="frame_tag" type="std::string" />
       <option id="split_layers" type="bool" default="false" />
-      <option id="split_tags" type="bool" default="false" />
+      <option id="split_tags" type="bool" default="true" /> <!-- Tekisasu : set split tags by default -->
       <option id="split_grid" type="bool" default="false" />
       <option id="list_layers" type="bool" default="true" />
       <option id="list_frame_tags" type="bool" default="true" />
