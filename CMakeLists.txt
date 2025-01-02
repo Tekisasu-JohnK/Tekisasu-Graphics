@@ -19,12 +19,12 @@ endif()
 set(CMAKE_USER_MAKE_RULES_OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/laf/cmake/c_flag_overrides.cmake)
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX ${CMAKE_CURRENT_SOURCE_DIR}/laf/cmake/cxx_flag_overrides.cmake)
 
-# Aseprite project
-project(aseprite C CXX)
+# Tekisasu-Graphics project
+project(Tekisasu-Graphics C CXX)
 
 # Check repository status
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/laf/CMakeLists.txt)
-  message(FATAL_ERROR "Your Aseprite repository is incomplete, initialize submodules using:\n  git submodule update --init --recursive")
+  message(FATAL_ERROR "Your Tekisasu Graphics repository is incomplete, initialize submodules using:\n  git submodule update --init --recursive")
 endif()
 
 # This is required for KDE/Qt destop integration, which sets
@@ -47,7 +47,7 @@ option(USE_SHARED_TINYXML "Use your installed copy of tinyxml" off)
 option(USE_SHARED_PIXMAN  "Use your installed copy of pixman" off)
 option(USE_SHARED_FREETYPE "Use shared FreeType library" off)
 option(USE_SHARED_HARFBUZZ "Use shared HarfBuzz library" off)
-option(ENABLE_ASEPRITE_EXE "Compile main Aseprite executable" on)
+option(ENABLE_ASEPRITE_EXE "Compile main Tekisasu Graphics executable" on)
 option(ENABLE_MEMLEAK      "Enable memory-leaks detector (only for developers)" off)
 option(ENABLE_NEWS         "Enable the news in Home tab" on)
 option(ENABLE_UPDATER      "Enable automatic check for updates" on)
@@ -103,7 +103,7 @@ if(NOT LAF_BACKEND)
 endif()
 
 if(ENABLE_DRM AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/drm/CMakeLists.txt)
-  message(FATAL_ERROR "Your Aseprite repository is incomplete, clone the drm repository")
+  message(FATAL_ERROR "Your Tekisasu Graphics repository is incomplete, clone the drm repository")
 endif()
 
 ######################################################################
