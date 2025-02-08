@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<theme name="Default Dark" screenscaling="1" uiscaling="2">
+<theme name="Default Dark" screenscaling="2" uiscaling="1">
     <authors>
         <author name="Tekisasu" url="https://dev.tekisasu.com/"/>
         <author name="David Capello" url="https://davidcapello.com/"/>
@@ -7,8 +7,8 @@
         <author name="Nicolas Desilets" url="https://twitter.com/MapleGecko"/>
     </authors>
     <fonts>
-        <font id="default" name="Inter_18pt-Regular" type="truetype" file="Inter_18pt-Regular.ttf" antialias="true" size="7"/>
-        <font id="mini" name="Inter_18pt-Regular" type="truetype" file="Inter_18pt-Regular.ttf" antialias="true" size="7"/>
+        <font id="default" font="Aseprite"/>
+        <font id="mini" font="Aseprite Mini" mnemonics="off"/>
     </fonts>
     <dimensions>
         <dim id="scrollbar_size" value="12"/>
@@ -35,9 +35,9 @@
     <colors>
         <color id="text" value="#c0c0c0"/>
         <color id="text_hot" value="#41444a" new="true"/>
-        <color id="detail_text" value="#303037" new="true"/>
+        <color id="detail_text" value="#292c33" new="true"/>
         <color id="disabled" value="#202125"/>
-        <color id="face" value="#303037"/>
+        <color id="face" value="#292c33"/>
         <color id="hot_face" value="#faf0e6"/>
         <color id="selected" value="#5f63e1"/>
         <color id="selected_text" value="#41444a"/>
@@ -58,12 +58,12 @@
         <color id="radio_focus_face" value="#41444a"/>
         <color id="menuitem_normal_text" value="#c0c0c0"/>
         <color id="menuitem_disabled_text" value="#202125"/>
-        <color id="menuitem_normal_face" value="#303037"/>
-        <color id="menuitem_hot_text" value="#303037"/>
+        <color id="menuitem_normal_face" value="#292c33"/>
+        <color id="menuitem_hot_text" value="#292c33"/>
         <color id="menuitem_hot_face" value="#c0c0c0"/>
         <color id="menuitem_highlight_text" value="#ffffff"/>
         <color id="menuitem_highlight_face" value="#5a6af0"/>
-        <color id="window_face" value="#303037"/>
+        <color id="window_face" value="#292c33"/>
         <color id="window_titlebar_text" value="#c0c0c0"/>
         <color id="window_titlebar_face" value="#41444a"/>
         <color id="editor_face" value="#202125"/>
@@ -109,7 +109,7 @@
         <color id="timeline_band_bg" value="#76858e"/>
         <color id="status_bar_text" value="#636d79"/>
         <color id="status_bar_face" value="#292c33"/>
-        <color id="flag_normal" value="#303037"/>
+        <color id="flag_normal" value="#292c33"/>
         <color id="flag_active" value="#c75a68"/>
         <color id="flag_clicked" value="#41444a"/>
         <color id="select_box_ruler" value="#0000ff"/>
